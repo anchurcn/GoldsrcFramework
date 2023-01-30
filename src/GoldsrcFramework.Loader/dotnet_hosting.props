@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Label="PropertySheets" />
+  <PropertyGroup Label="UserMacros">
+    <AppHostDir>C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Host.win-x86\6.0.13\runtimes\win-x86\native</AppHostDir>
+  </PropertyGroup>
+  <PropertyGroup />
+  <ItemDefinitionGroup />
+  <ItemGroup>
+    <BuildMacro Include="AppHostDir">
+      <Value>$(AppHostDir)</Value>
+    </BuildMacro>
+  </ItemGroup>
+</Project>
