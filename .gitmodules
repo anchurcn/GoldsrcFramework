@@ -1,0 +1,3 @@
+[submodule "external/hlsdk"]
+	path = external/hlsdk
+	url = https://github.com/anchurcn/halflife-updated.git
