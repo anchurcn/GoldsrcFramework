@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
@@ -6,8 +6,16 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <HalfLifeInstallDir>$(registry:HKEY_CURRENT_USER\Software\Valve\Steam@ModInstallPath)</HalfLifeInstallDir>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\GoldsrcFramework\GoldsrcFramework.csproj" />
   </ItemGroup>
+
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="xcopy &quot;..\GoldsrcFramework\bin\$(Configuration)\$(TargetFramework)\*.*&quot; &quot;$(OutDir)&quot; /E /H /C /I /Y&#xD;&#xA;xcopy &quot;$(OutDir)*.*&quot; &quot;$(HalfLifeInstallDir)\gsfdemo\cl_dlls&quot; /E /H /C /I /Y" />
+  </Target>
 
 </Project>
