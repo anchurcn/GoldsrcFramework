@@ -4,6 +4,12 @@
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <OutputType>Exe</OutputType>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CppAst" Version="0.9.4" />
+    <PackageReference Include="libclang" Version="15.0.0" />
+  </ItemGroup>
 
 </Project>
