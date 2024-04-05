@@ -2,6 +2,8 @@
 #include<assert.h>
 #include<Windows.h>
 
+// The better project name is GoldsrcFramework.Loading.Test
+// Because this project is not just test the loader.
 
 typedef int (*fn_Test)(void* pIntValue);
 
