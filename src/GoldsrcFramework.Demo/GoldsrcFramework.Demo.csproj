@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\GoldsrcFramework.Engine\GoldsrcFramework.Engine.csproj" />
+    <ProjectReference Include="..\GoldsrcFramework\GoldsrcFramework.csproj" />
   </ItemGroup>
 
 </Project>
