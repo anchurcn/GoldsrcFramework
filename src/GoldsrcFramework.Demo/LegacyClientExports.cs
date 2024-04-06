@@ -1,16 +1,19 @@
-﻿using System.Diagnostics;
+﻿using GoldsrcFramework.Engine;
+using System.Diagnostics;
 
 
 namespace GoldsrcFramework.Demo
 {
     public unsafe class LegacyClientFuncs : GoldsrcFramework.Engine.ClientFuncs
     {
+        EngineApi* _pengfuncs = null;
         public void HUD_PostRunCmd(void* from, void* to, void* cmd, int runfuncs, long time, int random_seed)
         {//Debugger.Break();
             LegacyClientInterop.HUD_PostRunCmd(from, to, cmd, runfuncs, time, random_seed);
         }
         public  int Initialize(void* pEnginefuncs, int iVersion)
         {//Debugger.Break();
+            _pengfuncs = (EngineApi*)pEnginefuncs;
             return LegacyClientInterop.Initialize(pEnginefuncs, iVersion);
         }
         public  int HUD_VidInit()
@@ -55,6 +58,7 @@ namespace GoldsrcFramework.Demo
         }
         public  void HUD_Frame(long time)
         {//Debugger.Break();
+            _pengfuncs->pfnConsolePrint(_pengfuncs->pfnGetGameDirectory());
             LegacyClientInterop.HUD_Frame(time);
         }
         public  void HUD_VoiceStatus(int entindex, int bTalking)
