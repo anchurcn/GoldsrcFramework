@@ -2,6 +2,7 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
+using System.Text.Json;
 using GoldsrcFramework.Engine;
 
 namespace GoldsrcFramework
@@ -64,8 +65,10 @@ namespace GoldsrcFramework
             pathEnvVar += ";" + cldllDir;
             Environment.SetEnvironmentVariable("Path", pathEnvVar);
 
-            // TODO: Get <GameClient.dll> name from modsettings.json.
-            var clientAssemblyPath = Path.Combine(cldllDir, "GoldsrcFramework.Demo.dll");
+            var modSettings = File.ReadAllText(Path.Combine(cldllDir, "modsettings.json"));
+            var modSettingsObj = JsonSerializer.Deserialize<Dictionary<string, string>>(modSettings);
+            var clientDllName = modSettingsObj["GameClientAssembly"];
+            var clientAssemblyPath = Path.Combine(cldllDir, clientDllName);
             var clientAssembly = AssemblyLoadContext.GetLoadContext(typeof(clfuncs).Assembly).LoadFromAssemblyPath(clientAssemblyPath);
 
             // Find the first type in the assembly where implements ClientFuncs interface.

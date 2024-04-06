@@ -20,4 +20,10 @@
     <ProjectReference Include="..\GoldsrcFramework\GoldsrcFramework.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="modSettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
