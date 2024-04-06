@@ -1,0 +1,10 @@
+﻿namespace GoldsrcFramework.Engine.Native;
+
+[StructLayout(LayoutKind.Sequential)]
+// For test, assert size of struct is equal to original size
+[GSF.Core.Annotations.OriginalStructSize('x86',540)] 
+[GSF.Core.Annotations.OriginalAlignOf(4)]
+public struct unused_demo_s
+{
+	public int index;
+}

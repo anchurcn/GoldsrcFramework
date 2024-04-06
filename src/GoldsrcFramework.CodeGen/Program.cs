@@ -107,13 +107,15 @@ namespace GoldsrcFramework
             // Parse
             var options = new CppParserOptions();
             options.IncludeFolders.AddRange(includeList);
-            options.SystemIncludeFolders.Add(@"G:\_Apps\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.28.29910\include");
-            options.SystemIncludeFolders.Add(@"C:\Program Files (x86)\Windows Kits\10\Include\10.0.18362.0\ucrt");
+            //options.SystemIncludeFolders.Add(@"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.38.33130\include");
+            //options.SystemIncludeFolders.Add(@"C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt");
             options.ParseSystemIncludes = true;
-            options.ParseAttributes = true;
+            options.ParseTokenAttributes = true;
             options.AdditionalArguments.Add("-std=c++17");
+            options.AdditionalArguments.Add("CLIENT_DLL");
+            options.AdditionalArguments.Add("WIN32");
             options.ParseMacros = true;
-            options.ConfigureForWindowsMsvc();
+            options.ConfigureForWindowsMsvc(CppTargetCpu.X86, CppVisualStudioVersion.VS2022);
 
             var compilation = CppParser.ParseFiles(new List<string>() {
                 Path.Combine(_hlsdkDir,"common/Platform.h"),
@@ -121,10 +123,21 @@ namespace GoldsrcFramework
                 Path.Combine(_hlsdkDir,"cl_dll/Exports.h"),
             }, options);
 
+            if (compilation.HasErrors)
+            {
+                foreach (var i in compilation.Diagnostics.Messages)
+                {
+                    Console.WriteLine(i);
+                }
+                return;
+            }
+
             var exportsFuncs = compilation.Functions.Where(x => x.SourceFile.Contains("Exports.h")).ToList();
             // ClientFuncs
             var clientFuncs = string.Empty;
             var funcDeclList = new List<FuncInfo>();
+
+            //exportsFuncs.First().
             foreach (var i in exportsFuncs)
             {
                 var retType = GetCSharpTypeName(i.ReturnType);
