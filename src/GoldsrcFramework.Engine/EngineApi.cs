@@ -2,30 +2,53 @@
 
 namespace GoldsrcFramework.Engine
 {
+    public struct HSPRITE
+    {
+        public int Value;
+    }
+    public struct Rect
+    {
+        public int left;
+        public int top;
+        public int right;
+        public int bottom;
+    }
+
+    // client_sprite_s
+    public struct client_sprite_s
+    {
+    }
+    public struct SCREENINFO_s
+    {
+    }
+    public struct cvar_s
+    {
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct EngineApi
     {
-        public IntPtr pfnSPR_Load;
-        public IntPtr pfnSPR_Frames;
-        public IntPtr pfnSPR_Height;
-        public IntPtr pfnSPR_Width;
-        public IntPtr pfnSPR_Set;
-        public IntPtr pfnSPR_Draw;
-        public IntPtr pfnSPR_DrawHoles;
-        public IntPtr pfnSPR_DrawAdditive;
-        public IntPtr pfnSPR_EnableScissor;
-        public IntPtr pfnSPR_DisableScissor;
-        public IntPtr pfnSPR_GetList;
-        public IntPtr pfnFillRGBA;
-        public IntPtr pfnGetScreenInfo;
-        public IntPtr pfnSetCrosshair;
-        public IntPtr pfnRegisterVariable;
-        public IntPtr pfnGetCvarFloat;
-        public IntPtr pfnGetCvarString;
-        public IntPtr pfnAddCommand;
-        public IntPtr pfnHookUserMsg;
-        public IntPtr pfnServerCmd;
-        public IntPtr pfnClientCmd;
+        public delegate* unmanaged[Cdecl]<sbyte*, HSPRITE> pfnSPR_Load;
+        public delegate* unmanaged[Cdecl]<HSPRITE, int> pfnSPR_Frames;
+        public delegate* unmanaged[Cdecl]<HSPRITE, int, int> pfnSPR_Height;
+        public delegate* unmanaged[Cdecl]<HSPRITE, int, int> pfnSPR_Width;
+        public delegate* unmanaged[Cdecl]<HSPRITE, int, int, int, void> pfnSPR_Set;
+        public delegate* unmanaged[Cdecl]<int, int, int, Rect*, void> pfnSPR_Draw;
+        public delegate* unmanaged[Cdecl]<int, int, int, Rect*, void> pfnSPR_DrawHoles;
+        public delegate* unmanaged[Cdecl]<int, int, int, Rect*, void> pfnSPR_DrawAdditive;
+        public delegate* unmanaged[Cdecl]<int, int, int, int, void> pfnSPR_EnableScissor;
+        public delegate* unmanaged[Cdecl]<void> pfnSPR_DisableScissor;
+        public delegate* unmanaged[Cdecl]<sbyte*, int*, client_sprite_s*> pfnSPR_GetList;
+        public delegate* unmanaged[Cdecl]<int, int, int, int, int, int, int, void> pfnFillRGBA;
+        public delegate* unmanaged[Cdecl]<SCREENINFO_s*, int> pfnGetScreenInfo;
+        public delegate* unmanaged[Cdecl]<HSPRITE, Rect, int, int, int, void> pfnSetCrosshair;
+        public delegate* unmanaged[Cdecl]<sbyte*, sbyte*, int, cvar_s*> pfnRegisterVariable;
+        public delegate* unmanaged[Cdecl]<sbyte*, float> pfnGetCvarFloat;
+        public delegate* unmanaged[Cdecl]<sbyte*, IntPtr> pfnGetCvarString;
+        public delegate* unmanaged[Cdecl]<sbyte*, delegate* unmanaged[Cdecl]<void>, int> pfnAddCommand;
+        public delegate* unmanaged[Cdecl]<sbyte*, delegate* unmanaged[Cdecl]<sbyte*, int, void*, int>, int> pfnHookUserMsg;
+        public delegate* unmanaged[Cdecl]<sbyte*, int> pfnServerCmd;
+        public delegate* unmanaged[Cdecl]<sbyte*, int> pfnClientCmd;
         public IntPtr pfnGetPlayerInfo;
         public IntPtr pfnPlaySoundByName;
         public IntPtr pfnPlaySoundByIndex;
