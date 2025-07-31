@@ -8,7 +8,7 @@ using GoldsrcFramework.Engine.Native;
 
 namespace GoldsrcFramework
 {
-    internal unsafe static class ClientExportsInterop
+    internal unsafe static class ClientMain
     {
         static IClientExportFuncs s_client = null!;
 
@@ -20,7 +20,7 @@ namespace GoldsrcFramework
         static void F(ClientExportFuncs* pv)
         {
             var pathEnvVar = Environment.GetEnvironmentVariable("Path");
-            var cldllDir = Path.GetDirectoryName(typeof(ClientExportsInterop).Assembly.Location);
+            var cldllDir = Path.GetDirectoryName(typeof(ClientMain).Assembly.Location);
             pathEnvVar += ";" + cldllDir;
             Environment.SetEnvironmentVariable("Path", pathEnvVar);
 
@@ -28,7 +28,7 @@ namespace GoldsrcFramework
             var modSettingsObj = JsonSerializer.Deserialize<Dictionary<string, string>>(modSettings);
             var clientDllName = modSettingsObj["GameClientAssembly"];
             var clientAssemblyPath = Path.Combine(cldllDir, clientDllName);
-            var clientAssembly = AssemblyLoadContext.GetLoadContext(typeof(ClientExportsInterop).Assembly).LoadFromAssemblyPath(clientAssemblyPath);
+            var clientAssembly = AssemblyLoadContext.GetLoadContext(typeof(ClientMain).Assembly).LoadFromAssemblyPath(clientAssemblyPath);
 
             // Find the first type in the assembly where implements ClientFuncs interface.
             var t = clientAssembly.GetTypes().FirstOrDefault(x => x.GetInterface(nameof(IClientExportFuncs)) == typeof(IClientExportFuncs));
