@@ -6,10 +6,13 @@
     <Nullable>enable</Nullable>
     <OutputType>Exe</OutputType>
   </PropertyGroup>
-
+	<PropertyGroup>
+		<!-- Workaround for issue https://github.com/microsoft/ClangSharp/issues/129 -->
+		<RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' AND '$(PackAsTool)' != 'true'">$(NETCoreSdkRuntimeIdentifier)</RuntimeIdentifier>
+	</PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CppAst" Version="0.15.0" />
-    <PackageReference Include="libclang" Version="17.0.4" />
+    <PackageReference Include="CppAst" Version="0.23.1" />
+    <PackageReference Include="CppAst.CodeGen" Version="0.27.0" />
   </ItemGroup>
 
   <ItemGroup>

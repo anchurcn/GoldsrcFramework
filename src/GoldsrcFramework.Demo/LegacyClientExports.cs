@@ -4,7 +4,7 @@ using System.Diagnostics;
 
 namespace GoldsrcFramework.Demo
 {
-    public unsafe class LegacyClientFuncs : GoldsrcFramework.Engine.ClientFuncs
+    public unsafe class LegacyClientFuncs : GoldsrcFramework.Engine.IClientExportFuncs
     {
         EngineApi* _pengfuncs = null;
         public void HUD_PostRunCmd(void* from, void* to, void* cmd, int runfuncs, long time, int random_seed)
