@@ -179,3 +179,217 @@ extern "C" int __declspec(dllexport) Test(void* pIntValue)
 
 	return pfn_Test(pIntValue);
 }
+
+#pragma region Server side
+extern "C" {
+	// Standard Half-Life server exports
+	__declspec(dllexport) void GiveFnptrsToDll(void* pengfuncsFromEngine, void* pGlobals);
+	__declspec(dllexport) int GetEntityAPI(void* pFunctionTable, int interfaceVersion);
+	__declspec(dllexport) int GetEntityAPI2(void* pFunctionTable, int* interfaceVersion);
+	__declspec(dllexport) int GetNewDLLFunctions(void* pFunctionTable, int* interfaceVersion);
+}
+
+typedef void(__cdecl* fn_GiveFnptrsToDll)(void* pengfuncsFromEngine, void* pGlobals);
+typedef int(__cdecl* fn_GetEntityAPI)(void* pFunctionTable, int interfaceVersion);
+typedef int(__cdecl* fn_GetEntityAPI2)(void* pFunctionTable, int* interfaceVersion);
+typedef int(__cdecl* fn_GetNewDLLFunctions)(void* pFunctionTable, int* interfaceVersion);
+
+void GiveFnptrsToDll(void* pengfuncsFromEngine, void* pGlobals)
+{
+	HMODULE hm = GetModuleHandle(NULL);
+	char_t buf[MAX_PATH];
+	GetModuleFileName(hm, buf, MAX_PATH);
+
+	string_t root_path = buf;
+	auto pos = root_path.find_last_of(L"\\");
+	root_path = root_path.substr(0, pos + 1);
+
+	//
+	// STEP 1: Load HostFxr and get exported hosting functions
+	//
+	if (!load_hostfxr())
+	{
+		return;
+	}
+
+	//
+	// STEP 2: Initialize and start the .NET Core runtime
+	//
+	const string_t config_path = root_path + L"GoldsrcFramework.runtimeconfig.json";
+	load_assembly_and_get_function_pointer_fn load_assembly_and_get_function_pointer = nullptr;
+	load_assembly_and_get_function_pointer = get_dotnet_load_assembly(config_path.c_str());
+
+	//
+	// STEP 3: Load managed assembly and get function pointer to a managed method
+	//
+	const string_t dotnetlib_path = root_path + L"GoldsrcFramework.dll";
+	const char_t* dotnet_type = L"GoldsrcFramework.ServerMain, GoldsrcFramework";
+	const char_t* dotnet_type_method = L"GiveFnptrsToDll";
+
+	// Function pointer to managed delegate with non-default signature
+	fn_GiveFnptrsToDll pfn_GiveFnptrsToDll = nullptr;
+	int rc = load_assembly_and_get_function_pointer(
+		dotnetlib_path.c_str(),
+		dotnet_type,
+		dotnet_type_method /*method_name*/,
+		UNMANAGEDCALLERSONLY_METHOD,
+		nullptr,
+		(void**)&pfn_GiveFnptrsToDll);
+
+	if (rc == 0 && pfn_GiveFnptrsToDll != nullptr)
+	{
+		pfn_GiveFnptrsToDll(pengfuncsFromEngine, pGlobals);
+	}
+}
+
+int GetEntityAPI(void* pFunctionTable, int interfaceVersion)
+{
+	HMODULE hm = GetModuleHandle(NULL);
+	char_t buf[MAX_PATH];
+	GetModuleFileName(hm, buf, MAX_PATH);
+
+	string_t root_path = buf;
+	auto pos = root_path.find_last_of(L"\\");
+	root_path = root_path.substr(0, pos + 1);
+
+	//
+	// STEP 1: Load HostFxr and get exported hosting functions
+	//
+	if (!load_hostfxr())
+	{
+		return 0;
+	}
+
+	//
+	// STEP 2: Initialize and start the .NET Core runtime
+	//
+	const string_t config_path = root_path + L"GoldsrcFramework.runtimeconfig.json";
+	load_assembly_and_get_function_pointer_fn load_assembly_and_get_function_pointer = nullptr;
+	load_assembly_and_get_function_pointer = get_dotnet_load_assembly(config_path.c_str());
+
+	//
+	// STEP 3: Load managed assembly and get function pointer to a managed method
+	//
+	const string_t dotnetlib_path = root_path + L"GoldsrcFramework.dll";
+	const char_t* dotnet_type = L"GoldsrcFramework.ServerMain, GoldsrcFramework";
+	const char_t* dotnet_type_method = L"GetEntityAPI";
+
+	// Function pointer to managed delegate with non-default signature
+	fn_GetEntityAPI pfn_GetEntityAPI = nullptr;
+	int rc = load_assembly_and_get_function_pointer(
+		dotnetlib_path.c_str(),
+		dotnet_type,
+		dotnet_type_method /*method_name*/,
+		UNMANAGEDCALLERSONLY_METHOD,
+		nullptr,
+		(void**)&pfn_GetEntityAPI);
+
+	if (rc == 0 && pfn_GetEntityAPI != nullptr)
+	{
+		return pfn_GetEntityAPI(pFunctionTable, interfaceVersion);
+	}
+
+	return 0;
+}
+
+int GetEntityAPI2(void* pFunctionTable, int* interfaceVersion)
+{
+	HMODULE hm = GetModuleHandle(NULL);
+	char_t buf[MAX_PATH];
+	GetModuleFileName(hm, buf, MAX_PATH);
+
+	string_t root_path = buf;
+	auto pos = root_path.find_last_of(L"\\");
+	root_path = root_path.substr(0, pos + 1);
+
+	//
+	// STEP 1: Load HostFxr and get exported hosting functions
+	//
+	if (!load_hostfxr())
+	{
+		return 0;
+	}
+
+	//
+	// STEP 2: Initialize and start the .NET Core runtime
+	//
+	const string_t config_path = root_path + L"GoldsrcFramework.runtimeconfig.json";
+	load_assembly_and_get_function_pointer_fn load_assembly_and_get_function_pointer = nullptr;
+	load_assembly_and_get_function_pointer = get_dotnet_load_assembly(config_path.c_str());
+
+	//
+	// STEP 3: Load managed assembly and get function pointer to a managed method
+	//
+	const string_t dotnetlib_path = root_path + L"GoldsrcFramework.dll";
+	const char_t* dotnet_type = L"GoldsrcFramework.ServerMain, GoldsrcFramework";
+	const char_t* dotnet_type_method = L"GetEntityAPI2";
+
+	// Function pointer to managed delegate with non-default signature
+	fn_GetEntityAPI2 pfn_GetEntityAPI2 = nullptr;
+	int rc = load_assembly_and_get_function_pointer(
+		dotnetlib_path.c_str(),
+		dotnet_type,
+		dotnet_type_method /*method_name*/,
+		UNMANAGEDCALLERSONLY_METHOD,
+		nullptr,
+		(void**)&pfn_GetEntityAPI2);
+
+	if (rc == 0 && pfn_GetEntityAPI2 != nullptr)
+	{
+		return pfn_GetEntityAPI2(pFunctionTable, interfaceVersion);
+	}
+
+	return 0;
+}
+
+int GetNewDLLFunctions(void* pFunctionTable, int* interfaceVersion)
+{
+	HMODULE hm = GetModuleHandle(NULL);
+	char_t buf[MAX_PATH];
+	GetModuleFileName(hm, buf, MAX_PATH);
+
+	string_t root_path = buf;
+	auto pos = root_path.find_last_of(L"\\");
+	root_path = root_path.substr(0, pos + 1);
+
+	//
+	// STEP 1: Load HostFxr and get exported hosting functions
+	//
+	if (!load_hostfxr())
+	{
+		return 0;
+	}
+
+	//
+	// STEP 2: Initialize and start the .NET Core runtime
+	//
+	const string_t config_path = root_path + L"GoldsrcFramework.runtimeconfig.json";
+	load_assembly_and_get_function_pointer_fn load_assembly_and_get_function_pointer = nullptr;
+	load_assembly_and_get_function_pointer = get_dotnet_load_assembly(config_path.c_str());
+
+	//
+	// STEP 3: Load managed assembly and get function pointer to a managed method
+	//
+	const string_t dotnetlib_path = root_path + L"GoldsrcFramework.dll";
+	const char_t* dotnet_type = L"GoldsrcFramework.ServerMain, GoldsrcFramework";
+	const char_t* dotnet_type_method = L"GetNewDLLFunctions";
+
+	// Function pointer to managed delegate with non-default signature
+	fn_GetNewDLLFunctions pfn_GetNewDLLFunctions = nullptr;
+	int rc = load_assembly_and_get_function_pointer(
+		dotnetlib_path.c_str(),
+		dotnet_type,
+		dotnet_type_method /*method_name*/,
+		UNMANAGEDCALLERSONLY_METHOD,
+		nullptr,
+		(void**)&pfn_GetNewDLLFunctions);
+
+	if (rc == 0 && pfn_GetNewDLLFunctions != nullptr)
+	{
+		return pfn_GetNewDLLFunctions(pFunctionTable, interfaceVersion);
+	}
+
+	return 0;
+}
+
+#pragma endregion
