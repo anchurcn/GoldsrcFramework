@@ -193,6 +193,60 @@ typedef void(__cdecl* fn_GiveFnptrsToDll)(void* pengfuncsFromEngine, void* pGlob
 typedef int(__cdecl* fn_GetEntityAPI)(void* pFunctionTable, int interfaceVersion);
 typedef int(__cdecl* fn_GetEntityAPI2)(void* pFunctionTable, int* interfaceVersion);
 typedef int(__cdecl* fn_GetNewDLLFunctions)(void* pFunctionTable, int* interfaceVersion);
+typedef void*(__cdecl* fn_GetPrivateDataAllocator)(void* pszEntityClassName);
+
+void InitializePrivateDataAllocators();
+
+void* GetPrivateDataAllocator(const char* const pszEntityClassName)
+{
+	HMODULE hm = GetModuleHandle(NULL);
+	char_t buf[MAX_PATH];
+	GetModuleFileName(hm, buf, MAX_PATH);
+
+	string_t root_path = buf;
+	auto pos = root_path.find_last_of(L"\\");
+	root_path = root_path.substr(0, pos + 1);
+
+	//
+	// STEP 1: Load HostFxr and get exported hosting functions
+	//
+	if (!load_hostfxr())
+	{
+		return nullptr;
+	}
+
+	//
+	// STEP 2: Initialize and start the .NET Core runtime
+	//
+	const string_t config_path = root_path + L"GoldsrcFramework.runtimeconfig.json";
+	load_assembly_and_get_function_pointer_fn load_assembly_and_get_function_pointer = nullptr;
+	load_assembly_and_get_function_pointer = get_dotnet_load_assembly(config_path.c_str());
+
+	//
+	// STEP 3: Load managed assembly and get function pointer to a managed method
+	//
+	const string_t dotnetlib_path = root_path + L"GoldsrcFramework.dll";
+	const char_t* dotnet_type = L"GoldsrcFramework.FrameworkInterop, GoldsrcFramework";
+	const char_t* dotnet_type_method = L"GetPrivateDataAllocator";
+
+	// Function pointer to managed delegate
+	fn_GetPrivateDataAllocator pfn_GetPrivateDataAllocator = nullptr;
+	int rc = load_assembly_and_get_function_pointer(
+		dotnetlib_path.c_str(),
+		dotnet_type,
+		dotnet_type_method /*method_name*/,
+		UNMANAGEDCALLERSONLY_METHOD,
+		nullptr,
+		(void**)&pfn_GetPrivateDataAllocator);
+
+	if (rc == 0 && pfn_GetPrivateDataAllocator != nullptr)
+	{
+		// Convert entity class name to IntPtr for managed call
+		return pfn_GetPrivateDataAllocator((void*)pszEntityClassName);
+	}
+
+	return nullptr;
+}
 
 void GiveFnptrsToDll(void* pengfuncsFromEngine, void* pGlobals)
 {
@@ -240,6 +294,7 @@ void GiveFnptrsToDll(void* pengfuncsFromEngine, void* pGlobals)
 	{
 		pfn_GiveFnptrsToDll(pengfuncsFromEngine, pGlobals);
 	}
+	InitializePrivateDataAllocators();
 }
 
 int GetEntityAPI(void* pFunctionTable, int interfaceVersion)
