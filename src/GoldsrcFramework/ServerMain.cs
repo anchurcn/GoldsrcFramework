@@ -24,19 +24,51 @@ namespace GoldsrcFramework
         private static globalvars_t* s_globalVars = null;
 
         /// <summary>
+        /// Initialize server with game assembly (called from FrameworkInterop)
+        /// </summary>
+        public static void Initialize(Assembly? gameAssembly)
+        {
+            if (_inited) return;
+            _inited = true;
+
+            try
+            {
+                if (gameAssembly != null)
+                {
+                    // Find type implementing IServerExportFuncs
+                    var serverType = gameAssembly.GetTypes()
+                        .FirstOrDefault(x => x.GetInterface(nameof(IServerExportFuncs)) == typeof(IServerExportFuncs));
+
+                    if (serverType != null)
+                    {
+                        s_server = (IServerExportFuncs)Activator.CreateInstance(serverType)!;
+                        return;
+                    }
+                }
+
+                // Fallback to framework default implementation
+                s_server = new FrameworkServerExports();
+            }
+            catch (Exception ex)
+            {
+                // Error fallback to framework default
+                s_server = new FrameworkServerExports();
+                System.Diagnostics.Debug.WriteLine($"Server initialization error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// 引擎调用此函数来传递引擎函数指针和全局变量
         /// </summary>
         /// <param name="pengfuncsFromEngine">引擎函数指针</param>
         /// <param name="pGlobals">全局变量指针</param>
-        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
         public static void GiveFnptrsToDll(enginefuncs_s* pengfuncsFromEngine, globalvars_t* pGlobals)
         {
             // 保存引擎函数指针和全局变量
             s_engineFuncs = pengfuncsFromEngine;
             s_globalVars = pGlobals;
 
-            // 初始化服务端实例
-            InitializeServer();
+            // Server instance should be initialized by FrameworkInterop before this call
         }
 
         /// <summary>
@@ -45,7 +77,6 @@ namespace GoldsrcFramework
         /// <param name="pFunctionTable">函数表指针</param>
         /// <param name="interfaceVersion">接口版本</param>
         /// <returns>成功返回1，失败返回0</returns>
-        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
         public static int GetEntityAPI(ServerExportFuncs* pFunctionTable, int interfaceVersion)
         {
             if (pFunctionTable == null || interfaceVersion != INTERFACE_VERSION)
@@ -55,7 +86,6 @@ namespace GoldsrcFramework
 
             // 填充函数表
             FillServerExportFuncs(pFunctionTable);
-            InitializeServer();
             return 1;
         }
 
@@ -65,7 +95,6 @@ namespace GoldsrcFramework
         /// <param name="pFunctionTable">函数表指针</param>
         /// <param name="interfaceVersion">接口版本指针</param>
         /// <returns>成功返回1，失败返回0</returns>
-        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
         public static int GetEntityAPI2(ServerExportFuncs* pFunctionTable, int* interfaceVersion)
         {
             if (pFunctionTable == null || *interfaceVersion != INTERFACE_VERSION)
@@ -77,7 +106,6 @@ namespace GoldsrcFramework
 
             // 填充函数表
             FillServerExportFuncs(pFunctionTable);
-            InitializeServer();
             return 1;
         }
 
@@ -87,7 +115,6 @@ namespace GoldsrcFramework
         /// <param name="pFunctionTable">新函数表指针</param>
         /// <param name="interfaceVersion">接口版本指针</param>
         /// <returns>成功返回1，失败返回0</returns>
-        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
         public static int GetNewDLLFunctions(ServerNewExportFuncs* pFunctionTable, int* interfaceVersion)
         {
             if (pFunctionTable == null || *interfaceVersion != NEW_DLL_FUNCTIONS_VERSION)
@@ -99,65 +126,10 @@ namespace GoldsrcFramework
 
             // 填充新函数表
             FillServerNewExportFuncs(pFunctionTable);
-            InitializeServer();
             return 1;
         }
 
         private static bool _inited = false;
-        /// <summary>
-        /// 初始化服务端实例
-        /// </summary>
-        private static void InitializeServer()
-        {
-            if (_inited) return;
-            try
-            {
-                // 设置环境变量
-                var pathEnvVar = Environment.GetEnvironmentVariable("Path");
-                var serverDllDir = Path.GetDirectoryName(typeof(ServerMain).Assembly.Location);
-                pathEnvVar += ";" + serverDllDir;
-                Environment.SetEnvironmentVariable("Path", pathEnvVar);
-
-                // 读取模组设置
-                var modSettingsPath = Path.Combine(serverDllDir, "modsettings.json");
-                if (File.Exists(modSettingsPath))
-                {
-                    var modSettings = File.ReadAllText(modSettingsPath);
-                    var modSettingsObj = JsonSerializer.Deserialize<Dictionary<string, string>>(modSettings);
-
-                    if (modSettingsObj.TryGetValue("GameServerAssembly", out var serverDllName))
-                    {
-                        var serverAssemblyPath = Path.Combine(serverDllDir, serverDllName);
-                        if (File.Exists(serverAssemblyPath))
-                        {
-                            var serverAssembly = AssemblyLoadContext.GetLoadContext(typeof(ServerMain).Assembly)
-                                .LoadFromAssemblyPath(serverAssemblyPath);
-
-                            // 查找实现了 IServerExportFuncs 接口的类型
-                            var serverType = serverAssembly.GetTypes()
-                                .FirstOrDefault(x => x.GetInterface(nameof(IServerExportFuncs)) == typeof(IServerExportFuncs));
-
-                            if (serverType != null)
-                            {
-                                s_server = (IServerExportFuncs)Activator.CreateInstance(serverType)!;
-                            }
-                        }
-                    }
-                }
-
-                // 如果没有找到自定义实现，使用框架默认实现
-                if (s_server == null)
-                {
-                    s_server = new FrameworkServerExports();
-                }
-            }
-            catch (Exception ex)
-            {
-                // 发生错误时使用默认实现
-                s_server = new FrameworkServerExports();
-                System.Diagnostics.Debug.WriteLine($"服务端初始化错误: {ex.Message}");
-            }
-        }
 
         /// <summary>
         /// 填充服务端导出函数表

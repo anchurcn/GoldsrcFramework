@@ -13,35 +13,43 @@ namespace GoldsrcFramework
         static IClientExportFuncs s_client = null!;
 
         /// <summary>
+        /// Initialize client with game assembly (called from FrameworkInterop)
+        /// </summary>
+        public static void Initialize(Assembly? gameAssembly)
+        {
+            try
+            {
+                if (gameAssembly != null)
+                {
+                    // Find type implementing IClientExportFuncs
+                    var clientType = gameAssembly.GetTypes()
+                        .FirstOrDefault(x => x.GetInterface(nameof(IClientExportFuncs)) == typeof(IClientExportFuncs));
+
+                    if (clientType != null)
+                    {
+                        s_client = (IClientExportFuncs)Activator.CreateInstance(clientType)!;
+                        return;
+                    }
+                }
+
+                // Fallback to framework default implementation
+                s_client = new FrameworkClientExports();
+            }
+            catch (Exception ex)
+            {
+                // Error fallback to framework default
+                s_client = new FrameworkClientExports();
+                System.Diagnostics.Debug.WriteLine($"Client initialization error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Entry point.
         /// </summary>
         /// <param name="pv"></param>
-        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static void F(ClientExportFuncs* pv)
+        public static void F(ClientExportFuncs* pv)
         {
-            var pathEnvVar = Environment.GetEnvironmentVariable("Path");
-            var cldllDir = Path.GetDirectoryName(typeof(ClientMain).Assembly.Location);
-            pathEnvVar += ";" + cldllDir;
-            Environment.SetEnvironmentVariable("Path", pathEnvVar);
-
-            var modSettings = File.ReadAllText(Path.Combine(cldllDir, "modsettings.json"));
-            var modSettingsObj = JsonSerializer.Deserialize<Dictionary<string, string>>(modSettings);
-            var clientDllName = modSettingsObj["GameClientAssembly"];
-            var clientAssemblyPath = Path.Combine(cldllDir, clientDllName);
-            var clientAssembly = AssemblyLoadContext.GetLoadContext(typeof(ClientMain).Assembly).LoadFromAssemblyPath(clientAssemblyPath);
-
-            // Find the first type in the assembly where implements ClientFuncs interface.
-            var t = clientAssembly.GetTypes().FirstOrDefault(x => x.GetInterface(nameof(IClientExportFuncs)) == typeof(IClientExportFuncs));
-            
-            if (t is null)
-            {
-                s_client = new FrameworkClientExports();
-            }
-            else
-            {
-                var o = Activator.CreateInstance(t);
-                s_client = (IClientExportFuncs)o;
-            }
+            // Client instance should be initialized by FrameworkInterop before this call
 
             ClientExportFuncs v = new ClientExportFuncs();
 

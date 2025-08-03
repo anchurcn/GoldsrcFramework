@@ -10,9 +10,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\GoldsrcFramework.Engine\GoldsrcFramework.Engine.csproj" />
-    <ProjectReference Include="..\GoldsrcFramework.Loader\GoldsrcFramework.Loader.vcxproj">
-      <ReferenceOutputAssembly>False</ReferenceOutputAssembly>
-    </ProjectReference>
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
