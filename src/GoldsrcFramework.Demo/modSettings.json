@@ -1,3 +1,4 @@
 {
-  "GameClientAssembly": "GoldsrcFramework.Demo.dll"
+  "GameClientAssembly": "GoldsrcFramework.Demo.dll",
+  "GameServerAssembly": "GoldsrcFramework.Demo.dll"
 }

@@ -17,6 +17,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\GoldsrcFramework.Engine\GoldsrcFramework.Engine.csproj" />
+	  <ProjectReference Include="..\GoldsrcFramework.Loader\GoldsrcFramework.Loader.vcxproj">
+		  <ReferenceOutputAssembly>False</ReferenceOutputAssembly>
+	  </ProjectReference>
     <ProjectReference Include="..\GoldsrcFramework\GoldsrcFramework.csproj" />
   </ItemGroup>
 
@@ -25,5 +28,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
+		<Exec Command="xcopy &quot;..\GoldsrcFramework.Loader\bin\$(Configuration)\*.*&quot; &quot;$(OutDir)&quot; /E /H /C /I /Y" />
+	</Target>
 
 </Project>
