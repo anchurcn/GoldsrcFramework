@@ -2,7 +2,7 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros">
-    <AppHostDir>C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Host.win-x86\6.0.36\runtimes\win-x86\native</AppHostDir>
+    <AppHostDir>C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Host.win-x86\8.0.16\runtimes\win-x86\native</AppHostDir>
   </PropertyGroup>
   <PropertyGroup />
   <ItemDefinitionGroup />

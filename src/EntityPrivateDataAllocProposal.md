@@ -45,7 +45,7 @@ However, we want to avoid requiring mod developers to write boilerplate entity r
 
 ### Architecture Overview
 
-1. **GoldsrcFramework Distribution**: Framework components (including loader) will be distributed as NuGet packages
+1. **GoldsrcFramework Distribution**: Framework components (including loader.cpp) will be distributed as NuGet packages
 2. **Project Template**: Mod developers create projects using `dotnet new` templates
 3. **Build Output**: Compilation produces:
    - `loader.dll` (unmanaged, engine interface)
@@ -57,7 +57,7 @@ However, we want to avoid requiring mod developers to write boilerplate entity r
 #### Phase 1: Pre-built Loader Template
 
 During GoldsrcFramework packaging, generate a semi-compiled loader in one of these forms:
-- `loader.cpp` (source template)
+- `loader.cpp` (source template)(we using this now)
 - `loader.obj` (pre-compiled object file)
 
 #### Phase 2: Entity Discovery

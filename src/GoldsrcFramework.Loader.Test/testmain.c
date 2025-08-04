@@ -7,9 +7,10 @@
 
 typedef int (*fn_Test)(void* pIntValue);
 
+// **NOTE** Rebuild the project after any change to this repo before debug run.
+// Make sure the lasted file copy to this project out dir.
 int main(int argc, char** argv)
 {
-
 	HMODULE hModule = LoadLibrary(L"gsfloader.dll");
 	if (hModule == NULL)
 	{
