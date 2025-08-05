@@ -179,7 +179,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="entity_exports_tmpl.cpp" />
-    <ClCompile Include="main.cpp" />
+    <ClCompile Include="loader.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
