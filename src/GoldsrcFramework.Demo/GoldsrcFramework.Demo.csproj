@@ -1,36 +1,28 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
 
-  <PropertyGroup>
-    <HalfLifeInstallDir>$(registry:HKEY_CURRENT_USER\Software\Valve\Steam@ModInstallPath)</HalfLifeInstallDir>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-  </PropertyGroup>
+	<PropertyGroup>
+		<HalfLifeInstallDir>$(registry:HKEY_CURRENT_USER\Software\Valve\Steam@ModInstallPath)</HalfLifeInstallDir>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
 
-  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="xcopy &quot;..\GoldsrcFramework\bin\$(Configuration)\$(TargetFramework)\*.*&quot; &quot;$(OutDir)&quot; /E /H /C /I /Y&#xD;&#xA;xcopy &quot;$(OutDir)*.*&quot; &quot;$(HalfLifeInstallDir)\gsfdemo\cl_dlls&quot; /E /H /C /I /Y" />
-  </Target>
+	<ItemGroup>
+		<ProjectReference Include="..\GoldsrcFramework.Engine\GoldsrcFramework.Engine.csproj" />
+		<ProjectReference Include="..\GoldsrcFramework\GoldsrcFramework.csproj" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\GoldsrcFramework.Engine\GoldsrcFramework.Engine.csproj" />
-	  <ProjectReference Include="..\GoldsrcFramework.Loader\GoldsrcFramework.Loader.vcxproj">
-		  <ReferenceOutputAssembly>False</ReferenceOutputAssembly>
-	  </ProjectReference>
-    <ProjectReference Include="..\GoldsrcFramework\GoldsrcFramework.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Update="modSettings.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-
-	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
-		<Exec Command="xcopy &quot;..\GoldsrcFramework.Loader\bin\$(Configuration)\*.*&quot; &quot;$(OutDir)&quot; /E /H /C /I /Y" />
-	</Target>
-
+	<ItemGroup>
+		<None Update="modSettings.json">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+	<PropertyGroup>
+		<IsBuildInDemo>true</IsBuildInDemo>
+	</PropertyGroup>
+	<Import Project="..\GoldsrcFramework\bin\$(Configuration)\$(TargetFramework)\GoldsrcFramework.targets" />
 </Project>

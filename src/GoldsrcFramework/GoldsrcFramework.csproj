@@ -8,12 +8,9 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
+
+
   <ItemGroup>
     <ProjectReference Include="..\GoldsrcFramework.Engine\GoldsrcFramework.Engine.csproj" />
   </ItemGroup>
-
-  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="xcopy &quot;..\GoldsrcFramework.Loader\bin\$(Configuration)\*.*&quot; &quot;$(OutDir)&quot; /E /H /C /I /Y" />
-  </Target>
-
 </Project>

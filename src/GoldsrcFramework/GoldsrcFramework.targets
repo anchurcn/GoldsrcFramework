@@ -1,0 +1,76 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+	<!-- 1. 定义属性：配置路径和工具链 -->
+	<PropertyGroup>
+
+		<!-- if is build in demo, then set the LoaderSourcePath to ../GoldsrcFramework.Loader/loader.cpp -->
+		<LoaderSourcePath Condition="'$(IsBuildInDemo)' == 'true'">$(ProjectDir)..\GoldsrcFramework.Loader\loader.cpp</LoaderSourcePath>
+		<LoaderSourcePath Condition="'$(IsBuildInDemo)' != 'true'">$(MSBuildThisFileDirectory)loader.cpp</LoaderSourcePath>
+
+		<!-- Mod 项目的中间目录（obj）和输出目录 -->
+		<ModIntermediateDir>$(IntermediateOutputPath)</ModIntermediateDir>
+		<ModOutputDir>$(OutputPath)</ModOutputDir>
+
+		<!-- 生成的 loader.dll 路径 -->
+		<LoaderOutputPath>$(ModOutputDir)loader.dll</LoaderOutputPath>
+
+		<!-- MSVC 工具链路径（自动检测） -->
+		<VCToolChainPath Condition="'$(VCToolChainPath)' == ''">
+			$(VSInstallDir)VC\Tools\MSVC\$(VCToolsVersion)\bin\Hostx64\x64\
+		</VCToolChainPath>
+	</PropertyGroup>
+
+	<!-- 2. 目标1：复制 loader.cpp 到 Mod 的 obj 目录 -->
+	<Target Name="CopyLoaderSource"
+			BeforeTargets="GenerateEntityExports"
+		Inputs="$(LoaderSourcePath)"
+		Outputs="$(ModIntermediateDir)loader.cpp">
+
+		<Message Text="Copying loader.cpp to $(ModIntermediateDir)" Importance="high" />
+		<Copy SourceFiles="$(LoaderSourcePath)"
+			  DestinationFiles="$(ModIntermediateDir)loader.cpp"
+			  OverwriteReadOnlyFiles="true" />
+	</Target>
+
+
+	<!-- 生成 entity_exports.cpp -->
+	<UsingTask TaskName="GenerateEntityExportsTask" AssemblyFile="GoldsrcFramework.dll" Runtime="NET" />
+	<Target Name="GenerateEntityExports" AfterTargets="Build" Outputs="$(ModIntermediateDir)entity_exports.cpp">
+		<GenerateEntityExportsTask/>
+	</Target>
+
+	<!-- 3. 目标2：编译 loader.dll（依赖 entity_exports.cpp 和 loader.cpp） -->
+	<Target Name="CompileLoaderDll"
+			AfterTargets="GenerateEntityExports"
+		DependsOnTargets="CopyLoaderSource"
+		Inputs="$(ModIntermediateDir)loader.cpp;$(ModIntermediateDir)entity_exports.cpp"
+		Outputs="$(LoaderOutputPath)">
+
+		<Message Text="Compiling loader.dll..." Importance="high" />
+
+		<!-- 定义编译参数 -->
+		<PropertyGroup>
+			<ClCompile>$(VCToolChainPath)cl.exe</ClCompile>
+			<Link>$(VCToolChainPath)link.exe</Link>
+			<IncludePaths>/I"$(ModIntermediateDir)" /I"$(MSBuildThisFileDirectory)include"</IncludePaths>
+			<CompileFlags>/c /EHsc /nologo $(IncludePaths)</CompileFlags>
+			<LinkFlags>/DLL /OUT:"$(LoaderOutputPath)" /nologo</LinkFlags>
+		</PropertyGroup>
+
+		<!-- 编译 .cpp 文件为 .obj -->
+		<Exec Command="$(ClCompile) $(CompileFlags) $(ModIntermediateDir)loader.cpp /Fo$(ModIntermediateDir)loader.obj" />
+		<Exec Command="$(ClCompile) $(CompileFlags) $(ModIntermediateDir)entity_exports.cpp /Fo$(ModIntermediateDir)entity_exports.obj" />
+
+		<!-- 链接生成 loader.dll -->
+		<Exec Command="$(Link) $(LinkFlags) $(ModIntermediateDir)loader.obj $(ModIntermediateDir)entity_exports.obj" />
+
+		<Message Text="loader.dll generated at $(LoaderOutputPath)" Importance="high" />
+	</Target>
+
+	<!-- 4. 注入到 Mod 项目的构建流程：先执行生成 entity_exports.cpp 的目标 -->
+	<!-- 注意：Mod 项目需要定义 GenerateEntityExports 目标来生成 entity_exports.cpp -->
+	<Target Name="GoldsrcBuildPipeline" AfterTargets="Build">
+		<CallTarget Targets="GenerateEntityExports;CopyLoaderSource;CompileLoaderDll" />
+	</Target>
+
+</Project>
