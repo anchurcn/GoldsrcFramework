@@ -178,7 +178,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="entity_exports_tmpl.cpp" />
+    <ClCompile Include="entity_exports_demo.cpp" />
     <ClCompile Include="loader.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
