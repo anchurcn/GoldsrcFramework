@@ -1,0 +1,62 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!-- ============================================================
+       ModPostBuild.Simple.targets
+       
+       Simplified version for testing - only generates entity_exports.cpp
+       ============================================================ -->
+
+  <!-- 1. Define properties and paths -->
+  <PropertyGroup>
+    <!-- LoaderSourceDir: Directory where loader source files will be copied and compiled -->
+    <LoaderSourceDir Condition="'$(LoaderSourceDir)' == ''">$(IntermediateOutputPath)LoaderSource\</LoaderSourceDir>
+    
+    <!-- BuildTool paths -->
+    <BuildToolProjectPath>$(MSBuildThisFileDirectory)GoldsrcFramework.BuildTool\GoldsrcFramework.BuildTool.csproj</BuildToolProjectPath>
+    <BuildToolExePath>$(MSBuildThisFileDirectory)GoldsrcFramework.BuildTool\bin\$(Configuration)\net8.0\GoldsrcFramework.BuildTool.exe</BuildToolExePath>
+    
+    <!-- Output paths -->
+    <EntityExportsCppPath>$(LoaderSourceDir)entity_exports.cpp</EntityExportsCppPath>
+  </PropertyGroup>
+
+  <!-- 2. Ensure BuildTool is built -->
+  <Target Name="BuildBuildTool" BeforeTargets="GenerateEntityExports">
+    <Message Text="Building GoldsrcFramework.BuildTool..." Importance="high" />
+    <MSBuild Projects="$(BuildToolProjectPath)" 
+             Properties="Configuration=$(Configuration);Platform=AnyCPU" 
+             Targets="Build" />
+  </Target>
+
+  <!-- 3. Create LoaderSourceDir -->
+  <Target Name="CreateLoaderSourceDir" BeforeTargets="GenerateEntityExports">
+    <MakeDir Directories="$(LoaderSourceDir)" />
+  </Target>
+
+  <!-- 4. Generate entity_exports.cpp using BuildTool -->
+  <Target Name="GenerateEntityExports" 
+          AfterTargets="Build"
+          DependsOnTargets="BuildBuildTool;CreateLoaderSourceDir"
+          Inputs="$(TargetPath)" 
+          Outputs="$(EntityExportsCppPath)">
+    
+    <Message Text="Generating entity_exports.cpp using BuildTool..." Importance="high" />
+    <Message Text="BuildTool: $(BuildToolExePath)" Importance="normal" />
+    
+    <!-- Use GoldsrcFramework.dll instead of the mod DLL since EntityContext is in GoldsrcFramework -->
+    <PropertyGroup>
+      <GoldsrcFrameworkDllPath>$(OutDir)GoldsrcFramework.dll</GoldsrcFrameworkDllPath>
+    </PropertyGroup>
+    
+    <Message Text="GoldsrcFramework DLL: $(GoldsrcFrameworkDllPath)" Importance="normal" />
+    <Message Text="Output: $(EntityExportsCppPath)" Importance="normal" />
+    
+    <Error Text="GoldsrcFramework.dll not found at: $(GoldsrcFrameworkDllPath)" 
+           Condition="!Exists('$(GoldsrcFrameworkDllPath)')" />
+    
+    <Exec Command="&quot;$(BuildToolExePath)&quot; &quot;$(GoldsrcFrameworkDllPath)&quot; &quot;$(EntityExportsCppPath)&quot;"
+          WorkingDirectory="$(MSBuildProjectDirectory)" />
+          
+    <Message Text="entity_exports.cpp generated at: $(EntityExportsCppPath)" Importance="high" />
+  </Target>
+
+</Project>

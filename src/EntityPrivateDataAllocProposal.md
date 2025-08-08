@@ -246,3 +246,13 @@ graph TD
 This proposal provides a comprehensive solution for automatic entity private data allocation in GoldsrcFramework. By eliminating boilerplate code and providing a streamlined development experience, it enables mod developers to focus on creating engaging gameplay rather than dealing with low-level infrastructure concerns.
 
 The proposed architecture maintains compatibility with the existing Half-Life engine while providing modern development conveniences through managed code integration.
+
+
+这个 GoldsrcFramework C# 项目，后续应该会发布成 Nuget 包给 Mod 开发者使用。这个框架主要是用于开发 Goldsrc 引擎游戏的，这是C++引擎，所以需要实现一个薄层 loader （非托管 dll），引擎加载 loader，loader加载 GoldsrcFramework 。但是引擎加载实体是需要 loader 在导出表暴露这些函数的，所以 loader.dll 的编译需要延迟到 Mod.dll 的编译，依赖了 Mod.dll 编译后输出的一些信息，假设是 entity_exports.cpp。
+最佳实践一般是如何实现这种需求的？另外还有几个问题：
+1.  loader 有个 loader.cpp 这部分代码是跟着 GoldsrcFramework 的，那么在 GoldsrcFramework 项目里它应该放在哪里？构建成 Nuget 包时又应该在哪里？content 文件夹？
+2. 开发 Mod 时有个后构建步骤会根据 Mod.dll 里声明的实体生成 entity_exports.cpp，我希望是生成到中间目录 obj 中，在生成entity_exports.cpp 后还有个生成 loader.dll 的操作，那么 loader.cpp 应该也要出现在 obj 文件夹，这个如何做到？是 GoldsrcFramework 包提供一个 target ，Mod 项目依赖它去做到？还是有什么其他更好的方法？总之两个都要在 obj 中，然后有个任务使用 msvc 工具链将这俩编译链接成 loader.dll 输出到 Mod 的输出目录。
+在制作 GoldsrcFramework 时，同一个解决方案下有个 Demo项目充当Mod项目，项目引用 GoldsrcFramework ，这个项目也需要，如何实现？
+
+上面是我之前的一个想法，存在一些疑问，现在我想实现一下：
+在 src/targets 文件夹下创建 GoldsrcFramework.targets（后续会输出到 Nuget）

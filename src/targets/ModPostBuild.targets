@@ -1,0 +1,201 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!-- ============================================================
+       ModPostBuild.targets
+
+       This targets file implements the post-build process for GoldsrcFramework mods:
+       1. Generate entity_exports.cpp using BuildTool
+       2. Copy loader.cpp from GoldsrcFramework.Loader
+       3. Compile loader.dll using MSVC toolchain (x86)
+
+       Supports both Debug and Release configurations:
+       - Debug: Uses /MDd runtime, /D_DEBUG, /Od (no optimization), /Zi (debug info)
+       - Release: Uses /MD runtime, /DNDEBUG, /Gy /Oi (optimizations), /OPT:REF /OPT:ICF
+       ============================================================ -->
+
+  <!-- 1. Define properties and paths -->
+  <PropertyGroup>
+    <!-- LoaderSourceDir: Directory where loader source files will be copied and compiled -->
+    <LoaderSourceDir Condition="'$(LoaderSourceDir)' == ''">$(IntermediateOutputPath)LoaderSource\</LoaderSourceDir>
+    
+    <!-- BuildTool paths -->
+    <BuildToolProjectPath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.BuildTool\GoldsrcFramework.BuildTool.csproj</BuildToolProjectPath>
+    <BuildToolExePath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.BuildTool\bin\$(Configuration)\net8.0\GoldsrcFramework.BuildTool.exe</BuildToolExePath>
+
+    <!-- Source paths -->
+    <LoaderCppSourcePath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.Loader\loader.cpp</LoaderCppSourcePath>
+    <DotNetHostingPropsPath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.Loader\dotnet_hosting.props</DotNetHostingPropsPath>
+    
+    <!-- Output paths -->
+    <LoaderDllOutputPath>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\loader.dll</LoaderDllOutputPath>
+    <EntityExportsCppPath>$(LoaderSourceDir)entity_exports.cpp</EntityExportsCppPath>
+    <LoaderCppPath>$(LoaderSourceDir)loader.cpp</LoaderCppPath>
+    <DotNetHostingPropsTargetPath>$(LoaderSourceDir)dotnet_hosting.props</DotNetHostingPropsTargetPath>
+    
+    <!-- MSVC toolchain detection - simplified approach -->
+    <!-- Try to use environment variables first -->
+    <VCInstallDir Condition="'$(VCInstallDir)' == '' and '$(VCINSTALLDIR)' != ''">$(VCINSTALLDIR)</VCInstallDir>
+    <VCInstallDir Condition="'$(VCInstallDir)' == '' and '$(VCToolsInstallDir)' != ''">$(VCToolsInstallDir)</VCInstallDir>
+
+    <!-- Fallback to common installation paths -->
+    <VCInstallDir Condition="'$(VCInstallDir)' == '' and Exists('$(ProgramFiles)\Microsoft Visual Studio\2022\Professional\VC\Tools\MSVC\')">$(ProgramFiles)\Microsoft Visual Studio\2022\Professional\VC\Tools\MSVC\</VCInstallDir>
+    <VCInstallDir Condition="'$(VCInstallDir)' == '' and Exists('$(ProgramFiles)\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\')">$(ProgramFiles)\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\</VCInstallDir>
+    <VCInstallDir Condition="'$(VCInstallDir)' == '' and Exists('$(ProgramFiles)\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\')">$(ProgramFiles)\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\</VCInstallDir>
+
+    <!-- Use VCToolsVersion from environment or try to detect -->
+    <VCToolsVersion Condition="'$(VCToolsVersion)' == ''">14.44.35207</VCToolsVersion>
+
+    <!-- MSVC compiler and linker paths (x86) -->
+    <VCToolsPath>$(VCInstallDir)$(VCToolsVersion)\bin\Hostx64\x86\</VCToolsPath>
+    <ClCompilerPath>$(VCToolsPath)cl.exe</ClCompilerPath>
+    <LinkerPath>$(VCToolsPath)link.exe</LinkerPath>
+
+    <!-- Windows SDK paths -->
+    <WindowsSDKDir Condition="'$(WindowsSDKDir)' == ''">C:\Program Files (x86)\Windows Kits\10\</WindowsSDKDir>
+    <WindowsSDKVersion Condition="'$(WindowsSDKVersion)' == ''">10.0.26100.0</WindowsSDKVersion>
+
+    <!-- Include paths -->
+    <VCIncludePath>$(VCInstallDir)$(VCToolsVersion)\include</VCIncludePath>
+    <WindowsSDKIncludePath>$(WindowsSDKDir)Include\$(WindowsSDKVersion)\um;$(WindowsSDKDir)Include\$(WindowsSDKVersion)\shared;$(WindowsSDKDir)Include\$(WindowsSDKVersion)\ucrt</WindowsSDKIncludePath>
+
+    <!-- Library paths -->
+    <VCLibPath>$(VCInstallDir)$(VCToolsVersion)\lib\x86</VCLibPath>
+    <WindowsSDKUmLibPath>$(WindowsSDKDir)Lib\$(WindowsSDKVersion)\um\x86</WindowsSDKUmLibPath>
+    <WindowsSDKUcrtLibPath>$(WindowsSDKDir)Lib\$(WindowsSDKVersion)\ucrt\x86</WindowsSDKUcrtLibPath>
+  </PropertyGroup>
+
+  <!-- Import dotnet_hosting.props to get AppHostDir -->
+  <Import Project="$(DotNetHostingPropsPath)" Condition="Exists('$(DotNetHostingPropsPath)')" />
+
+  <!-- 2. Ensure BuildTool is built -->
+  <Target Name="BuildBuildTool" BeforeTargets="GenerateEntityExports">
+    <Message Text="Building GoldsrcFramework.BuildTool..." Importance="high" />
+    <MSBuild Projects="$(BuildToolProjectPath)" 
+             Properties="Configuration=$(Configuration);Platform=AnyCPU" 
+             Targets="Build" />
+  </Target>
+
+  <!-- 3. Create LoaderSourceDir -->
+  <Target Name="CreateLoaderSourceDir" BeforeTargets="GenerateEntityExports">
+    <MakeDir Directories="$(LoaderSourceDir)" />
+  </Target>
+
+  <!-- 4. Generate entity_exports.cpp using BuildTool -->
+  <Target Name="GenerateEntityExports"
+          AfterTargets="Build"
+          DependsOnTargets="BuildBuildTool;CreateLoaderSourceDir"
+          Inputs="$(TargetPath)"
+          Outputs="$(EntityExportsCppPath)">
+
+    <Message Text="Generating entity_exports.cpp using BuildTool..." Importance="high" />
+    <Message Text="BuildTool: $(BuildToolExePath)" Importance="normal" />
+
+    <!-- Use GoldsrcFramework.dll instead of the mod DLL since EntityContext is in GoldsrcFramework -->
+    <PropertyGroup>
+      <GoldsrcFrameworkDllPath>$(OutDir)GoldsrcFramework.dll</GoldsrcFrameworkDllPath>
+    </PropertyGroup>
+
+    <Message Text="GoldsrcFramework DLL: $(GoldsrcFrameworkDllPath)" Importance="normal" />
+    <Message Text="Output: $(EntityExportsCppPath)" Importance="normal" />
+
+    <Error Text="GoldsrcFramework.dll not found at: $(GoldsrcFrameworkDllPath)"
+           Condition="!Exists('$(GoldsrcFrameworkDllPath)')" />
+
+    <Exec Command="&quot;$(BuildToolExePath)&quot; &quot;$(GoldsrcFrameworkDllPath)&quot; &quot;$(EntityExportsCppPath)&quot;"
+          WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+
+  <!-- 5. Copy loader.cpp and dotnet_hosting.props to LoaderSourceDir -->
+  <Target Name="CopyLoaderSource"
+          AfterTargets="GenerateEntityExports"
+          DependsOnTargets="CreateLoaderSourceDir"
+          Inputs="$(LoaderCppSourcePath);$(DotNetHostingPropsPath)"
+          Outputs="$(LoaderCppPath);$(DotNetHostingPropsTargetPath)">
+
+    <Message Text="Copying loader source files to $(LoaderSourceDir)..." Importance="high" />
+
+    <Copy SourceFiles="$(LoaderCppSourcePath)"
+          DestinationFiles="$(LoaderCppPath)"
+          OverwriteReadOnlyFiles="true" />
+
+    <Copy SourceFiles="$(DotNetHostingPropsPath)"
+          DestinationFiles="$(DotNetHostingPropsTargetPath)"
+          OverwriteReadOnlyFiles="true" />
+  </Target>
+
+  <!-- 6. Compile loader.dll using MSVC toolchain (x86) -->
+  <Target Name="CompileLoaderDll"
+          AfterTargets="CopyLoaderSource"
+          Inputs="$(LoaderCppPath);$(EntityExportsCppPath)"
+          Outputs="$(LoaderDllOutputPath)">
+
+    <Message Text="Compiling loader.dll using MSVC toolchain (x86)..." Importance="high" />
+    <Message Text="Compiler: $(ClCompilerPath)" Importance="normal" />
+    <Message Text="Linker: $(LinkerPath)" Importance="normal" />
+    <Message Text="AppHostDir: $(AppHostDir)" Importance="normal" />
+
+    <!-- Verify MSVC tools exist -->
+    <Error Text="MSVC compiler not found at: $(ClCompilerPath)"
+           Condition="!Exists('$(ClCompilerPath)')" />
+    <Error Text="MSVC linker not found at: $(LinkerPath)"
+           Condition="!Exists('$(LinkerPath)')" />
+    <Error Text="AppHostDir not defined. Please ensure dotnet_hosting.props is properly configured."
+           Condition="'$(AppHostDir)' == ''" />
+
+    <!-- Define compilation flags based on Configuration (Debug/Release) -->
+    <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+      <!-- Debug configuration: /MDd for debug runtime, /D_DEBUG, /Od for no optimization, /Zi for debug info -->
+      <CompileFlags>/c /W3 /nologo /MDd /DWIN32 /D_DEBUG /D_CONSOLE /EHsc /Od /Zi /DUNICODE /D_UNICODE</CompileFlags>
+      <LinkFlags>/DLL /NOLOGO /SUBSYSTEM:CONSOLE /MACHINE:X86 /DEBUG</LinkFlags>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+      <!-- Release configuration: /MD for release runtime, /DNDEBUG, /Gy /Oi for optimizations -->
+      <CompileFlags>/c /W3 /nologo /MD /DWIN32 /DNDEBUG /D_CONSOLE /EHsc /Gy /Oi /DUNICODE /D_UNICODE</CompileFlags>
+      <LinkFlags>/DLL /NOLOGO /SUBSYSTEM:CONSOLE /MACHINE:X86 /OPT:REF /OPT:ICF</LinkFlags>
+    </PropertyGroup>
+
+    <!-- Common flags for both configurations -->
+    <PropertyGroup>
+      <IncludeFlags>/I"$(AppHostDir)" /I"$(WindowsSDKDir)Include\$(WindowsSDKVersion)\ucrt" /I"$(VCIncludePath)" /I"$(WindowsSDKDir)Include\$(WindowsSDKVersion)\um" /I"$(WindowsSDKDir)Include\$(WindowsSDKVersion)\shared"</IncludeFlags>
+      <LibraryFlags>/LIBPATH:"$(AppHostDir)" /LIBPATH:"$(VCLibPath)" /LIBPATH:"$(WindowsSDKUmLibPath)" /LIBPATH:"$(WindowsSDKUcrtLibPath)"</LibraryFlags>
+      <Libraries>nethost.lib kernel32.lib user32.lib ole32.lib oleaut32.lib uuid.lib</Libraries>
+    </PropertyGroup>
+
+    <!-- Compile source files to object files -->
+    <Message Text="Compiling loader.cpp..." Importance="normal" />
+    <Exec Command="&quot;$(ClCompilerPath)&quot; $(CompileFlags) $(IncludeFlags) &quot;$(LoaderCppPath)&quot; /Fo&quot;$(LoaderSourceDir)loader.obj&quot;"
+          WorkingDirectory="$(MSBuildProjectDirectory)" />
+
+    <Message Text="Compiling entity_exports.cpp..." Importance="normal" />
+    <Exec Command="&quot;$(ClCompilerPath)&quot; $(CompileFlags) $(IncludeFlags) &quot;$(EntityExportsCppPath)&quot; /Fo&quot;$(LoaderSourceDir)entity_exports.obj&quot;"
+          WorkingDirectory="$(MSBuildProjectDirectory)" />
+
+    <!-- Link object files to create loader.dll -->
+    <Message Text="Linking loader.dll..." Importance="normal" />
+    <Message Text="TargetDir: $(TargetDir)" Importance="normal" />
+    <Message Text="LoaderDllOutputPath: $(LoaderDllOutputPath)" Importance="normal" />
+    <Exec Command="&quot;$(LinkerPath)&quot; $(LinkFlags) $(LibraryFlags) $(Libraries) /OUT:&quot;$(LoaderDllOutputPath)&quot; &quot;$(LoaderSourceDir)loader.obj&quot; &quot;$(LoaderSourceDir)entity_exports.obj&quot;"
+          WorkingDirectory="$(MSBuildProjectDirectory)" />
+
+    <!-- Copy nethost.dll to output directory -->
+    <Copy SourceFiles="$(AppHostDir)\nethost.dll"
+          DestinationFiles="$(OutDir)nethost.dll"
+          OverwriteReadOnlyFiles="true"
+          Condition="Exists('$(AppHostDir)\nethost.dll')" />
+
+    <Message Text="loader.dll compiled successfully at: $(LoaderDllOutputPath)" Importance="high" />
+  </Target>
+
+  <!-- 7. Main target that orchestrates the entire process -->
+  <Target Name="ModPostBuild"
+          AfterTargets="Build"
+          DependsOnTargets="GenerateEntityExports;CopyLoaderSource;CompileLoaderDll">
+
+    <Message Text="ModPostBuild completed successfully!" Importance="high" />
+    <Message Text="Generated files:" Importance="high" />
+    <Message Text="  - $(EntityExportsCppPath)" Importance="high" />
+    <Message Text="  - $(LoaderDllOutputPath)" Importance="high" />
+  </Target>
+
+</Project>
