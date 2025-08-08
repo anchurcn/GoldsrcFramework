@@ -23,6 +23,12 @@
 	</ItemGroup>
 	<PropertyGroup>
 		<IsBuildInDemo>true</IsBuildInDemo>
+		<!-- Define LoaderSourceDir for ModPostBuild.targets -->
+		<LoaderSourceDir>$(IntermediateOutputPath)LoaderSource\</LoaderSourceDir>
 	</PropertyGroup>
-	<Import Project="..\GoldsrcFramework\bin\$(Configuration)\$(TargetFramework)\GoldsrcFramework.targets" />
+
+	<!-- Import ModPostBuild.targets for post-build processing -->
+	<Import Project="..\targets\ModPostBuild.targets" />
+
+	<!--<Import Project="..\GoldsrcFramework\bin\$(Configuration)\$(TargetFramework)\GoldsrcFramework.targets" />-->
 </Project>
