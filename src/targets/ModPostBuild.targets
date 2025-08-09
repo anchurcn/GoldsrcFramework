@@ -27,7 +27,7 @@
     <DotNetHostingPropsPath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.Loader\dotnet_hosting.props</DotNetHostingPropsPath>
     
     <!-- Output paths -->
-    <LoaderDllOutputPath>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\loader.dll</LoaderDllOutputPath>
+    <LoaderDllOutputPath>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\client.dll</LoaderDllOutputPath>
     <EntityExportsCppPath>$(LoaderSourceDir)entity_exports.cpp</EntityExportsCppPath>
     <LoaderCppPath>$(LoaderSourceDir)loader.cpp</LoaderCppPath>
     <DotNetHostingPropsTargetPath>$(LoaderSourceDir)dotnet_hosting.props</DotNetHostingPropsTargetPath>

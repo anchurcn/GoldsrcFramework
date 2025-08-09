@@ -156,7 +156,7 @@ namespace GoldsrcFramework.BuildTool
 
             // Initialization function
             sb.AppendLine("//InitializePrivateDataAllocators");
-            sb.AppendLine("void InitializePrivateDataAllocators()");
+            sb.AppendLine("extern \"C\" void InitializePrivateDataAllocators()");
             sb.AppendLine("{");
             sb.AppendLine("\t// Set up the function pointers for legacy Half-Life entities");
             sb.AppendLine("\t// GENERATED");
