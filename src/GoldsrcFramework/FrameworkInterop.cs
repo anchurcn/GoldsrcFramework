@@ -25,7 +25,7 @@ namespace GoldsrcFramework
 
         #region Entity System
 
-        [UnmanagedCallersOnly]
+        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
         public static IntPtr GetPrivateDataAllocator(IntPtr pszEntityClassName)
         {
             if (pszEntityClassName == IntPtr.Zero)
