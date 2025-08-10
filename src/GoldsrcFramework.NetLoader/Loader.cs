@@ -1,47 +1,104 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Text;
 using Mxrx.NetHost;
 using Rxmxnx.PInvoke;
 
+[assembly: DisableRuntimeMarshalling]
+
 namespace GoldsrcFramework.NetLoader
 {
+    public static partial class NetHost
+    {
+        public static string GetHostFxrPath()
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                char[] buffer = new char[1024];
+                nint bufferSize = buffer.Length;
+                int rc = get_hostfxr_path_windows(buffer, ref bufferSize, IntPtr.Zero);
+                if (rc == 0)
+                {
+                    return new string(buffer.AsSpan().Slice(0, (int)bufferSize - 1));
+                }
+                else
+                {
+                    throw new Exception($"get_hostfxr_path failed: {rc}");
+                }
+            }
+            else
+            {
+                byte[] buffer = new byte[1024];
+                nint bufferSize = buffer.Length;
+                int rc = get_hostfxr_path_non_windows(buffer, ref bufferSize, IntPtr.Zero);
+                if (rc == 0)
+                {
+                    return Encoding.UTF8.GetString(buffer.AsSpan().Slice(0, (int)bufferSize - 1));
+                }
+                else
+                {
+                    throw new Exception($"get_hostfxr_path failed: {rc}");
+                }
+            }
+        }
+
+        [LibraryImport("*", EntryPoint = "get_hostfxr_path")]
+        private static partial int get_hostfxr_path_windows(char[] buffer, ref nint buffer_size, IntPtr parameters);
+
+        [LibraryImport("*", EntryPoint = "get_hostfxr_path")]
+        private static partial int get_hostfxr_path_non_windows(byte[] buffer, ref nint buffer_size, IntPtr parameters);
+    }
     /// <summary>
     /// Native AOT loader implementation using Mxrx.NetHost.Fxr
     /// This replaces the C++ loader.cpp functionality
     /// </summary>
-    public static class Loader
+    public static partial class Loader
     {
-        private static bool s_isInitialized = false;
-        private static FrameworkResolver? s_frameworkResolver = null;
-        private static HostContext? s_hostContext = null;
+        private static FrameworkResolver s_hostFxr = null!;
+        private static HostContext s_hostContext = null!;
+        private static string s_frameworkPath = string.Empty;
 
         /// <summary>
         /// Initialize the .NET host using Mxrx.NetHost.Fxr
         /// </summary>
-        private static bool InitializeNetHost()
+        private static void InitializeNetHost()
         {
-            if (s_isInitialized && s_hostContext != null)
-                return true;
+            if (s_hostContext is not null)
+            {
+                return;
+            }
 
             try
             {
                 // Get the current module directory
-                string moduleDir = GetModuleDirectory();
-                string frameworkPath = Path.Combine(moduleDir, "GoldsrcFramework.dll");
+                string moduleDir = AppContext.BaseDirectory;
+                string gsfPath = Path.Combine(moduleDir, "GoldsrcFramework.dll");
                 string runtimeConfigPath = Path.Combine(moduleDir, "GoldsrcFramework.runtimeconfig.json");
+                s_frameworkPath = gsfPath;
 
-                if (!File.Exists(frameworkPath) || !File.Exists(runtimeConfigPath))
-                    return false;
+                Debug.WriteLine($"[Debug] Trying to load GoldsrcFramework from: {gsfPath}");
+
+                if (!File.Exists(gsfPath) || !File.Exists(runtimeConfigPath))
+                {
+                    Debug.WriteLine($"[Error] GoldsrcFramework.dll or runtimeconfig.json not found in {moduleDir}");
+                    throw new FileNotFoundException("GoldsrcFramework.dll or runtimeconfig.json not found.");
+                }
 
                 // Find hostfxr library
-                string hostfxrPath = FindHostfxrLibrary();
+                string hostfxrPath = NetHost.GetHostFxrPath();
                 if (string.IsNullOrEmpty(hostfxrPath))
-                    return false;
+                {
+                    Debug.WriteLine("Hostfxr path is empty or null.");
+                    throw new Exception("Hostfxr path is empty or null.");
+                }
 
                 // Load the framework resolver
-                s_frameworkResolver = FrameworkResolver.LoadResolver(hostfxrPath);
+                s_hostFxr = FrameworkResolver.GetActiveOrLoad(hostfxrPath, out var _);
 
                 // Create initialization parameters
                 InitializationParameters initParams = InitializationParameters.CreateBuilder()
@@ -49,222 +106,156 @@ namespace GoldsrcFramework.NetLoader
                     .Build();
 
                 // Initialize the host context
-                s_hostContext = s_frameworkResolver.Initialize(initParams);
-
-                s_isInitialized = true;
-                return true;
+                s_hostContext = s_hostFxr.Initialize(initParams);
             }
             catch
             {
-                return false;
+                Debug.WriteLine("Failed to initialize .NET host.");
+                throw new Exception("Failed to initialize .NET host.");
             }
         }
 
-        /// <summary>
-        /// Find the hostfxr library path
-        /// </summary>
-        private static string FindHostfxrLibrary()
+        private static void EnsureInitialized()
         {
-            try
-            {
-                // Try common locations for hostfxr
-                string[] possiblePaths = {
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "dotnet", "host", "fxr"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "dotnet", "host", "fxr"),
-                    @"C:\Program Files\dotnet\host\fxr",
-                    @"C:\Program Files (x86)\dotnet\host\fxr"
-                };
-
-                foreach (string basePath in possiblePaths)
-                {
-                    if (Directory.Exists(basePath))
-                    {
-                        // Find the latest version directory
-                        var versionDirs = Directory.GetDirectories(basePath)
-                            .Select(d => new DirectoryInfo(d))
-                            .OrderByDescending(d => d.Name)
-                            .ToArray();
-
-                        foreach (var versionDir in versionDirs)
-                        {
-                            string hostfxrPath = Path.Combine(versionDir.FullName, "hostfxr.dll");
-                            if (File.Exists(hostfxrPath))
-                                return hostfxrPath;
-                        }
-                    }
-                }
-
-                return string.Empty;
-            }
-            catch
-            {
-                return string.Empty;
-            }
+            InitializeNetHost();
         }
 
-        /// <summary>
-        /// Get the directory containing the current module
-        /// </summary>
-        private static string GetModuleDirectory()
+        [UnmanagedCallersOnly(EntryPoint = "F", CallConvs = new[] { typeof(CallConvCdecl) })]
+        public unsafe static void F(IntPtr pv)
         {
-            // Get the current executable path
-            string? exePath = Environment.ProcessPath;
-            if (string.IsNullOrEmpty(exePath))
+            EnsureInitialized();
+            delegate* unmanaged[Cdecl]<IntPtr, void> pfn = (delegate* unmanaged[Cdecl]<IntPtr, void>)
+                GetGoldsrcFrameworkFunctionPointer("GoldsrcFramework.FrameworkInterop", "F");
+            if (pfn == null)
             {
-                // Fallback to current directory
-                return Directory.GetCurrentDirectory();
+                Debug.WriteLine("Unable to get function pointer for F");
+                throw new InvalidOperationException("Function pointer for F is null.");
             }
-
-            return Path.GetDirectoryName(exePath) ?? Directory.GetCurrentDirectory();
+            pfn(pv);
         }
 
-        /// <summary>
-        /// Main entry point - equivalent to F() function in loader.cpp
-        /// </summary>
-        [UnmanagedCallersOnly(EntryPoint = "F", CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
-        public static void F(IntPtr pv)
+        private static IntPtr GetGoldsrcFrameworkFunctionPointer(string typeName, string methodName)
         {
-            try
-            {
-                // Initialize .NET host if not already done
-                if (!InitializeNetHost())
-                    return;
-
-                // Get function pointer for FrameworkInterop.F
-                NetFunctionInfo fFunctionInfo = CreateFunctionInfo("GoldsrcFramework.FrameworkInterop", "F");
-                IntPtr fPtr = s_hostContext!.GetFunctionPointer(fFunctionInfo);
-
-                if (fPtr != IntPtr.Zero)
-                {
-                    // Call the managed F method via function pointer
-                    var fDelegate = fPtr.GetUnsafeDelegate<Action<IntPtr>>();
-                    fDelegate?.Invoke(pv);
-                }
-            }
-            catch
-            {
-                // Silently handle errors - similar to C++ version
-            }
-        }
-
-        /// <summary>
-        /// Create NetFunctionInfo for calling managed methods
-        /// </summary>
-        private static NetFunctionInfo CreateFunctionInfo(string typeName, string methodName)
-        {
-            string moduleDir = GetModuleDirectory();
-            string frameworkPath = Path.Combine(moduleDir, "GoldsrcFramework.dll");
-
-            NetFunctionInfo.Builder builder = NetFunctionInfo.CreateBuilder()
-                .WithAssemblyPathPath(frameworkPath);
+            var builder = NetFunctionInfo.CreateBuilder()
+                .WithAssemblyPathPath(s_frameworkPath)
+                .WithUnmanagedCallerOnly(true);
 
             if (OperatingSystem.IsWindows())
             {
-                builder = builder.WithTypeName($"{typeName}, GoldsrcFramework\0")
-                               .WithMethodName($"{methodName}\0");
+                builder = builder.WithTypeName($"{typeName}\0")
+                                 .WithMethodName($"{methodName}\0");
             }
             else
             {
-                string typeNameUtf8 = $"{typeName}, GoldsrcFramework";
-                string methodNameUtf8 = methodName;
-                builder = builder.WithTypeName(System.Text.Encoding.UTF8.GetBytes(typeNameUtf8))
-                               .WithMethodName(System.Text.Encoding.UTF8.GetBytes(methodNameUtf8));
+                builder = builder.WithTypeName(Encoding.UTF8.GetBytes($"{typeName}"))
+                                 .WithMethodName(Encoding.UTF8.GetBytes(methodName));
             }
+            NetFunctionInfo functionInfo = builder.Build();
+            return s_hostContext.GetFunctionPointer(functionInfo);
+        }
 
-            return builder.Build();
+        [UnmanagedCallersOnly(EntryPoint = "Test", CallConvs = new[] { typeof(CallConvCdecl) })]
+        public unsafe static int Test(IntPtr pIntValue)
+        {
+            EnsureInitialized();
+            delegate* unmanaged[Cdecl]<IntPtr, int> pfn = (delegate* unmanaged[Cdecl]<IntPtr, int>)
+                GetGoldsrcFrameworkFunctionPointer("GoldsrcFramework.HostingTest", "Test");
+            if (pfn == null)
+            {
+                Debug.WriteLine("Unable to get function pointer for Test");
+                throw new InvalidOperationException("Function pointer for Test is null.");
+            }
+            return pfn(pIntValue);
+        }
+
+        [UnmanagedCallersOnly(EntryPoint = "Test2", CallConvs = new[] { typeof(CallConvCdecl) })]
+        public unsafe static int Test2(IntPtr pIntValue)
+        {
+            EnsureInitialized();
+            delegate* unmanaged[Cdecl]<IntPtr, int> pfn = (delegate* unmanaged[Cdecl]<IntPtr, int>)
+                GetGoldsrcFrameworkFunctionPointer("GoldsrcFramework.HostingTest", "Test");
+            if (pfn == null)
+            {
+                Debug.WriteLine("Unable to get function pointer for Test2");
+                throw new InvalidOperationException("Function pointer for Test2 is null.");
+            }
+            return pfn(pIntValue);
+        }
+
+        [UnmanagedCallersOnly(EntryPoint = "GiveFnptrsToDll", CallConvs = new[] { typeof(CallConvCdecl) })]
+        public unsafe static void GiveFnptrsToDll(IntPtr pengfuncsFromEngine, IntPtr pGlobals)
+        {
+            EnsureInitialized();
+            delegate* unmanaged[Cdecl]<IntPtr, IntPtr, void> pfn = (delegate* unmanaged[Cdecl]<IntPtr, IntPtr, void>)
+                GetGoldsrcFrameworkFunctionPointer("GoldsrcFramework.FrameworkInterop", "GiveFnptrsToDll");
+            if (pfn == null)
+            {
+                Debug.WriteLine("Unable to get function pointer for GiveFnptrsToDll");
+                throw new InvalidOperationException("Function pointer for GiveFnptrsToDll is null.");
+            }
+            pfn(pengfuncsFromEngine, pGlobals);
+
+            // Initialize private data allocators after calling the framework function
+            EntityExportsDemo.InitializePrivateDataAllocators();
+        }
+
+        [UnmanagedCallersOnly(EntryPoint = "GetEntityAPI", CallConvs = new[] { typeof(CallConvCdecl) })]
+        public unsafe static int GetEntityAPI(IntPtr pFunctionTable, int interfaceVersion)
+        {
+            EnsureInitialized();
+            delegate* unmanaged[Cdecl]<IntPtr, int, int> pfn = (delegate* unmanaged[Cdecl]<IntPtr, int, int>)
+                GetGoldsrcFrameworkFunctionPointer("GoldsrcFramework.FrameworkInterop", "GetEntityAPI");
+            if (pfn == null)
+            {
+                Debug.WriteLine("Unable to get function pointer for GetEntityAPI");
+                return 0;
+            }
+            return pfn(pFunctionTable, interfaceVersion);
+        }
+
+        [UnmanagedCallersOnly(EntryPoint = "GetEntityAPI2", CallConvs = new[] { typeof(CallConvCdecl) })]
+        public unsafe static int GetEntityAPI2(IntPtr pFunctionTable, IntPtr interfaceVersion)
+        {
+            EnsureInitialized();
+            delegate* unmanaged[Cdecl]<IntPtr, IntPtr, int> pfn = (delegate* unmanaged[Cdecl]<IntPtr, IntPtr, int>)
+                GetGoldsrcFrameworkFunctionPointer("GoldsrcFramework.FrameworkInterop", "GetEntityAPI2");
+            if (pfn == null)
+            {
+                Debug.WriteLine("Unable to get function pointer for GetEntityAPI2");
+                return 0;
+            }
+            return pfn(pFunctionTable, interfaceVersion);
+        }
+
+        [UnmanagedCallersOnly(EntryPoint = "GetNewDLLFunctions", CallConvs = new[] { typeof(CallConvCdecl) })]
+        public unsafe static int GetNewDLLFunctions(IntPtr pFunctionTable, IntPtr interfaceVersion)
+        {
+            EnsureInitialized();
+            delegate* unmanaged[Cdecl]<IntPtr, IntPtr, int> pfn = (delegate* unmanaged[Cdecl]<IntPtr, IntPtr, int>)
+                GetGoldsrcFrameworkFunctionPointer("GoldsrcFramework.FrameworkInterop", "GetNewDLLFunctions");
+            if (pfn == null)
+            {
+                Debug.WriteLine("Unable to get function pointer for GetNewDLLFunctions");
+                return 0;
+            }
+            return pfn(pFunctionTable, interfaceVersion);
         }
 
         /// <summary>
-        /// Test function - equivalent to Test() function in loader.cpp
+        /// Internal method to get private data allocator - used by EntityExportsDemo
         /// </summary>
-        [UnmanagedCallersOnly(EntryPoint = "Test", CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
-        public static int Test(IntPtr pIntValue)
+        internal unsafe static IntPtr GetPrivateDataAllocator(IntPtr pszEntityClassName)
         {
-            try
+            EnsureInitialized();
+            delegate* unmanaged[Cdecl]<IntPtr, IntPtr> pfn = (delegate* unmanaged[Cdecl]<IntPtr, IntPtr>)
+                GetGoldsrcFrameworkFunctionPointer("GoldsrcFramework.FrameworkInterop", "GetPrivateDataAllocator");
+            if (pfn == null)
             {
-                // Initialize .NET host if not already done
-                if (!InitializeNetHost())
-                    return -1;
-
-                // Get function pointer for FrameworkInterop.Test
-                NetFunctionInfo testFunctionInfo = CreateFunctionInfo("GoldsrcFramework.FrameworkInterop", "Test");
-                IntPtr testPtr = s_hostContext!.GetFunctionPointer(testFunctionInfo);
-
-                if (testPtr != IntPtr.Zero)
-                {
-                    // Call the managed Test method via function pointer
-                    var testDelegate = testPtr.GetUnsafeDelegate<Func<IntPtr, int>>();
-                    return testDelegate?.Invoke(pIntValue) ?? -1;
-                }
-
-                return -1;
-            }
-            catch
-            {
-                return -1;
-            }
-        }
-
-        /// <summary>
-        /// GetPrivateDataAllocator function - equivalent to the one in loader.cpp
-        /// </summary>
-        [UnmanagedCallersOnly(EntryPoint = "GetPrivateDataAllocator", CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
-        public static IntPtr GetPrivateDataAllocator(IntPtr pszEntityClassName)
-        {
-            try
-            {
-                // Initialize .NET host if not already done
-                if (!InitializeNetHost())
-                    return IntPtr.Zero;
-
-                // Get function pointer for FrameworkInterop.GetPrivateDataAllocator
-                NetFunctionInfo allocatorFunctionInfo = CreateFunctionInfo("GoldsrcFramework.FrameworkInterop", "GetPrivateDataAllocator");
-                IntPtr allocatorPtr = s_hostContext!.GetFunctionPointer(allocatorFunctionInfo);
-
-                if (allocatorPtr != IntPtr.Zero)
-                {
-                    // Call the managed GetPrivateDataAllocator method via function pointer
-                    var allocatorDelegate = allocatorPtr.GetUnsafeDelegate<Func<IntPtr, IntPtr>>();
-                    return allocatorDelegate?.Invoke(pszEntityClassName) ?? IntPtr.Zero;
-                }
-
+                Debug.WriteLine("Unable to get function pointer for GetPrivateDataAllocator");
                 return IntPtr.Zero;
             }
-            catch
-            {
-                return IntPtr.Zero;
-            }
+            return pfn(pszEntityClassName);
         }
 
-        /// <summary>
-        /// Cleanup resources when the loader is unloaded
-        /// </summary>
-        [UnmanagedCallersOnly(EntryPoint = "DllMain", CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvStdcall) })]
-        public static bool DllMain(IntPtr hModule, uint dwReason, IntPtr lpReserved)
-        {
-            const uint DLL_PROCESS_DETACH = 0;
-
-            if (dwReason == DLL_PROCESS_DETACH)
-            {
-                // Cleanup when DLL is unloaded
-                try
-                {
-                    s_hostContext?.Dispose();
-                    s_frameworkResolver?.Dispose();
-                }
-                catch
-                {
-                    // Ignore cleanup errors
-                }
-                finally
-                {
-                    s_hostContext = null;
-                    s_frameworkResolver = null;
-                    s_isInitialized = false;
-                }
-            }
-
-            return true;
-        }
     }
 }
