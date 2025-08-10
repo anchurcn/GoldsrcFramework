@@ -17,7 +17,9 @@
     <PropertyGroup>
       <LoaderSourceDir Condition="'$(LoaderSourceDir)' == ''">$(IntermediateOutputPath)LoaderSource\</LoaderSourceDir>
       <!-- Set dependent paths after LoaderSourceDir is properly set -->
-      <EntityExportsCppPath>$(LoaderSourceDir)entity_exports.cpp</EntityExportsCppPath>
+      <EntityExportsCsPath>$(LoaderSourceDir)EntityExports.cs</EntityExportsCsPath>
+      <LoaderCsPath>$(LoaderSourceDir)Loader.cs</LoaderCsPath>
+      <NetLoaderCsprojPath>$(LoaderSourceDir)GoldsrcFramework.NetLoader.csproj</NetLoaderCsprojPath>
       <NetLoaderClientDllPath>$(LoaderSourceDir)client.dll</NetLoaderClientDllPath>
     </PropertyGroup>
   </Target>
@@ -41,14 +43,14 @@
     <MakeDir Directories="$(LoaderSourceDir)" />
   </Target>
 
-  <!-- 3. Generate entity_exports.cpp using BuildTool -->
+  <!-- 3. Generate EntityExports.cs using BuildTool -->
   <Target Name="GenerateEntityExports"
           AfterTargets="Build"
           DependsOnTargets="BuildBuildTool;CreateLoaderSourceDir;SetLoaderSourceDir"
           Inputs="$(TargetPath)"
-          Outputs="$(EntityExportsCppPath)">
+          Outputs="$(EntityExportsCsPath)">
 
-    <Message Text="Generating entity exports..." Importance="high" />
+    <Message Text="Generating entity exports (C#)..." Importance="high" />
 
     <!-- Use GoldsrcFramework.dll instead of the mod DLL since EntityContext is in GoldsrcFramework -->
     <PropertyGroup>
@@ -56,42 +58,116 @@
     </PropertyGroup>
 
     <Message Text="GoldsrcFramework DLL: $(GoldsrcFrameworkDllPath)" Importance="normal" />
-    <Message Text="Output: $(EntityExportsCppPath)" Importance="normal" />
+    <Message Text="Output: $(EntityExportsCsPath)" Importance="normal" />
 
     <Error Text="GoldsrcFramework.dll not found at: $(GoldsrcFrameworkDllPath)"
            Condition="!Exists('$(GoldsrcFrameworkDllPath)')" />
 
-    <Exec Command="&quot;$(BuildToolOutputPath)&quot; &quot;$(GoldsrcFrameworkDllPath)&quot; &quot;$(EntityExportsCppPath)&quot;"
+    <Exec Command="&quot;$(BuildToolOutputPath)&quot; cs &quot;$(GoldsrcFrameworkDllPath)&quot; &quot;$(EntityExportsCsPath)&quot;"
           WorkingDirectory="$(MSBuildProjectDirectory)" />
   </Target>
 
-  <!-- 4. Build NetLoader using Native AOT -->
-  <Target Name="BuildNetLoader"
+  <!-- 4. Copy NetLoader source files -->
+  <Target Name="CopyNetLoaderSource"
           AfterTargets="GenerateEntityExports"
           DependsOnTargets="GenerateEntityExports"
-          Inputs="$(TargetPath);$(EntityExportsCppPath)"
+          Inputs="$(TargetPath);$(EntityExportsCsPath)"
+          Outputs="$(LoaderCsPath);$(NetLoaderCsprojPath)">
+
+    <Message Text="Copying NetLoader source files..." Importance="high" />
+
+    <!-- Copy Loader.cs -->
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)..\GoldsrcFramework.NetLoader\Loader.cs"
+          DestinationFiles="$(LoaderCsPath)" />
+
+    <!-- Modify Loader.cs to use EntityExports instead of EntityExportsDemo -->
+    <PropertyGroup>
+      <LoaderCsContent>$([System.IO.File]::ReadAllText('$(LoaderCsPath)'))</LoaderCsContent>
+      <ModifiedLoaderCsContent>$(LoaderCsContent.Replace('EntityExportsDemo', 'EntityExports'))</ModifiedLoaderCsContent>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(LoaderCsPath)" Lines="$(ModifiedLoaderCsContent)" Overwrite="true" />
+
+    <!-- Create a modified csproj file for win-x86 -->
+    <PropertyGroup>
+      <CsprojContent><![CDATA[<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net9.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<OutputType>Library</OutputType>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+		<!-- Native AOT Configuration for win-x86 -->
+		<PublishAot>true</PublishAot>
+		<RuntimeIdentifier>win-x86</RuntimeIdentifier>
+		<SelfContained>true</SelfContained>
+		<PublishTrimmed>true</PublishTrimmed>
+		<TrimMode>partial</TrimMode>
+
+		<!-- Output as DLL -->
+		<NativeLib>Shared</NativeLib>
+		<AssemblyName>client</AssemblyName>
+
+		<!-- Ensure exports are preserved -->
+		<IlcExportUnmanagedEntrypoints>true</IlcExportUnmanagedEntrypoints>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Mxrx.NetHost.Fxr" Version="0.1.1" />
+	</ItemGroup>
+
+	<Target Name="PrepareForNativePublish" AfterTargets="Build">
+		<ItemGroup>
+			<NativeLibrary Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Host.win-x86\9.0.5\runtimes\win-x86\native\libnethost.lib" />
+		</ItemGroup>
+	</Target>
+
+</Project>]]></CsprojContent>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(NetLoaderCsprojPath)" Lines="$(CsprojContent)" Overwrite="true" />
+
+    <Message Text="NetLoader source files copied to: $(LoaderSourceDir)" Importance="high" />
+  </Target>
+
+  <!-- 5. Build NetLoader using Native AOT -->
+  <Target Name="BuildNetLoader"
+          AfterTargets="CopyNetLoaderSource"
+          DependsOnTargets="CopyNetLoaderSource"
+          Inputs="$(TargetPath);$(EntityExportsCsPath);$(LoaderCsPath);$(NetLoaderCsprojPath)"
           Outputs="$(NetLoaderClientDllPath)">
 
-    <Message Text="Building NetLoader with Native AOT..." Importance="high" />
-    
-    <!-- First ensure GoldsrcFramework is built -->
-    <MSBuild Projects="$(MSBuildProjectFile)" 
-             Properties="Configuration=$(Configuration)" 
+    <Message Text="Building NetLoader with Native AOT from LoaderSource..." Importance="high" />
+
+    <!-- First ensure GoldsrcFramework is built and copy required files -->
+    <MSBuild Projects="$(MSBuildProjectFile)"
+             Properties="Configuration=$(Configuration)"
              Targets="Build" />
-    
-    <!-- Then publish NetLoader -->
-    <MSBuild Projects="$(NetLoaderProjectPath)" 
-             Properties="Configuration=Release;RuntimeIdentifier=win-x64" 
+
+    <!-- Copy GoldsrcFramework.dll and runtimeconfig.json to LoaderSource -->
+    <PropertyGroup>
+      <GoldsrcFrameworkBinDir>$(MSBuildProjectDirectory)\..\GoldsrcFramework\bin\$(Configuration)\net8.0\</GoldsrcFrameworkBinDir>
+    </PropertyGroup>
+
+    <Copy SourceFiles="$(GoldsrcFrameworkBinDir)GoldsrcFramework.dll"
+          DestinationFolder="$(LoaderSourceDir)" />
+    <Copy SourceFiles="$(GoldsrcFrameworkBinDir)GoldsrcFramework.runtimeconfig.json"
+          DestinationFolder="$(LoaderSourceDir)" />
+
+    <!-- Restore packages for the copied project -->
+    <MSBuild Projects="$(NetLoaderCsprojPath)"
+             Properties="Configuration=$(Configuration);RuntimeIdentifier=win-x86"
+             Targets="Restore" />
+
+    <!-- Publish NetLoader from LoaderSource directory -->
+    <MSBuild Projects="$(NetLoaderCsprojPath)"
+             Properties="Configuration=$(Configuration);RuntimeIdentifier=win-x86;PublishDir=$(LoaderSourceDir)publish\"
              Targets="Publish" />
-    
-    <!-- Copy client.dll to LoaderSourceDir -->
-    <Copy SourceFiles="$(NetLoaderPublishDir)\client.dll" 
-          DestinationFiles="$(NetLoaderClientDllPath)" />
-    
+
     <!-- Copy client.dll to final output location -->
-    <Copy SourceFiles="$(NetLoaderPublishDir)\client.dll" 
+    <Copy SourceFiles="$(LoaderSourceDir)bin\$(Configuration)\net9.0\win-x86\native\client.dll"
           DestinationFiles="$(NetLoaderOutputPath)" />
-          
+
     <Message Text="NetLoader built successfully: $(NetLoaderOutputPath)" Importance="high" />
   </Target>
 
