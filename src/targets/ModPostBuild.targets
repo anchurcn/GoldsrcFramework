@@ -16,8 +16,21 @@
   <!-- 1. Define properties and paths -->
   <PropertyGroup>
     <!-- LoaderSourceDir: Directory where loader source files will be copied and compiled -->
-    <LoaderSourceDir Condition="'$(LoaderSourceDir)' == ''">$(IntermediateOutputPath)LoaderSource\</LoaderSourceDir>
-    
+    <!-- Use a target to set this property to ensure IntermediateOutputPath is properly evaluated -->
+  </PropertyGroup>
+
+  <!-- Set LoaderSourceDir in a target to ensure proper evaluation of IntermediateOutputPath -->
+  <Target Name="SetLoaderSourceDir" BeforeTargets="CreateLoaderSourceDir">
+    <PropertyGroup>
+      <LoaderSourceDir Condition="'$(LoaderSourceDir)' == ''">$(IntermediateOutputPath)LoaderSource\</LoaderSourceDir>
+      <!-- Set dependent paths after LoaderSourceDir is properly set -->
+      <EntityExportsCppPath>$(LoaderSourceDir)entity_exports.cpp</EntityExportsCppPath>
+      <LoaderCppPath>$(LoaderSourceDir)loader.cpp</LoaderCppPath>
+      <DotNetHostingPropsTargetPath>$(LoaderSourceDir)dotnet_hosting.props</DotNetHostingPropsTargetPath>
+    </PropertyGroup>
+  </Target>
+
+  <PropertyGroup>
     <!-- BuildTool paths -->
     <BuildToolProjectPath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.BuildTool\GoldsrcFramework.BuildTool.csproj</BuildToolProjectPath>
     <BuildToolExePath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.BuildTool\bin\$(Configuration)\net8.0\GoldsrcFramework.BuildTool.exe</BuildToolExePath>
@@ -28,9 +41,7 @@
     
     <!-- Output paths -->
     <LoaderDllOutputPath>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\client.dll</LoaderDllOutputPath>
-    <EntityExportsCppPath>$(LoaderSourceDir)entity_exports.cpp</EntityExportsCppPath>
-    <LoaderCppPath>$(LoaderSourceDir)loader.cpp</LoaderCppPath>
-    <DotNetHostingPropsTargetPath>$(LoaderSourceDir)dotnet_hosting.props</DotNetHostingPropsTargetPath>
+    <!-- Note: EntityExportsCppPath, LoaderCppPath, and DotNetHostingPropsTargetPath are set in SetLoaderSourceDir target -->
     
     <!-- MSVC toolchain detection - simplified approach -->
     <!-- Try to use environment variables first -->
@@ -70,20 +81,20 @@
   <!-- 2. Ensure BuildTool is built -->
   <Target Name="BuildBuildTool" BeforeTargets="GenerateEntityExports">
     <Message Text="Building GoldsrcFramework.BuildTool..." Importance="high" />
-    <MSBuild Projects="$(BuildToolProjectPath)" 
-             Properties="Configuration=$(Configuration);Platform=AnyCPU" 
+    <MSBuild Projects="$(BuildToolProjectPath)"
+             Properties="Configuration=$(Configuration);Platform=AnyCPU"
              Targets="Build" />
   </Target>
 
   <!-- 3. Create LoaderSourceDir -->
-  <Target Name="CreateLoaderSourceDir" BeforeTargets="GenerateEntityExports">
+  <Target Name="CreateLoaderSourceDir" BeforeTargets="GenerateEntityExports" DependsOnTargets="SetLoaderSourceDir">
     <MakeDir Directories="$(LoaderSourceDir)" />
   </Target>
 
   <!-- 4. Generate entity_exports.cpp using BuildTool -->
   <Target Name="GenerateEntityExports"
           AfterTargets="Build"
-          DependsOnTargets="BuildBuildTool;CreateLoaderSourceDir"
+          DependsOnTargets="BuildBuildTool;CreateLoaderSourceDir;SetLoaderSourceDir"
           Inputs="$(TargetPath)"
           Outputs="$(EntityExportsCppPath)">
 
@@ -108,7 +119,7 @@
   <!-- 5. Copy loader.cpp and dotnet_hosting.props to LoaderSourceDir -->
   <Target Name="CopyLoaderSource"
           AfterTargets="GenerateEntityExports"
-          DependsOnTargets="CreateLoaderSourceDir"
+          DependsOnTargets="CreateLoaderSourceDir;SetLoaderSourceDir"
           Inputs="$(LoaderCppSourcePath);$(DotNetHostingPropsPath)"
           Outputs="$(LoaderCppPath);$(DotNetHostingPropsTargetPath)">
 

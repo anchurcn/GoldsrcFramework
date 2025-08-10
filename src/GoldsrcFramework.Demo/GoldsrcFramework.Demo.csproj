@@ -24,7 +24,7 @@
 	<PropertyGroup>
 		<IsBuildInDemo>true</IsBuildInDemo>
 		<!-- Define LoaderSourceDir for ModPostBuild.targets -->
-		<LoaderSourceDir>$(IntermediateOutputPath)LoaderSource\</LoaderSourceDir>
+		<!-- NOTE: Removed explicit LoaderSourceDir setting - let ModPostBuild.targets handle it -->
 	</PropertyGroup>
 
 	<!-- Import ModPostBuild.targets for post-build processing -->
