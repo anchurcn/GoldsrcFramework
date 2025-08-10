@@ -11,7 +11,7 @@ typedef int (*fn_Test)(void* pIntValue);
 // Make sure the lasted file copy to this project out dir.
 int main(int argc, char** argv)
 {
-	HMODULE hModule = LoadLibrary(L"gsfloader.dll");
+	HMODULE hModule = LoadLibrary(L"client.dll");
 	if (hModule == NULL)
 	{
 		printf("Cannot load gsfloader.dll.");

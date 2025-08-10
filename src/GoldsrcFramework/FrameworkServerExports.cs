@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 
 namespace GoldsrcFramework.Engine.Native;
 
@@ -15,6 +16,12 @@ public unsafe class FrameworkServerExports : IServerExportFuncs
 
     public virtual int Spawn(edict_t* pent)
     {
+        var msgbuf = Encoding.UTF8.GetBytes("hello spawn from framework");
+        
+        fixed (byte* pDst = msgbuf)
+        {
+            sbyte* p = (sbyte*) pDst;
+        }
         return LegacyServerInterop.Spawn(pent);
     }
 
@@ -150,6 +157,7 @@ public unsafe class FrameworkServerExports : IServerExportFuncs
 
     public virtual sbyte* GetGameDescription()
     {
+        LegacyServerInterop.Initialize(ServerMain.s_engineFuncs, ServerMain.s_globalVars);
         return LegacyServerInterop.GetGameDescription();
     }
 

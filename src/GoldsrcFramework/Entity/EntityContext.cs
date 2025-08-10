@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -10,17 +11,49 @@ namespace GoldsrcFramework.Entity
     public class EntityContext
     {
         private static IntPtr _hlibcServer = IntPtr.Zero;
+        private static IntPtr _errorAllocatorPtr = IntPtr.Zero;
+        
+        [UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
+        private static void ErrorAllocator(IntPtr pev)
+        {
+            Debug.Assert(false, "The entity is not exported in legacy server dll");
+            throw new NotImplementedException("The entity is not exported in legacy server dll.");
+        }
+
+        /// <summary>
+        /// Gets the function pointer to the error allocator function.
+        /// </summary>
+        private static IntPtr GetErrorAllocatorPtr()
+        {
+            if (_errorAllocatorPtr == IntPtr.Zero)
+            {
+                unsafe
+                {
+                    _errorAllocatorPtr = (IntPtr)(delegate* unmanaged[Cdecl]<IntPtr, void>)&ErrorAllocator;
+                }
+            }
+            return _errorAllocatorPtr;
+        }
 
         public static IntPtr GetLegacyEntityPrivateDataAllocator(string entityClassName)
         {
-            // From libcserver.dll.
+            // From libserver.dll.
             if (_hlibcServer == IntPtr.Zero)
             {
-                _hlibcServer = NativeLibrary.Load("libcserver.dll");
+                _hlibcServer = NativeLibrary.Load("libserver.dll");
                 if (_hlibcServer == IntPtr.Zero)
-                    throw new Exception("Failed to load libcserver.dll. Ensure it is present in the application directory.");
+                    throw new Exception("Failed to load libserver.dll. Ensure it is present in the application directory.");
             }
-            return NativeLibrary.GetExport(_hlibcServer, entityClassName);
+            try
+            {
+                return NativeLibrary.GetExport(_hlibcServer, entityClassName);
+
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.ToString());
+                return GetErrorAllocatorPtr();
+            }
         }
 
         /*
@@ -76,9 +109,9 @@ namespace GoldsrcFramework.Entity
                 "info_target",
                 "env_bubbles",
                 "beam",
+                "trip_beam",
                 "env_lightning",
                 "env_beam",
-                "trip_beam",
                 "env_laser",
                 "env_glow",
                 "env_sprite",

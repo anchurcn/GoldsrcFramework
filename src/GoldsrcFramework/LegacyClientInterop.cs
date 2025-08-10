@@ -9,7 +9,7 @@ namespace GoldsrcFramework
     /// </summary>
     public unsafe static class LegacyClientInterop
     {
-        private const string LegacyClientDll = "client.dll";
+        private const string LegacyClientDll = "libclient.dll";
 
         // 声明原版 client.dll 的导出函数，函数签名与 IClientExportFuncs 对齐
         [DllImport(LegacyClientDll, CallingConvention = CallingConvention.Cdecl)]

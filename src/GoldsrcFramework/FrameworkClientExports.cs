@@ -1,4 +1,4 @@
-using System;
+using System.Text;
 
 namespace GoldsrcFramework.Engine.Native;
 
@@ -7,9 +7,11 @@ namespace GoldsrcFramework.Engine.Native;
 /// </summary>
 public unsafe class FrameworkClientExports : IClientExportFuncs
 {
+    cl_enginefunc_t* EngineClientApis;
     // IClientExportFuncs implementation - all based on LegacyClientInterop
     public virtual int Initialize(cl_enginefunc_t* pEnginefuncs, int iVersion)
     {
+        EngineClientApis = pEnginefuncs;
         return LegacyClientInterop.Initialize(pEnginefuncs, iVersion);
     }
 
@@ -25,6 +27,9 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
 
     public virtual int HUD_Redraw(float flTime, int intermission)
     {
+        byte* msg = stackalloc byte[100];
+        Encoding.UTF8.GetBytes("framework client",new Span<byte>(msg,100));
+        EngineClientApis->CenterPrint((sbyte*)msg);
         return LegacyClientInterop.HUD_Redraw(flTime, intermission);
     }
 

@@ -9,7 +9,7 @@ namespace GoldsrcFramework
     /// </summary>
     public unsafe static class LegacyServerInterop
     {
-        private const string LegacyServerDll = "hl.dll";
+        private const string LegacyServerDll = "libserver.dll";
 
         // 存储从原版 DLL 获取的函数表
         private static ServerExportFuncs* Api = null;

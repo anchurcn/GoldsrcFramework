@@ -20,8 +20,8 @@ namespace GoldsrcFramework
 
         // 静态变量存储服务端实例和引擎函数
         private static IServerExportFuncs s_server = null!;
-        private static enginefuncs_s* s_engineFuncs = null;
-        private static globalvars_t* s_globalVars = null;
+        public static enginefuncs_s* s_engineFuncs = null;
+        public static globalvars_t* s_globalVars = null;
 
         /// <summary>
         /// Initialize server with game assembly (called from FrameworkInterop)
