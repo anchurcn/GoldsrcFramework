@@ -1,9 +1,55 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <OutputType>Library</OutputType>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <!-- Native AOT Configuration for win-x64 (will be overridden for x86 builds) -->
+    <PublishAot>true</PublishAot>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>false</PublishSingleFile>
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>partial</TrimMode>
+
+    <!-- Output as DLL -->
+    <NativeLib>Shared</NativeLib>
+    <AssemblyName>client</AssemblyName>
+
+    <!-- Preserve reflection capabilities -->
+    <IlcDisableReflection>false</IlcDisableReflection>
+
+    <!-- Ensure exports are preserved -->
+    <IlcExportUnmanagedEntrypoints>true</IlcExportUnmanagedEntrypoints>
   </PropertyGroup>
+
+  <!-- Preserve types and methods needed for reflection -->
+  <ItemGroup>
+    <TrimmerRootAssembly Include="GoldsrcFramework" />
+    <TrimmerRootAssembly Include="GoldsrcFramework.Engine" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Add reference to Mxrx.NetHost.Fxr from refproj -->
+    <ProjectReference Include="..\..\refproj\Mxrx.NetHost.Fxr\src\Package\Mxrx.NetHost.Fxr\Mxrx.NetHost.Fxr.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GoldsrcFramework\GoldsrcFramework.csproj" />
+    <ProjectReference Include="..\GoldsrcFramework.Engine\GoldsrcFramework.Engine.csproj" />
+  </ItemGroup>
+
+  <!-- Copy GoldsrcFramework.dll and runtimeconfig.json to publish output -->
+  <Target Name="CopyFrameworkFiles" AfterTargets="Publish">
+    <ItemGroup>
+      <FrameworkFiles Include="$(MSBuildProjectDirectory)\..\GoldsrcFramework\bin\$(Configuration)\net8.0\GoldsrcFramework.dll" />
+      <FrameworkFiles Include="$(MSBuildProjectDirectory)\..\GoldsrcFramework\bin\$(Configuration)\net8.0\GoldsrcFramework.runtimeconfig.json" />
+      <FrameworkFiles Include="$(MSBuildProjectDirectory)\..\GoldsrcFramework\bin\$(Configuration)\net8.0\GoldsrcFramework.Engine.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(FrameworkFiles)" DestinationFolder="$(PublishDir)" />
+  </Target>
 
 </Project>

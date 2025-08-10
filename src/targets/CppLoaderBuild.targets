@@ -1,0 +1,128 @@
+<Project>
+
+  <!-- C++ Loader Build Targets -->
+  <!-- This targets file handles building the traditional C++ loader (client.dll) -->
+
+  <PropertyGroup>
+    <!-- Source paths -->
+    <LoaderCppSourcePath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.Loader\loader.cpp</LoaderCppSourcePath>
+    <DotNetHostingPropsPath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.Loader\dotnet_hosting.props</DotNetHostingPropsPath>
+    
+    <!-- Output paths -->
+    <LoaderDllOutputPath>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\client.dll</LoaderDllOutputPath>
+  </PropertyGroup>
+
+  <!-- Set LoaderSourceDir in a target to ensure proper evaluation of IntermediateOutputPath -->
+  <Target Name="SetLoaderSourceDir" BeforeTargets="CreateLoaderSourceDir">
+    <PropertyGroup>
+      <LoaderSourceDir Condition="'$(LoaderSourceDir)' == ''">$(IntermediateOutputPath)LoaderSource\</LoaderSourceDir>
+      <!-- Set dependent paths after LoaderSourceDir is properly set -->
+      <EntityExportsCppPath>$(LoaderSourceDir)entity_exports.cpp</EntityExportsCppPath>
+      <LoaderCppPath>$(LoaderSourceDir)loader.cpp</LoaderCppPath>
+      <DotNetHostingPropsTargetPath>$(LoaderSourceDir)dotnet_hosting.props</DotNetHostingPropsTargetPath>
+    </PropertyGroup>
+  </Target>
+
+  <PropertyGroup>
+    <!-- BuildTool paths -->
+    <BuildToolProjectPath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.BuildTool\GoldsrcFramework.BuildTool.csproj</BuildToolProjectPath>
+    <BuildToolOutputPath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.BuildTool\bin\$(Configuration)\net8.0\GoldsrcFramework.BuildTool.exe</BuildToolOutputPath>
+    
+    <!-- MSVC toolchain paths -->
+    <VsInstallDir Condition="'$(VsInstallDir)' == ''">C:\Program Files\Microsoft Visual Studio\2022\Community\</VsInstallDir>
+    <VcToolsVersion Condition="'$(VcToolsVersion)' == ''">14.44.35207</VcToolsVersion>
+    <ClCompilerPath>$(VsInstallDir)VC\Tools\MSVC\$(VcToolsVersion)\bin\Hostx86\x86\cl.exe</ClCompilerPath>
+    <LinkerPath>$(VsInstallDir)VC\Tools\MSVC\$(VcToolsVersion)\bin\Hostx86\x86\link.exe</LinkerPath>
+    <WindowsSdkDir Condition="'$(WindowsSdkDir)' == ''">C:\Program Files (x86)\Windows Kits\10\</WindowsSdkDir>
+    <WindowsSdkVersion Condition="'$(WindowsSdkVersion)' == ''">10.0.22621.0</WindowsSdkVersion>
+  </PropertyGroup>
+
+  <!-- Dynamically determine nethost path instead of hardcoding -->
+  <PropertyGroup>
+    <!-- Determine runtime identifier for current platform -->
+    <NetHostRuntimeIdentifier Condition="'$(NetHostRuntimeIdentifier)' == '' and $([MSBuild]::IsOsPlatform('Windows'))">win-x86</NetHostRuntimeIdentifier>
+    <NetHostRuntimeIdentifier Condition="'$(NetHostRuntimeIdentifier)' == '' and $([MSBuild]::IsOsPlatform('Linux'))">linux-x64</NetHostRuntimeIdentifier>
+    <NetHostRuntimeIdentifier Condition="'$(NetHostRuntimeIdentifier)' == '' and $([MSBuild]::IsOsPlatform('OSX'))">osx-x64</NetHostRuntimeIdentifier>
+    
+    <!-- Get the .NET version from TargetFramework (e.g., net8.0 -> 8.0) -->
+    <NetHostVersion Condition="'$(NetHostVersion)' == '' and $(TargetFramework.StartsWith('net')) and $(TargetFramework.Contains('.'))">$(TargetFramework.Substring(3))</NetHostVersion>
+    
+    <!-- Construct the path to nethost using MSBuild properties -->
+    <!-- Use NetCoreTargetingPackRoot if available, otherwise fall back to dotnet installation -->
+    <NetHostPackRoot Condition="'$(NetCoreTargetingPackRoot)' != ''">$(NetCoreTargetingPackRoot)</NetHostPackRoot>
+    <NetHostPackRoot Condition="'$(NetHostPackRoot)' == '' and '$(DOTNET_ROOT)' != ''">$(DOTNET_ROOT)\packs</NetHostPackRoot>
+    <NetHostPackRoot Condition="'$(NetHostPackRoot)' == '' and $([MSBuild]::IsOsPlatform('Windows'))">$(ProgramFiles)\dotnet\packs</NetHostPackRoot>
+    <NetHostPackRoot Condition="'$(NetHostPackRoot)' == '' and $([MSBuild]::IsOsPlatform('Linux'))">/usr/share/dotnet/packs</NetHostPackRoot>
+    <NetHostPackRoot Condition="'$(NetHostPackRoot)' == '' and $([MSBuild]::IsOsPlatform('OSX'))">/usr/local/share/dotnet/packs</NetHostPackRoot>
+    
+    <!-- Construct the full path to nethost -->
+    <AppHostDir>$(NetHostPackRoot)\Microsoft.NETCore.App.Host.$(NetHostRuntimeIdentifier)\$(NetHostVersion).0\runtimes\$(NetHostRuntimeIdentifier)\native</AppHostDir>
+  </PropertyGroup>
+  
+  <!-- Fallback: Import dotnet_hosting.props if AppHostDir doesn't exist or as backup -->
+  <Import Project="$(DotNetHostingPropsPath)" Condition="Exists('$(DotNetHostingPropsPath)') and !Exists('$(AppHostDir)')" />
+
+  <!-- 1. Ensure BuildTool is built -->
+  <Target Name="BuildBuildTool" BeforeTargets="GenerateEntityExports">
+    <Message Text="Building GoldsrcFramework.BuildTool..." Importance="high" />
+    <MSBuild Projects="$(BuildToolProjectPath)" 
+             Properties="Configuration=$(Configuration);Platform=AnyCPU" 
+             Targets="Build" />
+  </Target>
+
+  <!-- 2. Create LoaderSourceDir -->
+  <Target Name="CreateLoaderSourceDir" BeforeTargets="GenerateEntityExports" DependsOnTargets="SetLoaderSourceDir">
+    <MakeDir Directories="$(LoaderSourceDir)" />
+  </Target>
+
+  <!-- 3. Generate entity_exports.cpp using BuildTool -->
+  <Target Name="GenerateEntityExports"
+          AfterTargets="Build"
+          DependsOnTargets="BuildBuildTool;CreateLoaderSourceDir;SetLoaderSourceDir"
+          Inputs="$(TargetPath)"
+          Outputs="$(EntityExportsCppPath)">
+
+    <Message Text="Generating entity exports..." Importance="high" />
+    <Exec Command="&quot;$(BuildToolOutputPath)&quot; &quot;$(TargetPath)&quot; &quot;$(EntityExportsCppPath)&quot;"
+          WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+
+  <!-- 4. Copy loader.cpp and dotnet_hosting.props to LoaderSourceDir -->
+  <Target Name="CopyLoaderSource"
+          AfterTargets="GenerateEntityExports"
+          DependsOnTargets="CreateLoaderSourceDir;SetLoaderSourceDir"
+          Inputs="$(LoaderCppSourcePath);$(DotNetHostingPropsPath)"
+          Outputs="$(LoaderCppPath);$(DotNetHostingPropsTargetPath)">
+
+    <Message Text="Copying loader source files..." Importance="high" />
+    <Copy SourceFiles="$(LoaderCppSourcePath)" DestinationFiles="$(LoaderCppPath)" />
+    <Copy SourceFiles="$(DotNetHostingPropsPath)" DestinationFiles="$(DotNetHostingPropsTargetPath)" />
+  </Target>
+
+  <!-- 5. Compile loader.dll using MSVC toolchain -->
+  <Target Name="CompileLoader"
+          AfterTargets="CopyLoaderSource"
+          DependsOnTargets="CopyLoaderSource"
+          Inputs="$(EntityExportsCppPath);$(LoaderCppPath)"
+          Outputs="$(LoaderDllOutputPath)">
+
+    <Message Text="Compiling loader.dll using MSVC toolchain (x86)..." Importance="high" />
+    <Message Text="Compiler: $(ClCompilerPath)" Importance="normal" />
+    <Message Text="Linker: $(LinkerPath)" Importance="normal" />
+    <Message Text="NetHost Runtime ID: $(NetHostRuntimeIdentifier)" Importance="normal" />
+    <Message Text="NetHost Version: $(NetHostVersion)" Importance="normal" />
+    <Message Text="NetHost Pack Root: $(NetHostPackRoot)" Importance="normal" />
+    <Message Text="AppHostDir: $(AppHostDir)" Importance="normal" />
+
+    <!-- Compile object files -->
+    <Exec Command="&quot;$(ClCompilerPath)&quot; /c /EHsc /MD /O2 /DNDEBUG /I&quot;$(AppHostDir)&quot; /I&quot;$(WindowsSdkDir)Include\$(WindowsSdkVersion)\ucrt&quot; /I&quot;$(WindowsSdkDir)Include\$(WindowsSdkVersion)\um&quot; /I&quot;$(WindowsSdkDir)Include\$(WindowsSdkVersion)\shared&quot; /I&quot;$(VsInstallDir)VC\Tools\MSVC\$(VcToolsVersion)\include&quot; /Fo&quot;$(LoaderSourceDir)&quot; &quot;$(EntityExportsCppPath)&quot; &quot;$(LoaderCppPath)&quot;"
+          WorkingDirectory="$(LoaderSourceDir)" />
+
+    <!-- Link DLL -->
+    <Exec Command="&quot;$(LinkerPath)&quot; /DLL /OUT:&quot;$(LoaderDllOutputPath)&quot; /LIBPATH:&quot;$(AppHostDir)&quot; /LIBPATH:&quot;$(WindowsSdkDir)Lib\$(WindowsSdkVersion)\um\x86&quot; /LIBPATH:&quot;$(WindowsSdkDir)Lib\$(WindowsSdkVersion)\ucrt\x86&quot; /LIBPATH:&quot;$(VsInstallDir)VC\Tools\MSVC\$(VcToolsVersion)\lib\x86&quot; nethost.lib kernel32.lib user32.lib &quot;$(LoaderSourceDir)entity_exports.obj&quot; &quot;$(LoaderSourceDir)loader.obj&quot;"
+          WorkingDirectory="$(LoaderSourceDir)" />
+
+    <Message Text="Loader compiled successfully: $(LoaderDllOutputPath)" Importance="high" />
+  </Target>
+
+</Project>

@@ -1,0 +1,98 @@
+<Project>
+
+  <!-- NetLoader Build Targets -->
+  <!-- This targets file handles building the NetLoader (client.dll) using Native AOT -->
+
+  <PropertyGroup>
+    <!-- NetLoader project path -->
+    <NetLoaderProjectPath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.NetLoader\GoldsrcFramework.NetLoader.csproj</NetLoaderProjectPath>
+    
+    <!-- Output paths -->
+    <NetLoaderOutputPath>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\client.dll</NetLoaderOutputPath>
+    <NetLoaderPublishDir>$(MSBuildProjectDirectory)\..\GoldsrcFramework.NetLoader\bin\Release\net8.0\win-x64\publish</NetLoaderPublishDir>
+  </PropertyGroup>
+
+  <!-- Set LoaderSourceDir in a target to ensure proper evaluation of IntermediateOutputPath -->
+  <Target Name="SetLoaderSourceDir" BeforeTargets="CreateLoaderSourceDir">
+    <PropertyGroup>
+      <LoaderSourceDir Condition="'$(LoaderSourceDir)' == ''">$(IntermediateOutputPath)LoaderSource\</LoaderSourceDir>
+      <!-- Set dependent paths after LoaderSourceDir is properly set -->
+      <EntityExportsCppPath>$(LoaderSourceDir)entity_exports.cpp</EntityExportsCppPath>
+      <NetLoaderClientDllPath>$(LoaderSourceDir)client.dll</NetLoaderClientDllPath>
+    </PropertyGroup>
+  </Target>
+
+  <PropertyGroup>
+    <!-- BuildTool paths -->
+    <BuildToolProjectPath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.BuildTool\GoldsrcFramework.BuildTool.csproj</BuildToolProjectPath>
+    <BuildToolOutputPath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.BuildTool\bin\$(Configuration)\net8.0\GoldsrcFramework.BuildTool.exe</BuildToolOutputPath>
+  </PropertyGroup>
+
+  <!-- 1. Ensure BuildTool is built -->
+  <Target Name="BuildBuildTool" BeforeTargets="GenerateEntityExports">
+    <Message Text="Building GoldsrcFramework.BuildTool..." Importance="high" />
+    <MSBuild Projects="$(BuildToolProjectPath)" 
+             Properties="Configuration=$(Configuration);Platform=AnyCPU" 
+             Targets="Build" />
+  </Target>
+
+  <!-- 2. Create LoaderSourceDir -->
+  <Target Name="CreateLoaderSourceDir" BeforeTargets="GenerateEntityExports" DependsOnTargets="SetLoaderSourceDir">
+    <MakeDir Directories="$(LoaderSourceDir)" />
+  </Target>
+
+  <!-- 3. Generate entity_exports.cpp using BuildTool -->
+  <Target Name="GenerateEntityExports"
+          AfterTargets="Build"
+          DependsOnTargets="BuildBuildTool;CreateLoaderSourceDir;SetLoaderSourceDir"
+          Inputs="$(TargetPath)"
+          Outputs="$(EntityExportsCppPath)">
+
+    <Message Text="Generating entity exports..." Importance="high" />
+
+    <!-- Use GoldsrcFramework.dll instead of the mod DLL since EntityContext is in GoldsrcFramework -->
+    <PropertyGroup>
+      <GoldsrcFrameworkDllPath>$(OutDir)GoldsrcFramework.dll</GoldsrcFrameworkDllPath>
+    </PropertyGroup>
+
+    <Message Text="GoldsrcFramework DLL: $(GoldsrcFrameworkDllPath)" Importance="normal" />
+    <Message Text="Output: $(EntityExportsCppPath)" Importance="normal" />
+
+    <Error Text="GoldsrcFramework.dll not found at: $(GoldsrcFrameworkDllPath)"
+           Condition="!Exists('$(GoldsrcFrameworkDllPath)')" />
+
+    <Exec Command="&quot;$(BuildToolOutputPath)&quot; &quot;$(GoldsrcFrameworkDllPath)&quot; &quot;$(EntityExportsCppPath)&quot;"
+          WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+
+  <!-- 4. Build NetLoader using Native AOT -->
+  <Target Name="BuildNetLoader"
+          AfterTargets="GenerateEntityExports"
+          DependsOnTargets="GenerateEntityExports"
+          Inputs="$(TargetPath);$(EntityExportsCppPath)"
+          Outputs="$(NetLoaderClientDllPath)">
+
+    <Message Text="Building NetLoader with Native AOT..." Importance="high" />
+    
+    <!-- First ensure GoldsrcFramework is built -->
+    <MSBuild Projects="$(MSBuildProjectFile)" 
+             Properties="Configuration=$(Configuration)" 
+             Targets="Build" />
+    
+    <!-- Then publish NetLoader -->
+    <MSBuild Projects="$(NetLoaderProjectPath)" 
+             Properties="Configuration=Release;RuntimeIdentifier=win-x64" 
+             Targets="Publish" />
+    
+    <!-- Copy client.dll to LoaderSourceDir -->
+    <Copy SourceFiles="$(NetLoaderPublishDir)\client.dll" 
+          DestinationFiles="$(NetLoaderClientDllPath)" />
+    
+    <!-- Copy client.dll to final output location -->
+    <Copy SourceFiles="$(NetLoaderPublishDir)\client.dll" 
+          DestinationFiles="$(NetLoaderOutputPath)" />
+          
+    <Message Text="NetLoader built successfully: $(NetLoaderOutputPath)" Importance="high" />
+  </Target>
+
+</Project>
