@@ -31,10 +31,12 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{02EA681E-C
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "targets", "targets", "{7251D0FD-B9B4-457F-B658-037834C19D99}"
 	ProjectSection(SolutionItems) = preProject
+		targets\CppLoaderBuild.targets = targets\CppLoaderBuild.targets
 		GoldsrcFramework.targets = GoldsrcFramework.targets
 		targets\ModPostBuild.README.md = targets\ModPostBuild.README.md
 		targets\ModPostBuild.Simple.targets = targets\ModPostBuild.Simple.targets
 		targets\ModPostBuild.targets = targets\ModPostBuild.targets
+		targets\NetLoaderBuild.targets = targets\NetLoaderBuild.targets
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GoldsrcFramework.BuildTool", "GoldsrcFramework.BuildTool\GoldsrcFramework.BuildTool.csproj", "{D3CE928A-00D5-4F91-9194-5F6F225177E4}"

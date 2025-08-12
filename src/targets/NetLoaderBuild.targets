@@ -1,95 +1,97 @@
 <Project>
 
-  <!-- NetLoader Build Targets -->
-  <!-- This targets file handles building the NetLoader (client.dll) using Native AOT -->
+	<!-- NetLoader Build Targets -->
+	<!-- This targets file handles building the NetLoader (client.dll) using Native AOT -->
 
-  <PropertyGroup>
-    <!-- NetLoader project path -->
-    <NetLoaderProjectPath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.NetLoader\GoldsrcFramework.NetLoader.csproj</NetLoaderProjectPath>
-    
-    <!-- Output paths -->
-    <NetLoaderOutputPath>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\client.dll</NetLoaderOutputPath>
-    <NetLoaderPublishDir>$(MSBuildProjectDirectory)\..\GoldsrcFramework.NetLoader\bin\Release\net8.0\win-x64\publish</NetLoaderPublishDir>
-  </PropertyGroup>
+	<PropertyGroup>
+		<!-- NetLoader project path -->
+		<NetLoaderProjectPath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.NetLoader\GoldsrcFramework.NetLoader.csproj</NetLoaderProjectPath>
 
-  <!-- Set LoaderSourceDir in a target to ensure proper evaluation of IntermediateOutputPath -->
-  <Target Name="SetLoaderSourceDir" BeforeTargets="CreateLoaderSourceDir">
-    <PropertyGroup>
-      <LoaderSourceDir Condition="'$(LoaderSourceDir)' == ''">$(IntermediateOutputPath)LoaderSource\</LoaderSourceDir>
-      <!-- Set dependent paths after LoaderSourceDir is properly set -->
-      <EntityExportsCsPath>$(LoaderSourceDir)EntityExports.cs</EntityExportsCsPath>
-      <LoaderCsPath>$(LoaderSourceDir)Loader.cs</LoaderCsPath>
-      <NetLoaderCsprojPath>$(LoaderSourceDir)GoldsrcFramework.NetLoader.csproj</NetLoaderCsprojPath>
-      <NetLoaderClientDllPath>$(LoaderSourceDir)client.dll</NetLoaderClientDllPath>
-    </PropertyGroup>
-  </Target>
+		<!-- Output paths -->
+		<NetLoaderOutputPath>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\client.dll</NetLoaderOutputPath>
+		<NetLoaderPdbOutputPath>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\client.pdb</NetLoaderPdbOutputPath>
+		<NetLoaderPublishDir>$(MSBuildProjectDirectory)\..\GoldsrcFramework.NetLoader\bin\Release\net8.0\win-x64\publish</NetLoaderPublishDir>
+	</PropertyGroup>
 
-  <PropertyGroup>
-    <!-- BuildTool paths -->
-    <BuildToolProjectPath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.BuildTool\GoldsrcFramework.BuildTool.csproj</BuildToolProjectPath>
-    <BuildToolOutputPath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.BuildTool\bin\$(Configuration)\net8.0\GoldsrcFramework.BuildTool.exe</BuildToolOutputPath>
-  </PropertyGroup>
+	<!-- Set LoaderSourceDir in a target to ensure proper evaluation of IntermediateOutputPath -->
+	<Target Name="SetLoaderSourceDir" BeforeTargets="CreateLoaderSourceDir">
+		<PropertyGroup>
+			<LoaderSourceDir Condition="'$(LoaderSourceDir)' == ''">$(IntermediateOutputPath)LoaderSource\</LoaderSourceDir>
+			<!-- Set dependent paths after LoaderSourceDir is properly set -->
+			<EntityExportsCsPath>$(LoaderSourceDir)EntityExports.cs</EntityExportsCsPath>
+			<LoaderCsPath>$(LoaderSourceDir)Loader.cs</LoaderCsPath>
+			<NetLoaderCsprojPath>$(LoaderSourceDir)GoldsrcFramework.NetLoader.csproj</NetLoaderCsprojPath>
+			<NetLoaderClientDllPath>$(LoaderSourceDir)client.dll</NetLoaderClientDllPath>
+		</PropertyGroup>
+	</Target>
 
-  <!-- 1. Ensure BuildTool is built -->
-  <Target Name="BuildBuildTool" BeforeTargets="GenerateEntityExports">
-    <Message Text="Building GoldsrcFramework.BuildTool..." Importance="high" />
-    <MSBuild Projects="$(BuildToolProjectPath)" 
-             Properties="Configuration=$(Configuration);Platform=AnyCPU" 
-             Targets="Build" />
-  </Target>
+	<PropertyGroup>
+		<!-- BuildTool paths -->
+		<BuildToolProjectPath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.BuildTool\GoldsrcFramework.BuildTool.csproj</BuildToolProjectPath>
+		<BuildToolOutputPath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.BuildTool\bin\$(Configuration)\net8.0\GoldsrcFramework.BuildTool.exe</BuildToolOutputPath>
+	</PropertyGroup>
 
-  <!-- 2. Create LoaderSourceDir -->
-  <Target Name="CreateLoaderSourceDir" BeforeTargets="GenerateEntityExports" DependsOnTargets="SetLoaderSourceDir">
-    <MakeDir Directories="$(LoaderSourceDir)" />
-  </Target>
+	<!-- 1. Ensure BuildTool is built -->
+	<Target Name="BuildBuildTool" BeforeTargets="GenerateEntityExports">
+		<Message Text="Building GoldsrcFramework.BuildTool..." Importance="high" />
+		<MSBuild Projects="$(BuildToolProjectPath)"
+				 Properties="Configuration=$(Configuration);Platform=AnyCPU"
+				 Targets="Build" />
+	</Target>
 
-  <!-- 3. Generate EntityExports.cs using BuildTool -->
-  <Target Name="GenerateEntityExports"
-          AfterTargets="Build"
-          DependsOnTargets="BuildBuildTool;CreateLoaderSourceDir;SetLoaderSourceDir"
-          Inputs="$(TargetPath)"
-          Outputs="$(EntityExportsCsPath)">
+	<!-- 2. Create LoaderSourceDir -->
+	<Target Name="CreateLoaderSourceDir" BeforeTargets="GenerateEntityExports" DependsOnTargets="SetLoaderSourceDir">
+		<MakeDir Directories="$(LoaderSourceDir)" />
+	</Target>
 
-    <Message Text="Generating entity exports (C#)..." Importance="high" />
+	<!-- 3. Generate EntityExports.cs using BuildTool -->
+	<Target Name="GenerateEntityExports"
+			AfterTargets="Build"
+			DependsOnTargets="BuildBuildTool;CreateLoaderSourceDir;SetLoaderSourceDir"
+			Inputs="$(TargetPath)"
+			Outputs="$(EntityExportsCsPath)">
 
-    <!-- Use GoldsrcFramework.dll instead of the mod DLL since EntityContext is in GoldsrcFramework -->
-    <PropertyGroup>
-      <GoldsrcFrameworkDllPath>$(OutDir)GoldsrcFramework.dll</GoldsrcFrameworkDllPath>
-    </PropertyGroup>
+		<Message Text="Generating entity exports (C#)..." Importance="high" />
 
-    <Message Text="GoldsrcFramework DLL: $(GoldsrcFrameworkDllPath)" Importance="normal" />
-    <Message Text="Output: $(EntityExportsCsPath)" Importance="normal" />
+		<!-- Use GoldsrcFramework.dll instead of the mod DLL since EntityContext is in GoldsrcFramework -->
+		<PropertyGroup>
+			<GoldsrcFrameworkDllPath>$(OutDir)GoldsrcFramework.dll</GoldsrcFrameworkDllPath>
+		</PropertyGroup>
 
-    <Error Text="GoldsrcFramework.dll not found at: $(GoldsrcFrameworkDllPath)"
-           Condition="!Exists('$(GoldsrcFrameworkDllPath)')" />
+		<Message Text="GoldsrcFramework DLL: $(GoldsrcFrameworkDllPath)" Importance="normal" />
+		<Message Text="Output: $(EntityExportsCsPath)" Importance="normal" />
 
-    <Exec Command="&quot;$(BuildToolOutputPath)&quot; cs &quot;$(GoldsrcFrameworkDllPath)&quot; &quot;$(EntityExportsCsPath)&quot;"
-          WorkingDirectory="$(MSBuildProjectDirectory)" />
-  </Target>
+		<Error Text="GoldsrcFramework.dll not found at: $(GoldsrcFrameworkDllPath)"
+			   Condition="!Exists('$(GoldsrcFrameworkDllPath)')" />
 
-  <!-- 4. Copy NetLoader source files -->
-  <Target Name="CopyNetLoaderSource"
-          AfterTargets="GenerateEntityExports"
-          DependsOnTargets="GenerateEntityExports"
-          Inputs="$(TargetPath);$(EntityExportsCsPath)"
-          Outputs="$(LoaderCsPath);$(NetLoaderCsprojPath)">
+		<Exec Command="&quot;$(BuildToolOutputPath)&quot; cs &quot;$(GoldsrcFrameworkDllPath)&quot; &quot;$(EntityExportsCsPath)&quot;"
+			  WorkingDirectory="$(MSBuildProjectDirectory)" />
+	</Target>
 
-    <Message Text="Copying NetLoader source files..." Importance="high" />
+	<!-- 4. Copy NetLoader source files -->
+	<Target Name="CopyNetLoaderSource"
+			AfterTargets="GenerateEntityExports"
+			DependsOnTargets="GenerateEntityExports"
+			Inputs="$(TargetPath);$(EntityExportsCsPath)"
+			Outputs="$(LoaderCsPath);$(NetLoaderCsprojPath)">
 
-    <!-- Copy Loader.cs -->
-    <Copy SourceFiles="$(MSBuildThisFileDirectory)..\GoldsrcFramework.NetLoader\Loader.cs"
-          DestinationFiles="$(LoaderCsPath)" />
+		<Message Text="Copying NetLoader source files..." Importance="high" />
 
-    <!-- Modify Loader.cs to use EntityExports instead of EntityExportsDemo -->
-    <PropertyGroup>
-      <LoaderCsContent>$([System.IO.File]::ReadAllText('$(LoaderCsPath)'))</LoaderCsContent>
-      <ModifiedLoaderCsContent>$(LoaderCsContent.Replace('EntityExportsDemo', 'EntityExports'))</ModifiedLoaderCsContent>
-    </PropertyGroup>
-    <WriteLinesToFile File="$(LoaderCsPath)" Lines="$(ModifiedLoaderCsContent)" Overwrite="true" />
+		<!-- Copy Loader.cs -->
+		<Copy SourceFiles="$(MSBuildThisFileDirectory)..\GoldsrcFramework.NetLoader\Loader.cs"
+			  DestinationFiles="$(LoaderCsPath)" />
 
-    <!-- Create a modified csproj file for win-x86 -->
-    <PropertyGroup>
-      <CsprojContent><![CDATA[<Project Sdk="Microsoft.NET.Sdk">
+		<!-- Modify Loader.cs to use EntityExports instead of EntityExportsDemo -->
+		<PropertyGroup>
+			<LoaderCsContent>$([System.IO.File]::ReadAllText('$(LoaderCsPath)'))</LoaderCsContent>
+			<ModifiedLoaderCsContent>$(LoaderCsContent.Replace('EntityExportsDemo', 'EntityExports'))</ModifiedLoaderCsContent>
+		</PropertyGroup>
+		<WriteLinesToFile File="$(LoaderCsPath)" Lines="$(ModifiedLoaderCsContent)" Overwrite="true" />
+
+		<!-- Create a modified csproj file for win-x86 -->
+		<PropertyGroup>
+			<CsprojContent>
+				<![CDATA[<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>net9.0</TargetFramework>
@@ -123,52 +125,55 @@
 		</ItemGroup>
 	</Target>
 
-</Project>]]></CsprojContent>
-    </PropertyGroup>
-    <WriteLinesToFile File="$(NetLoaderCsprojPath)" Lines="$(CsprojContent)" Overwrite="true" />
+</Project>]]>
+			</CsprojContent>
+		</PropertyGroup>
+		<WriteLinesToFile File="$(NetLoaderCsprojPath)" Lines="$(CsprojContent)" Overwrite="true" />
 
-    <Message Text="NetLoader source files copied to: $(LoaderSourceDir)" Importance="high" />
-  </Target>
+		<Message Text="NetLoader source files copied to: $(LoaderSourceDir)" Importance="high" />
+	</Target>
 
-  <!-- 5. Build NetLoader using Native AOT -->
-  <Target Name="BuildNetLoader"
-          AfterTargets="CopyNetLoaderSource"
-          DependsOnTargets="CopyNetLoaderSource"
-          Inputs="$(TargetPath);$(EntityExportsCsPath);$(LoaderCsPath);$(NetLoaderCsprojPath)"
-          Outputs="$(NetLoaderClientDllPath)">
+	<!-- 5. Build NetLoader using Native AOT -->
+	<Target Name="BuildNetLoader"
+			AfterTargets="CopyNetLoaderSource"
+			DependsOnTargets="CopyNetLoaderSource"
+			Inputs="$(TargetPath);$(EntityExportsCsPath);$(LoaderCsPath);$(NetLoaderCsprojPath)"
+			Outputs="$(NetLoaderClientDllPath)">
 
-    <Message Text="Building NetLoader with Native AOT from LoaderSource..." Importance="high" />
+		<Message Text="Building NetLoader with Native AOT from LoaderSource..." Importance="high" />
 
-    <!-- First ensure GoldsrcFramework is built and copy required files -->
-    <MSBuild Projects="$(MSBuildProjectFile)"
-             Properties="Configuration=$(Configuration)"
-             Targets="Build" />
+		<!-- First ensure GoldsrcFramework is built and copy required files -->
+		<MSBuild Projects="$(MSBuildProjectFile)"
+				 Properties="Configuration=$(Configuration)"
+				 Targets="Build" />
 
-    <!-- Copy GoldsrcFramework.dll and runtimeconfig.json to LoaderSource -->
-    <PropertyGroup>
-      <GoldsrcFrameworkBinDir>$(MSBuildProjectDirectory)\..\GoldsrcFramework\bin\$(Configuration)\net8.0\</GoldsrcFrameworkBinDir>
-    </PropertyGroup>
+		<!-- Copy GoldsrcFramework.dll and runtimeconfig.json to LoaderSource -->
+		<PropertyGroup>
+			<GoldsrcFrameworkBinDir>$(MSBuildProjectDirectory)\..\GoldsrcFramework\bin\$(Configuration)\net8.0\</GoldsrcFrameworkBinDir>
+		</PropertyGroup>
 
-    <Copy SourceFiles="$(GoldsrcFrameworkBinDir)GoldsrcFramework.dll"
-          DestinationFolder="$(LoaderSourceDir)" />
-    <Copy SourceFiles="$(GoldsrcFrameworkBinDir)GoldsrcFramework.runtimeconfig.json"
-          DestinationFolder="$(LoaderSourceDir)" />
+		<Copy SourceFiles="$(GoldsrcFrameworkBinDir)GoldsrcFramework.dll"
+			  DestinationFolder="$(LoaderSourceDir)" />
+		<Copy SourceFiles="$(GoldsrcFrameworkBinDir)GoldsrcFramework.runtimeconfig.json"
+			  DestinationFolder="$(LoaderSourceDir)" />
 
-    <!-- Restore packages for the copied project -->
-    <MSBuild Projects="$(NetLoaderCsprojPath)"
-             Properties="Configuration=$(Configuration);RuntimeIdentifier=win-x86"
-             Targets="Restore" />
+		<!-- Restore packages for the copied project -->
+		<MSBuild Projects="$(NetLoaderCsprojPath)"
+				 Properties="Configuration=$(Configuration);RuntimeIdentifier=win-x86"
+				 Targets="Restore" />
 
-    <!-- Publish NetLoader from LoaderSource directory -->
-    <MSBuild Projects="$(NetLoaderCsprojPath)"
-             Properties="Configuration=$(Configuration);RuntimeIdentifier=win-x86;PublishDir=$(LoaderSourceDir)publish\"
-             Targets="Publish" />
+		<!-- Publish NetLoader from LoaderSource directory -->
+		<MSBuild Projects="$(NetLoaderCsprojPath)"
+				 Properties="Configuration=$(Configuration);RuntimeIdentifier=win-x86;PublishDir=$(LoaderSourceDir)publish\"
+				 Targets="Publish" />
 
-    <!-- Copy client.dll to final output location -->
-    <Copy SourceFiles="$(LoaderSourceDir)bin\$(Configuration)\net9.0\win-x86\native\client.dll"
-          DestinationFiles="$(NetLoaderOutputPath)" />
+		<!-- Copy client.dll to final output location -->
+		<Copy SourceFiles="$(LoaderSourceDir)bin\$(Configuration)\net9.0\win-x86\native\client.dll"
+			  DestinationFiles="$(NetLoaderOutputPath)" />
+		<Copy SourceFiles="$(LoaderSourceDir)bin\$(Configuration)\net9.0\win-x86\native\client.pdb"
+			  DestinationFiles="$(NetLoaderPdbOutputPath)" />
 
-    <Message Text="NetLoader built successfully: $(NetLoaderOutputPath)" Importance="high" />
-  </Target>
+		<Message Text="NetLoader built successfully: $(NetLoaderOutputPath)" Importance="high" />
+	</Target>
 
 </Project>

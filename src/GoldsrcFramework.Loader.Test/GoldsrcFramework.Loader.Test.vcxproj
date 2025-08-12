@@ -98,7 +98,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy "..\GoldsrcFramework.NetLoader\bin\Release\net8.0\win-x64\publish\*.*" "$(OutDir)" /E /H /C /I /Y</Command>
+      <Command>xcopy "..\GoldsrcFramework.Demo\bin\$(Configuration)\net8.0\*.*" "$(OutDir)" /E /H /C /I /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -117,7 +117,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy "..\GoldsrcFramework.NetLoader\bin\Release\net8.0\win-x64\publish\*.*" "$(OutDir)" /E /H /C /I /Y</Command>
+      <Command>xcopy "..\GoldsrcFramework.Demo\bin\$(Configuration)\net8.0\*.*" "$(OutDir)" /E /H /C /I /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -132,7 +132,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy "..\GoldsrcFramework.NetLoader\bin\Release\net8.0\win-x64\publish\*.*" "$(OutDir)" /E /H /C /I /Y</Command>
+      <Command>xcopy "..\GoldsrcFramework.Demo\bin\$(Configuration)\net8.0\*.*" "$(OutDir)" /E /H /C /I /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -151,11 +151,21 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy "..\GoldsrcFramework.NetLoader\bin\Release\net8.0\win-x64\publish\*.*" "$(OutDir)" /E /H /C /I /Y</Command>
+      <Command>xcopy "..\GoldsrcFramework.Demo\bin\$(Configuration)\net8.0\*.*" "$(OutDir)" /E /H /C /I /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="testmain.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\GoldsrcFramework.Demo\GoldsrcFramework.Demo.csproj">
+      <Project>{b4c241d6-b42b-4786-97d8-0eaa31f20746}</Project>
+      <CopyLocalSatelliteAssemblies>false</CopyLocalSatelliteAssemblies>
+      <OutputItemType>Content</OutputItemType>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Private>false</Private>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
   </ItemGroup>
   <!-- No project references needed - we copy files via PostBuildEvent -->
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

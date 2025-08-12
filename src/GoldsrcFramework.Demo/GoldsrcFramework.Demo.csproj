@@ -13,7 +13,8 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\GoldsrcFramework.Engine\GoldsrcFramework.Engine.csproj" />
-		<ProjectReference Include="..\GoldsrcFramework\GoldsrcFramework.csproj" />
+		<ProjectReference Include="..\GoldsrcFramework\GoldsrcFramework.csproj">
+		</ProjectReference>
 	</ItemGroup>
 
 	<ItemGroup>
@@ -33,9 +34,7 @@
 	<!-- Post-build event to copy files to game directory -->
 	<Target Name="PostBuildCopyToGame" AfterTargets="ModPostBuild">
 		<Message Text="Executing post-build copy to game directory..." Importance="high" />
-		<Exec Command="&quot;$(ProjectDir)..\..\post_build_copy.bat&quot; &quot;$(OutDir)&quot;"
-		      ContinueOnError="true"
-		      IgnoreExitCode="false" />
+		<Exec Command="&quot;$(ProjectDir)..\..\post_build_copy.bat&quot; &quot;$(OutDir)&quot;" ContinueOnError="true" IgnoreExitCode="false" />
 	</Target>
 
 	<!--<Import Project="..\GoldsrcFramework\bin\$(Configuration)\$(TargetFramework)\GoldsrcFramework.targets" />-->

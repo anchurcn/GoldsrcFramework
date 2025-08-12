@@ -12,8 +12,8 @@
 		<RuntimeIdentifier>win-x86</RuntimeIdentifier>
 		<SelfContained>true</SelfContained>
 		<!--<PublishSingleFile>false</PublishSingleFile>-->
-		<PublishTrimmed>true</PublishTrimmed>
-		<TrimMode>partial</TrimMode>
+		<!--<PublishTrimmed>true</PublishTrimmed>
+		<TrimMode>partial</TrimMode>-->
 
 		<!-- Output as DLL -->
 		<NativeLib>Shared</NativeLib>
