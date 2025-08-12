@@ -121,7 +121,7 @@
 
 	<Target Name="PrepareForNativePublish" AfterTargets="Build">
 		<ItemGroup>
-			<NativeLibrary Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Host.win-x86\9.0.5\runtimes\win-x86\native\libnethost.lib" />
+			<NativeLibrary Include="$(NetCoreTargetingPackRoot)/Microsoft.NETCore.App.Host.win-x86/$(BundledNETCoreAppPackageVersion)/runtimes/win-x86/native\libnethost.lib" />
 		</ItemGroup>
 	</Target>
 
