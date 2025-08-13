@@ -44,14 +44,13 @@ namespace GoldsrcFramework.Entity
                 if (_hlibcServer == IntPtr.Zero)
                     throw new Exception("Failed to load libserver.dll. Ensure it is present in the application directory.");
             }
-            try
-            {
-                return NativeLibrary.GetExport(_hlibcServer, entityClassName);
 
-            }
-            catch (Exception ex)
+            if (NativeLibrary.TryGetExport(_hlibcServer, entityClassName, out var address))
             {
-                Debug.WriteLine(ex.ToString());
+                return address;
+            }
+            else
+            {
                 return GetErrorAllocatorPtr();
             }
         }
