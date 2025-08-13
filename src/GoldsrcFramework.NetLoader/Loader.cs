@@ -210,7 +210,7 @@ namespace GoldsrcFramework.NetLoader
         {
             EnsureInitialized();
             delegate* unmanaged[Cdecl]<IntPtr, void> pfn = (delegate* unmanaged[Cdecl]<IntPtr, void>)
-                GetGoldsrcFrameworkFunctionPointer("GoldsrcFramework.FrameworkInterop", "F");
+                GetGoldsrcFrameworkFunctionPointer("GoldsrcFramework.FrameworkInterop, GoldsrcFramework", "F");
             if (pfn == null)
             {
                 Debug.WriteLine("Unable to get function pointer for F");
@@ -266,7 +266,7 @@ namespace GoldsrcFramework.NetLoader
         {
             EnsureInitialized();
             delegate* unmanaged[Cdecl]<IntPtr, IntPtr, void> pfn = (delegate* unmanaged[Cdecl]<IntPtr, IntPtr, void>)
-                GetGoldsrcFrameworkFunctionPointer("GoldsrcFramework.FrameworkInterop", "GiveFnptrsToDll");
+                GetGoldsrcFrameworkFunctionPointer("GoldsrcFramework.FrameworkInterop, GoldsrcFramework", "GiveFnptrsToDll");
             if (pfn == null)
             {
                 Debug.WriteLine("Unable to get function pointer for GiveFnptrsToDll");
@@ -283,7 +283,7 @@ namespace GoldsrcFramework.NetLoader
         {
             EnsureInitialized();
             delegate* unmanaged[Cdecl]<IntPtr, int, int> pfn = (delegate* unmanaged[Cdecl]<IntPtr, int, int>)
-                GetGoldsrcFrameworkFunctionPointer("GoldsrcFramework.FrameworkInterop", "GetEntityAPI");
+                GetGoldsrcFrameworkFunctionPointer("GoldsrcFramework.FrameworkInterop, GoldsrcFramework", "GetEntityAPI");
             if (pfn == null)
             {
                 Debug.WriteLine("Unable to get function pointer for GetEntityAPI");
@@ -297,7 +297,7 @@ namespace GoldsrcFramework.NetLoader
         {
             EnsureInitialized();
             delegate* unmanaged[Cdecl]<IntPtr, IntPtr, int> pfn = (delegate* unmanaged[Cdecl]<IntPtr, IntPtr, int>)
-                GetGoldsrcFrameworkFunctionPointer("GoldsrcFramework.FrameworkInterop", "GetEntityAPI2");
+                GetGoldsrcFrameworkFunctionPointer("GoldsrcFramework.FrameworkInterop, GoldsrcFramework", "GetEntityAPI2");
             if (pfn == null)
             {
                 Debug.WriteLine("Unable to get function pointer for GetEntityAPI2");
@@ -311,7 +311,7 @@ namespace GoldsrcFramework.NetLoader
         {
             EnsureInitialized();
             delegate* unmanaged[Cdecl]<IntPtr, IntPtr, int> pfn = (delegate* unmanaged[Cdecl]<IntPtr, IntPtr, int>)
-                GetGoldsrcFrameworkFunctionPointer("GoldsrcFramework.FrameworkInterop", "GetNewDLLFunctions");
+                GetGoldsrcFrameworkFunctionPointer("GoldsrcFramework.FrameworkInterop, GoldsrcFramework", "GetNewDLLFunctions");
             if (pfn == null)
             {
                 Debug.WriteLine("Unable to get function pointer for GetNewDLLFunctions");
@@ -327,7 +327,7 @@ namespace GoldsrcFramework.NetLoader
         {
             EnsureInitialized();
             delegate* unmanaged[Cdecl]<IntPtr, IntPtr> pfn = (delegate* unmanaged[Cdecl]<IntPtr, IntPtr>)
-                GetGoldsrcFrameworkFunctionPointer("GoldsrcFramework.FrameworkInterop", "GetPrivateDataAllocator");
+                GetGoldsrcFrameworkFunctionPointer("GoldsrcFramework.FrameworkInterop, GoldsrcFramework", "GetPrivateDataAllocator");
             if (pfn == null)
             {
                 Debug.WriteLine("Unable to get function pointer for GetPrivateDataAllocator");
