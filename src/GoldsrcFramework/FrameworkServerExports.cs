@@ -157,7 +157,6 @@ public unsafe class FrameworkServerExports : IServerExportFuncs
 
     public virtual sbyte* GetGameDescription()
     {
-        LegacyServerInterop.Initialize(ServerMain.s_engineFuncs, ServerMain.s_globalVars);
         return LegacyServerInterop.GetGameDescription();
     }
 
