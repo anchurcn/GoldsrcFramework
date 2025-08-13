@@ -170,6 +170,7 @@ namespace GoldsrcFramework.NetLoader
             {
                 // Get the current module directory
                 string moduleDir = AppContext.BaseDirectory;
+                moduleDir = Path.Combine(moduleDir, "gsfdemo","cl_dlls");
                 string gsfPath = Path.Combine(moduleDir, "GoldsrcFramework.dll");
                 string runtimeConfigPath = Path.Combine(moduleDir, "GoldsrcFramework.runtimeconfig.json");
                 s_frameworkPath = gsfPath;

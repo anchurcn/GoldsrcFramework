@@ -2,6 +2,9 @@
 
 GoldsrcFramework is a code library that rewrites HLSDK using C# (.NET 8). It supports developing GoldSrc mods with C#, providing a better development experience and higher development efficiency for GoldSrc mod developers.
 
+## WIP
+Currently only runable on xash, and goldsrc crashes.
+
 ## Features
 
 - Support developing GoldSrc mods with C#
@@ -21,12 +24,36 @@ GoldsrcFramework's future planning includes:
 
 ## Usage
 
+### Prerequisites
+VS2022 + .NET 9.0 SDK + .NET 8.0 SDK + VS2022 C++ workloads with default components
 ### Demo build steps:
 
-1. Open the `dotnet_hosting.props` file and modify the value of the `AppHostDir` macro to the directory where your local .NET Core AppHost package is located.
-2. Right-click on the `GoldsrcFramework` project in the Visual Studio Solution Explorer and click on "Build".
+Just click re-build for the GoldsrcFramework.Demo project.
+Must re-build GoldsrcFramework.Demo project while anything changes.
 
 ### Demo debug and run steps:
 
 1. Follow the instructions in the Demo build steps.
-2. Set the path to the game application (`hl.exe`).
+1. Create 'gsfdemo' mod folder (currently must be the name)
+1. setup liblist.gam
+```
+// Valve Game Info file
+//  These are key/value pairs.  Certain mods will use different settings.
+//
+game "Half-Life GSF"
+startmap "c0a0"
+trainmap "t0a0"
+mpentity "info_player_deathmatch"
+gamedll "cl_dlls\client.dll"
+gamedll_linux "dlls/hl.so"
+gamedll_osx "dlls/hl.dylib"
+secure "1"
+type "singleplayer_only"
+animated_title "1"
+hd_background "1"
+```
+1. Copy all files in dlls to cl_dlls
+1. rename client.dll to libclient.dll, hl.dll to libserver.dll
+1. Copy all files in Demo project OutDir(usually bin/Debug/net8.0/) to gsfdemo/cl_dlls
+1. The demo can be run now
+1. For vs debug run, config the demo launcher project to launch the game
