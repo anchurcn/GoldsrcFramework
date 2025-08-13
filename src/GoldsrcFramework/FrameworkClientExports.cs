@@ -27,9 +27,11 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
 
     public virtual int HUD_Redraw(float flTime, int intermission)
     {
-        byte* msg = stackalloc byte[100];
-        Encoding.UTF8.GetBytes("framework client",new Span<byte>(msg,100));
-        EngineClientApis->CenterPrint((sbyte*)msg);
+        sbyte* msg = stackalloc sbyte[100];
+        var span = new Span<byte>(msg, 100);
+        span.Clear();
+        Encoding.UTF8.GetBytes("GoldsrcFramworkDemo",span);
+        EngineClientApis->CenterPrint(msg);
         return LegacyClientInterop.HUD_Redraw(flTime, intermission);
     }
 

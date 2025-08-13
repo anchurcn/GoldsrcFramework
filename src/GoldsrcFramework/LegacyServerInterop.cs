@@ -55,6 +55,8 @@ namespace GoldsrcFramework
             // 清零内存
             var span = new Span<IntPtr>(LegacyServerApiPtr, sizeof(ServerExportFuncs) / sizeof(IntPtr));
             var spannew = new Span<IntPtr>(LegacyServerNewApiPtr, sizeof(ServerNewExportFuncs) / sizeof(IntPtr));
+            span.Clear();
+            spannew.Clear();
 
             // 获取函数表
             // TODO validation and logging
@@ -185,7 +187,7 @@ namespace GoldsrcFramework
         public static int AllowLagCompensation() => LegacyServerApiPtr->AllowLagCompensation();
 
         // NEW_DLL_FUNCTIONS 静态转发方法
-        public static void OnFreeEntPrivateData(edict_t* pEnt) => LegacyServerNewApiPtr->OnFreeEntPrivateData(pEnt);
+        public static void OnFreeEntPrivateData(edict_t* pEnt) { }
 
         public static void GameShutdown() {}
 
