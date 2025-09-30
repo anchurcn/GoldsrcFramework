@@ -3,7 +3,16 @@
 GoldsrcFramework is a code library that rewrites HLSDK using C# (.NET 8). It supports developing GoldSrc mods with C#, providing a better development experience and higher development efficiency for GoldSrc mod developers.
 
 ## WIP
-Currently only runable on xash, and goldsrc crashes.
+Currently only runable on xash, and goldsrc only support client side [see issue](https://github.com/anchurcn/GoldsrcFramework/issues/9).
+
+For goldsrc, just modified liblist.gam to load the original dlls to avoid using GoldsrcFramework.dll on server side.
+
+```
+gamedll "dlls\hl.dll"
+
+# or following if you have libserver.dll
+gamedll "cl_dlls\libserver.dll"
+```
 
 ## Features
 
