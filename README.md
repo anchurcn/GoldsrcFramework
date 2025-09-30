@@ -14,6 +14,21 @@ Currently only runable on xash, and goldsrc crashes.
 - More basic libraries, including common data structures, algorithms, network programming, commonly used serialization tools, and other functions
 - More compatible with Visual Studio, allowing the use of Visual Studio's powerful debugger and development environment
 
+## Documentation
+
+📚 **Comprehensive documentation is now available!**
+
+- **[Architecture Overview](docs/Architecture.md)** - Detailed technical architecture documentation
+- **[Architecture Diagrams](docs/Architecture-Diagrams.md)** - Visual diagrams with Mermaid
+- **[Quick Reference](docs/Quick-Reference.md)** - API reference and code examples
+- **[Documentation Index](docs/README.md)** - Complete documentation guide
+
+### Quick Links
+
+- **New to the project?** Start with [Architecture Overview](docs/Architecture.md)
+- **Want to see diagrams?** Check out [Architecture Diagrams](docs/Architecture-Diagrams.md)
+- **Ready to code?** Use [Quick Reference](docs/Quick-Reference.md)
+
 ## Future Planning
 
 GoldsrcFramework's future planning includes:
