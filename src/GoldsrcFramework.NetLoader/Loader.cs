@@ -262,7 +262,7 @@ namespace GoldsrcFramework.NetLoader
             return pfn(pIntValue);
         }
 
-        [UnmanagedCallersOnly(EntryPoint = "GiveFnptrsToDll", CallConvs = new[] { typeof(CallConvCdecl) })]
+        [UnmanagedCallersOnly(EntryPoint = "GiveFnptrsToDll", CallConvs = new[] { typeof(CallConvStdcall) })]
         public unsafe static void GiveFnptrsToDll(IntPtr pengfuncsFromEngine, IntPtr pGlobals)
         {
             EnsureInitialized();
