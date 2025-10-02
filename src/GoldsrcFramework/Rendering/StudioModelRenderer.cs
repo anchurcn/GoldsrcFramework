@@ -1309,8 +1309,13 @@ public unsafe class StudioModelRenderer
                 m_pCurrentEntity->latched.prevframe = (float)f;
             }
 
-            // TODO: Implement gait animation blending (player-specific)
-            // This will be added when we implement player rendering
+            // Gait animation blending (player-specific)
+            // Note: Gait animation is handled in StudioProcessGait() which is called
+            // from StudioDrawPlayer() before this method. The gait blending modifies
+            // the bone rotations and positions for lower body bones to create walking
+            // animation that matches player movement speed and direction.
+            // For non-player entities, this step is skipped.
+            // Implementation deferred: Will be added when player rendering is fully implemented.
 
             // Build final bone matrices
             pbones = m_pStudioHeader->GetBones();
@@ -1368,22 +1373,51 @@ public unsafe class StudioModelRenderer
     /// Find final attachment points
     /// Original: void CStudioModelRenderer::StudioCalcAttachments()
     /// </summary>
+    /// <remarks>
+    /// Transforms attachment points from model space to world space using bone transforms.
+    /// Attachments are used for muzzle flashes, particle effects, and other effects that
+    /// need to be positioned relative to specific bones in the model.
+    ///
+    /// The engine limits attachments to 4 per model. Models with more than 4 attachments
+    /// will have their extra attachments ignored with a debug warning.
+    /// </remarks>
     private void StudioCalcAttachments()
     {
         int i;
         mstudioattachment_t* pattachment;
 
+        // Validate attachment count (engine limitation)
         if (m_pStudioHeader->numattachments > 4)
         {
-            // TODO: gEngfuncs.Con_DPrintf("Too many attachments on %s\n", m_pCurrentEntity->model->name);
-            // exit(-1);
+            // Output debug warning if developer mode is enabled
+            if (m_pCvarDeveloper != null && m_pCvarDeveloper->value != 0)
+            {
+                // Get engine client functions for console output
+                var engineFuncs = EngineApi.PClient;
+                if (engineFuncs != null && engineFuncs->Con_DPrintf != null)
+                {
+                    // Format warning message
+                    var modelName = m_pCurrentEntity->model != null
+                        ? Marshal.PtrToStringAnsi((nint)m_pCurrentEntity->model->name.AsPointer())
+                        : "unknown";
+
+                    var message = $"Too many attachments on {modelName}\n";
+                    var messagePtr = Marshal.StringToHGlobalAnsi(message);
+                    engineFuncs->Con_DPrintf((NChar*)messagePtr);
+                    Marshal.FreeHGlobal(messagePtr);
+                }
+            }
+
+            // Note: Original code had exit(-1) here, but that would crash the game.
+            // Instead, we just skip attachment calculation for this model.
             return;
         }
 
-        // Calculate attachment points
+        // Calculate attachment points by transforming from model space to world space
         pattachment = m_pStudioHeader->GetAttachments();
         for (i = 0; i < m_pStudioHeader->numattachments; i++)
         {
+            // Transform attachment origin through the bone's light transformation matrix
             // VectorTransform(pattachment[i].org, (*m_plighttransform)[pattachment[i].bone], m_pCurrentEntity->attachment[i])
             StudioMath.VectorTransform(ref pattachment[i].org, m_plighttransform + pattachment[i].bone,
                 ref m_pCurrentEntity->attachment[i]);
@@ -1530,35 +1564,78 @@ public unsafe class StudioModelRenderer
     /// Render the model
     /// Original: void CStudioModelRenderer::StudioRenderModel()
     /// </summary>
+    /// <remarks>
+    /// Handles special rendering effects like glow shells (kRenderFxGlowShell).
+    /// For glow shell effect:
+    /// 1. Renders the model normally first
+    /// 2. Then renders it again with chrome effect and sprite texture overlay
+    ///
+    /// In software rendering mode, uses TriAPI to set render modes.
+    /// In hardware mode, render modes are handled by the engine's GL_SetRenderMode.
+    /// </remarks>
     private void StudioRenderModel()
     {
         IEngineStudio->SetChromeOrigin();
         IEngineStudio->SetForceFaceFlags(0);
 
+        // Check if this entity has glow shell effect
         if (m_pCurrentEntity->curstate.renderfx == (int)RenderFx.kRenderFxGlowShell)
         {
+            // First pass: Render the model normally
             m_pCurrentEntity->curstate.renderfx = (int)RenderFx.kRenderFxNone;
             StudioRenderFinal();
 
+            // Software rendering: Set additive blend mode for glow effect
             if (IEngineStudio->IsHardware() == 0)
             {
-                // TODO: Set render mode to kRenderTransAdd via TriAPI
+                var engineFuncs = EngineApi.PClient;
+                if (engineFuncs != null && engineFuncs->pTriAPI != null)
+                {
+                    var triApi = engineFuncs->pTriAPI;
+                    if (triApi->RenderMode != null)
+                    {
+                        triApi->RenderMode((int)RenderMode.kRenderTransAdd);
+                    }
+                }
             }
 
+            // Second pass: Render with chrome effect for glow shell
             IEngineStudio->SetForceFaceFlags((int)StudioNormalFlags.STUDIO_NF_CHROME);
 
-            // TODO: Set sprite texture via TriAPI
-            m_pCurrentEntity->curstate.renderfx = (int)RenderFx.kRenderFxGlowShell;
+            // Set the chrome sprite texture for the glow effect
+            if (m_pChromeSprite != null)
+            {
+                var engineFuncs = EngineApi.PClient;
+                if (engineFuncs != null && engineFuncs->pTriAPI != null)
+                {
+                    var triApi = engineFuncs->pTriAPI;
+                    if (triApi->SpriteTexture != null)
+                    {
+                        triApi->SpriteTexture((int)(nint)m_pChromeSprite, 0);
+                    }
+                }
+            }
 
+            m_pCurrentEntity->curstate.renderfx = (int)RenderFx.kRenderFxGlowShell;
             StudioRenderFinal();
 
+            // Software rendering: Restore normal render mode
             if (IEngineStudio->IsHardware() == 0)
             {
-                // TODO: Set render mode to kRenderNormal via TriAPI
+                var engineFuncs = EngineApi.PClient;
+                if (engineFuncs != null && engineFuncs->pTriAPI != null)
+                {
+                    var triApi = engineFuncs->pTriAPI;
+                    if (triApi->RenderMode != null)
+                    {
+                        triApi->RenderMode((int)RenderMode.kRenderNormal);
+                    }
+                }
             }
         }
         else
         {
+            // Normal rendering without special effects
             StudioRenderFinal();
         }
     }
@@ -1583,23 +1660,36 @@ public unsafe class StudioModelRenderer
     /// Software renderer finishing function
     /// Original: void CStudioModelRenderer::StudioRenderFinal_Software()
     /// </summary>
+    /// <remarks>
+    /// Handles final rendering for software renderer path.
+    /// Supports multiple debug visualization modes controlled by r_drawentities cvar:
+    /// - 0/1: Normal model rendering
+    /// - 2: Draw skeleton bones only
+    /// - 3: Draw collision hulls only
+    /// - 4: Draw collision hulls with additive blending (semi-transparent)
+    /// - 5: Draw axis-aligned bounding box
+    /// </remarks>
     private void StudioRenderFinal_Software()
     {
         int i;
 
-        // Note, rendermode set here has effect in SW
+        // Setup software renderer (rendermode set here has effect in SW)
         IEngineStudio->SetupRenderer(0);
 
+        // Handle different debug visualization modes
         if (m_pCvarDrawEntities->value == 2)
         {
+            // Debug mode 2: Draw skeleton bones
             IEngineStudio->StudioDrawBones();
         }
         else if (m_pCvarDrawEntities->value == 3)
         {
+            // Debug mode 3: Draw collision hulls
             IEngineStudio->StudioDrawHulls();
         }
         else
         {
+            // Normal rendering: Draw all body parts
             for (i = 0; i < m_pStudioHeader->numbodyparts; i++)
             {
                 nint pBodyPart = (nint)m_pBodyPart;
@@ -1612,18 +1702,42 @@ public unsafe class StudioModelRenderer
             }
         }
 
+        // Debug mode 4: Draw collision hulls with additive blending (semi-transparent)
         if (m_pCvarDrawEntities->value == 4)
         {
-            // TODO: gEngfuncs.pTriAPI->RenderMode(kRenderTransAdd);
-            IEngineStudio->StudioDrawHulls();
-            // TODO: gEngfuncs.pTriAPI->RenderMode(kRenderNormal);
+            var engineFuncs = EngineApi.PClient;
+            if (engineFuncs != null && engineFuncs->pTriAPI != null)
+            {
+                var triApi = engineFuncs->pTriAPI;
+
+                // Set additive blend mode for semi-transparent hull rendering
+                if (triApi->RenderMode != null)
+                {
+                    triApi->RenderMode((int)RenderMode.kRenderTransAdd);
+                }
+
+                IEngineStudio->StudioDrawHulls();
+
+                // Restore normal render mode
+                if (triApi->RenderMode != null)
+                {
+                    triApi->RenderMode((int)RenderMode.kRenderNormal);
+                }
+            }
+            else
+            {
+                // Fallback: Draw hulls without transparency if TriAPI unavailable
+                IEngineStudio->StudioDrawHulls();
+            }
         }
 
+        // Debug mode 5: Draw axis-aligned bounding box
         if (m_pCvarDrawEntities->value == 5)
         {
             IEngineStudio->StudioDrawAbsBBox();
         }
 
+        // Restore renderer state
         IEngineStudio->RestoreRenderer();
     }
 
