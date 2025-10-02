@@ -235,7 +235,7 @@ public unsafe class TypeUsageExample: FrameworkClientExports
         var optionStr = "sound weapons/rifle1.wav"u8;
         for (int i = 0; i < Math.Min(optionStr.Length, 63); i++)
         {
-            studioEvent.options[i] = (sbyte)optionStr[i];
+            studioEvent.options[i] = optionStr[i];
         }
         studioEvent.options[Math.Min(optionStr.Length, 63)] = 0; // Null terminator
     }

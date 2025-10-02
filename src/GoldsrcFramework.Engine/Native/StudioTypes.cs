@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using GoldsrcFramework.LinearMath;
+using NativeInterop;
 
 namespace GoldsrcFramework.Engine.Native;
 
@@ -143,7 +144,7 @@ public unsafe struct studiohdr_t
     public int id;
     public int version;
 
-    public fixed sbyte name[64];
+    public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> name;
     public int length;
 
     public Vector3 eyeposition;  // ideal eye position
@@ -202,7 +203,7 @@ public unsafe struct studioseqhdr_t
     public int id;
     public int version;
 
-    public fixed sbyte name[64];
+    public FixedBuffer<NChar, BufferByte64> name;
     public int length;
 }
 
@@ -212,7 +213,7 @@ public unsafe struct studioseqhdr_t
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct mstudiobone_t
 {
-    public fixed sbyte name[32];      // bone name for symbolic links
+    public FixedBuffer<NChar, BufferByte32> name;     // bone name for symbolic links
     public int parent;                // parent bone
     public int flags;                 // ??
     public fixed int bonecontroller[6]; // bone controller index, -1 == none
@@ -252,8 +253,8 @@ public unsafe struct mstudiobbox_t
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct mstudioseqgroup_t
 {
-    public fixed sbyte label[32]; // textual name
-    public fixed sbyte name[64];  // file name
+    public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> label; // textual name
+    public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> name;  // file name
     public int unused1;           // was "cache" - index pointer
     public int unused2;           // was "data" - hack for group 0
 }
@@ -264,7 +265,7 @@ public unsafe struct mstudioseqgroup_t
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct mstudioseqdesc_t
 {
-    public fixed sbyte label[32]; // sequence label
+    public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> label; // sequence label
 
     public float fps;      // frames per second
     public int flags;      // looping/non-looping flags
@@ -316,7 +317,7 @@ public unsafe struct mstudioevent_t
     public int frame;
     public int @event;
     public int type;
-    public fixed sbyte options[64];
+    public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> options;
 }
 
 /// <summary>
@@ -336,7 +337,7 @@ public unsafe struct mstudiopivot_t
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct mstudioattachment_t
 {
-    public fixed sbyte name[32];
+    public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> name;
     public int type;
     public int bone;
     public Vector3 org;        // attachment point
@@ -380,7 +381,7 @@ public struct mstudioanimvalue_num
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct mstudiobodyparts_t
 {
-    public fixed sbyte name[64];
+    public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> name;
     public int nummodels;
     public int @base;
     public int modelindex; // index into models array
@@ -392,7 +393,7 @@ public unsafe struct mstudiobodyparts_t
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct mstudiotexture_t
 {
-    public fixed sbyte name[64];
+    public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> name;
     public int flags;
     public int width;
     public int height;
@@ -405,7 +406,7 @@ public unsafe struct mstudiotexture_t
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct mstudiomodel_t
 {
-    public fixed sbyte name[64];
+    public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> name;
 
     public int type;
 

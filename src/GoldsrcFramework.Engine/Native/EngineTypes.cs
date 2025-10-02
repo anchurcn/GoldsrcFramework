@@ -99,7 +99,7 @@ namespace GoldsrcFramework.Engine.Native
         public int frame;
         public int @event;
         public int type;
-        public fixed sbyte options[64];
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> options;
     }
 
     // User command structure
@@ -211,7 +211,7 @@ namespace GoldsrcFramework.Engine.Native
 
         public int deadflag;
 
-        public fixed sbyte physinfo[EngineConstants.MAX_PHYSINFO_STRING];
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte256> physinfo;
 
         // For mods
         public int iuser1;
@@ -304,6 +304,12 @@ namespace GoldsrcFramework.Engine.Native
 
         public float fov;
         public int weaponanim;
+
+        // Parametric movement overrides
+        public Vector3 startpos;
+        public Vector3 endpos;
+        public float impacttime;
+        public float starttime;
 
         // For mods
         public int iuser1;
@@ -413,14 +419,14 @@ namespace GoldsrcFramework.Engine.Native
         public float skyvec_x;          // Sky vector
         public float skyvec_y;          //
         public float skyvec_z;          //
-        public fixed sbyte skyName[32]; // Name of the sky map
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> skyName; // Name of the sky map
     }
 
     // Physics entity structure
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct physent_t
     {
-        public fixed sbyte name[32];    // Name of model, or "player" or "world".
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> name;    // Name of model, or "player" or "world".
         public int player;
         public Vector3 origin;         // Model's origin in world coordinates.
         public nint model;            // only for bsp models
@@ -541,8 +547,8 @@ namespace GoldsrcFramework.Engine.Native
         public int watertype;
         public int oldwaterlevel;
 
-        public fixed sbyte sztexturename[256];
-        public sbyte chtexturetype;
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte256> sztexturename;
+        public NativeInterop.NChar chtexturetype;
 
         public float maxspeed;
         public float clientmaxspeed; // Player specific maxspeed
@@ -580,19 +586,19 @@ namespace GoldsrcFramework.Engine.Native
         public int numtouch;
         public fixed byte touchindex[EngineConstants.MAX_PHYSENTS * 64]; // pmtrace_s touchindex[MAX_PHYSENTS]; // sizeof(pmtrace_s) = 64
 
-        public fixed sbyte physinfo[EngineConstants.MAX_PHYSINFO_STRING]; // Physics info string
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte256> physinfo; // Physics info string
 
         public movevars_s* movevars;
         public fixed float player_mins[4 * 3]; // 4 hulls, 3 coords each
         public fixed float player_maxs[4 * 3]; // 4 hulls, 3 coords each
 
         // Common functions
-        public delegate* unmanaged[Cdecl]<sbyte*, sbyte> PM_Info_ValueForKey;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, NativeInterop.NChar> PM_Info_ValueForKey;
         public delegate* unmanaged[Cdecl]<float*, float*, int, pmtrace_s*, void> PM_Particle;
         public delegate* unmanaged[Cdecl]<float*, float*, int, pmtrace_s*, void> PM_TestPlayerPosition;
         public delegate* unmanaged[Cdecl]<int, void> Con_NPrintf;
-        public delegate* unmanaged[Cdecl]<sbyte*, void> Con_DPrintf;
-        public delegate* unmanaged[Cdecl]<sbyte*, void> Con_Printf;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, void> Con_DPrintf;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, void> Con_Printf;
         public delegate* unmanaged[Cdecl]<float*, float*, int, pmtrace_s*, void> PM_Trace;
         public delegate* unmanaged[Cdecl]<float*, float*, int, pmtrace_s*, void> PM_TraceLine;
         public delegate* unmanaged[Cdecl]<int, float> RandomLong;
@@ -712,8 +718,8 @@ namespace GoldsrcFramework.Engine.Native
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct entvars_t
     {
-        public fixed sbyte classname[32];
-        public fixed sbyte globalname[32];
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> classname;
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> globalname;
 
         public Vector3 origin;
         public Vector3 oldorigin;
@@ -741,7 +747,7 @@ namespace GoldsrcFramework.Engine.Native
         public float yaw_speed;
 
         public int modelindex;
-        public fixed sbyte model[64];
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> model;
 
         public int viewmodel;            // player's viewmodel
         public int weaponmodel;          // what other players see
@@ -813,20 +819,20 @@ namespace GoldsrcFramework.Engine.Native
         public int waterlevel;
         public int watertype;
 
-        public fixed sbyte target[32];
-        public fixed sbyte targetname[32];
-        public fixed sbyte netname[32];
-        public fixed sbyte message[2048];
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> target;
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> targetname;
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> netname;
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte2048> message;
 
         public float dmg_take;
         public float dmg_save;
         public float dmg;
         public float dmgtime;
 
-        public fixed sbyte noise[64];
-        public fixed sbyte noise1[64];
-        public fixed sbyte noise2[64];
-        public fixed sbyte noise3[64];
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> noise;
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> noise1;
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> noise2;
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> noise3;
 
         public float speed;
         public float air_finished;
@@ -900,9 +906,9 @@ namespace GoldsrcFramework.Engine.Native
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct KeyValueData
     {
-        public sbyte* szClassName; // in: entity classname
-        public sbyte* szKeyName;   // in: name of key
-        public sbyte* szValue;     // in: value of key
+        public NativeInterop.NChar* szClassName; // in: entity classname
+        public NativeInterop.NChar* szKeyName;   // in: name of key
+        public NativeInterop.NChar* szValue;     // in: value of key
         public int fHandled;       // out: DLL sets to true if key-value pair was understood
     }
 
@@ -936,7 +942,7 @@ namespace GoldsrcFramework.Engine.Native
     public unsafe struct TYPEDESCRIPTION
     {
         public FIELDTYPE fieldType;
-        public sbyte* fieldName;
+        public NativeInterop.NChar* fieldName;
         public int fieldOffset;
         public short fieldSize;
         public short flags;
@@ -951,15 +957,15 @@ namespace GoldsrcFramework.Engine.Native
         public int location;        // Offset from the base data of this entity
         public int size;            // Byte size of this entity's data
         public int flags;           // This could be a short -- bit mask of transitions that this entity is in the PVS of
-        public fixed sbyte classname[64]; // entity class name
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> classname; // entity class name
     }
 
     // Level list structure
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct LEVELLIST
     {
-        public fixed sbyte mapName[32];
-        public fixed sbyte landmarkName[32];
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> mapName;
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> landmarkName;
         public edict_t* pentLandmark;
         public Vector3 vecLandmarkOrigin;
     }
@@ -968,13 +974,13 @@ namespace GoldsrcFramework.Engine.Native
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct SAVERESTOREDATA
     {
-        public sbyte* pBaseData;        // Start of all entity save data
-        public sbyte* pCurrentData;     // Current buffer pointer for sequential access
+        public NativeInterop.NChar* pBaseData;        // Start of all entity save data
+        public NativeInterop.NChar* pCurrentData;     // Current buffer pointer for sequential access
         public int size;                // Current data size
         public int bufferSize;          // Total space for data
         public int tokenSize;           // Size of the linear list of tokens
         public int tokenCount;          // Number of elements in the pTokens table
-        public sbyte** pTokens;         // Hash table of entity strings (sparse)
+        public NativeInterop.NChar** pTokens;         // Hash table of entity strings (sparse)
         public int currentIndex;        // Holds a global entity table ID
         public int tableCount;          // Number of elements in the entity table
         public int connectionCount;     // Number of elements in the levelList[]
@@ -983,17 +989,17 @@ namespace GoldsrcFramework.Engine.Native
 
         // smooth transition
         public int fUseLandmark;
-        public fixed sbyte szLandmarkName[20];  // landmark we'll spawn near in next level
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> szLandmarkName;  // landmark we'll spawn near in next level (20 bytes but using 32 for alignment)
         public Vector3 vecLandmarkOffset;      // for landmark transitions
         public float time;
-        public fixed sbyte szCurrentMapName[32]; // To check global entities
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> szCurrentMapName; // To check global entities
     }
 
     // Resource structure
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct resource_t
     {
-        public fixed sbyte szFileName[64]; // File name to download/precache.
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> szFileName; // File name to download/precache.
         public int type;                   // t_sound, t_skin, t_model, t_decal.
         public int nIndex;                 // For t_decals
         public int nDownloadSize;          // Size in Bytes if this must be downloaded.
@@ -1057,7 +1063,7 @@ namespace GoldsrcFramework.Engine.Native
         public int cdAudioTrack;
         public int maxClients;
         public int maxEntities;
-        public sbyte* pStringBase;
+        public NativeInterop.NChar* pStringBase;
         public nint pSaveData;        // void* pSaveData;
         public Vector3 vecLandmarkOffset;
     }
@@ -1091,7 +1097,7 @@ namespace GoldsrcFramework.Engine.Native
     {
         // This structure matches the ClientEngineFuncs structure exactly
         // We use the same layout as defined in ClientEngineFuncs.cs
-        public delegate* unmanaged[Cdecl]<sbyte*, HSPRITE> SPR_Load;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, HSPRITE> SPR_Load;
         public delegate* unmanaged[Cdecl]<HSPRITE, int> SPR_Frames;
         public delegate* unmanaged[Cdecl]<HSPRITE, int, int> SPR_Height;
         public delegate* unmanaged[Cdecl]<HSPRITE, int, int> SPR_Width;
@@ -1101,44 +1107,44 @@ namespace GoldsrcFramework.Engine.Native
         public delegate* unmanaged[Cdecl]<int, int, int, Rect*, void> SPR_DrawAdditive;
         public delegate* unmanaged[Cdecl]<int, int, int, int, void> SPR_EnableScissor;
         public delegate* unmanaged[Cdecl]<void> SPR_DisableScissor;
-        public delegate* unmanaged[Cdecl]<sbyte*, int*, client_sprite_s*> SPR_GetList;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, int*, client_sprite_s*> SPR_GetList;
         public delegate* unmanaged[Cdecl]<int, int, int, int, int, int, int, int, void> FillRGBA;
         public delegate* unmanaged[Cdecl]<SCREENINFO*, int> GetScreenInfo;
         public delegate* unmanaged[Cdecl]<HSPRITE, Rect, int, int, int, void> SetCrosshair;
-        public delegate* unmanaged[Cdecl]<sbyte*, sbyte*, int, cvar_s*> RegisterVariable;
-        public delegate* unmanaged[Cdecl]<sbyte*, float> GetCvarFloat;
-        public delegate* unmanaged[Cdecl]<sbyte*, sbyte*> GetCvarString;
-        public delegate* unmanaged[Cdecl]<sbyte*, delegate* unmanaged[Cdecl]<void>, int> AddCommand;
-        public delegate* unmanaged[Cdecl]<sbyte*, delegate* unmanaged[Cdecl]<sbyte*, int, void*, int>, int> HookUserMsg;
-        public delegate* unmanaged[Cdecl]<sbyte*, int> ServerCmd;
-        public delegate* unmanaged[Cdecl]<sbyte*, int> ClientCmd;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, NativeInterop.NChar*, int, cvar_s*> RegisterVariable;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, float> GetCvarFloat;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, NativeInterop.NChar*> GetCvarString;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, delegate* unmanaged[Cdecl]<void>, int> AddCommand;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, delegate* unmanaged[Cdecl]<NativeInterop.NChar*, int, void*, int>, int> HookUserMsg;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, int> ServerCmd;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, int> ClientCmd;
         public delegate* unmanaged[Cdecl]<int, hud_player_info_s*, void> GetPlayerInfo;
-        public delegate* unmanaged[Cdecl]<sbyte*, float, void> PlaySoundByName;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, float, void> PlaySoundByName;
         public delegate* unmanaged[Cdecl]<int, float, void> PlaySoundByIndex;
         public delegate* unmanaged[Cdecl]<float*, float*, float*, float*, void> AngleVectors;
-        public delegate* unmanaged[Cdecl]<sbyte*, client_textmessage_s*> TextMessageGet;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, client_textmessage_s*> TextMessageGet;
         public delegate* unmanaged[Cdecl]<int, int, int, int, int, int, int> DrawCharacter;
-        public delegate* unmanaged[Cdecl]<int, int, sbyte*, int> DrawConsoleString;
+        public delegate* unmanaged[Cdecl]<int, int, NativeInterop.NChar*, int> DrawConsoleString;
         public delegate* unmanaged[Cdecl]<float, float, float, void> DrawSetTextColor;
-        public delegate* unmanaged[Cdecl]<sbyte*, int*, int*, void> DrawConsoleStringLen;
-        public delegate* unmanaged[Cdecl]<sbyte*, void> ConsolePrint;
-        public delegate* unmanaged[Cdecl]<sbyte*, void> CenterPrint;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, int*, int*, void> DrawConsoleStringLen;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, void> ConsolePrint;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, void> CenterPrint;
         public delegate* unmanaged[Cdecl]<int> GetWindowCenterX;
         public delegate* unmanaged[Cdecl]<int> GetWindowCenterY;
         public delegate* unmanaged[Cdecl]<float*, void> GetViewAngles;
         public delegate* unmanaged[Cdecl]<float*, void> SetViewAngles;
         public delegate* unmanaged[Cdecl]<int> GetMaxClients;
-        public delegate* unmanaged[Cdecl]<sbyte*, float, void> Cvar_SetValue;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, float, void> Cvar_SetValue;
         public delegate* unmanaged[Cdecl]<int> Cmd_Argc;
-        public delegate* unmanaged[Cdecl]<int, sbyte*> Cmd_Argv;
-        public delegate* unmanaged[Cdecl]<sbyte*, void> Con_Printf;
-        public delegate* unmanaged[Cdecl]<sbyte*, void> Con_DPrintf;
-        public delegate* unmanaged[Cdecl]<int, sbyte*, void> Con_NPrintf;
-        public delegate* unmanaged[Cdecl]<con_nprint_s*, sbyte*, void> Con_NXPrintf;
-        public delegate* unmanaged[Cdecl]<sbyte*, sbyte*> PhysInfo_ValueForKey;
-        public delegate* unmanaged[Cdecl]<sbyte*, sbyte*> ServerInfo_ValueForKey;
+        public delegate* unmanaged[Cdecl]<int, NativeInterop.NChar*> Cmd_Argv;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, void> Con_Printf;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, void> Con_DPrintf;
+        public delegate* unmanaged[Cdecl]<int, NativeInterop.NChar*, void> Con_NPrintf;
+        public delegate* unmanaged[Cdecl]<con_nprint_s*, NativeInterop.NChar*, void> Con_NXPrintf;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, NativeInterop.NChar*> PhysInfo_ValueForKey;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, NativeInterop.NChar*> ServerInfo_ValueForKey;
         public delegate* unmanaged[Cdecl]<float> GetClientMaxspeed;
-        public delegate* unmanaged[Cdecl]<sbyte*, sbyte**, int> CheckParm;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, NativeInterop.NChar**, int> CheckParm;
         public delegate* unmanaged[Cdecl]<int, int, void> Key_Event;
         public delegate* unmanaged[Cdecl]<int*, int*, void> GetMousePosition;
         public delegate* unmanaged[Cdecl]<int> IsNoClipping;
@@ -1151,27 +1157,27 @@ namespace GoldsrcFramework.Engine.Native
         public delegate* unmanaged[Cdecl]<float*, int*, int> PM_PointContents;
         public delegate* unmanaged[Cdecl]<float*, int> PM_WaterEntity;
         public delegate* unmanaged[Cdecl]<float*, float*, int, int, int, pmtrace_s*> PM_TraceLine;
-        public delegate* unmanaged[Cdecl]<sbyte*, int*, model_s*> CL_LoadModel;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, int*, model_s*> CL_LoadModel;
         public delegate* unmanaged[Cdecl]<int, cl_entity_s*, int> CL_CreateVisibleEntity;
         public delegate* unmanaged[Cdecl]<HSPRITE, model_s*> GetSpritePointer;
-        public delegate* unmanaged[Cdecl]<sbyte*, float, float*, void> PlaySoundByNameAtLocation;
-        public delegate* unmanaged[Cdecl]<int, sbyte*, ushort> PrecacheEvent;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, float, float*, void> PlaySoundByNameAtLocation;
+        public delegate* unmanaged[Cdecl]<int, NativeInterop.NChar*, ushort> PrecacheEvent;
         public delegate* unmanaged[Cdecl]<int, edict_t*, ushort, float, float*, float*, float, float, int, int, int, int, void> PlaybackEvent;
         public delegate* unmanaged[Cdecl]<int, int, void> WeaponAnim;
         public delegate* unmanaged[Cdecl]<float, float, float> RandomFloat;
         public delegate* unmanaged[Cdecl]<int, int, int> RandomLong;
-        public delegate* unmanaged[Cdecl]<sbyte*, delegate* unmanaged[Cdecl]<event_args_s*, void>, void> HookEvent;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, delegate* unmanaged[Cdecl]<event_args_s*, void>, void> HookEvent;
         public delegate* unmanaged[Cdecl]<int> Con_IsVisible;
-        public delegate* unmanaged[Cdecl]<sbyte*> GetGameDirectory;
-        public delegate* unmanaged[Cdecl]<sbyte*, cvar_s*> GetCvarPointer;
-        public delegate* unmanaged[Cdecl]<sbyte*, sbyte*> Key_LookupBinding;
-        public delegate* unmanaged[Cdecl]<sbyte*> GetLevelName;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*> GetGameDirectory;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, cvar_s*> GetCvarPointer;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, NativeInterop.NChar*> Key_LookupBinding;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*> GetLevelName;
         public delegate* unmanaged[Cdecl]<screenfade_s*, void> GetScreenFade;
         public delegate* unmanaged[Cdecl]<screenfade_s*, void> SetScreenFade;
         public delegate* unmanaged[Cdecl]<nint> VGui_GetPanel;
         public delegate* unmanaged[Cdecl]<int, void> VGui_ViewportPaintBackground;
-        public delegate* unmanaged[Cdecl]<sbyte*, int, int*, byte*> COM_LoadFile;
-        public delegate* unmanaged[Cdecl]<sbyte*, sbyte*> COM_ParseFile;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, int, int*, byte*> COM_LoadFile;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, NativeInterop.NChar*> COM_ParseFile;
         public delegate* unmanaged[Cdecl]<nint, void> COM_FreeFile;
         public triangleapi_s* pTriAPI;
         public efx_api_s* pEfxAPI;
@@ -1180,52 +1186,52 @@ namespace GoldsrcFramework.Engine.Native
         public net_api_s* pNetAPI;
         public IVoiceTweak_s* pVoiceTweak;
         public delegate* unmanaged[Cdecl]<int> IsSpectateOnly;
-        public delegate* unmanaged[Cdecl]<sbyte*, model_s*> LoadMapSprite;
-        public delegate* unmanaged[Cdecl]<sbyte*, sbyte*, void> COM_AddAppDirectoryToSearchPath;
-        public delegate* unmanaged[Cdecl]<sbyte*, sbyte*, int> COM_ExpandFilename;
-        public delegate* unmanaged[Cdecl]<sbyte*, sbyte*> PlayerInfo_ValueForKey;
-        public delegate* unmanaged[Cdecl]<sbyte*, sbyte*, void> PlayerInfo_SetValueForKey;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, model_s*> LoadMapSprite;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, NativeInterop.NChar*, void> COM_AddAppDirectoryToSearchPath;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, NativeInterop.NChar*, int> COM_ExpandFilename;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, NativeInterop.NChar*> PlayerInfo_ValueForKey;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, NativeInterop.NChar*, void> PlayerInfo_SetValueForKey;
         public delegate* unmanaged[Cdecl]<int, qboolean> GetPlayerUniqueID;
         public delegate* unmanaged[Cdecl]<int, int> GetTrackerIDForPlayer;
         public delegate* unmanaged[Cdecl]<int, int> GetPlayerForTrackerID;
-        public delegate* unmanaged[Cdecl]<sbyte*, int> ServerCmdUnreliable;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, int> ServerCmdUnreliable;
         public delegate* unmanaged[Cdecl]<int*, int*, void> GetMousePos;
         public delegate* unmanaged[Cdecl]<int, int, void> SetMousePos;
         public delegate* unmanaged[Cdecl]<qboolean, void> SetMouseEnable;
         public delegate* unmanaged[Cdecl]<cvar_s*> GetFirstCVarPtr;
         public delegate* unmanaged[Cdecl]<nint> GetFirstCmdFunctionHandle;
         public delegate* unmanaged[Cdecl]<nint, nint> GetNextCmdFunctionHandle;
-        public delegate* unmanaged[Cdecl]<nint, sbyte*> GetCmdFunctionName;
+        public delegate* unmanaged[Cdecl]<nint, NativeInterop.NChar*> GetCmdFunctionName;
         public delegate* unmanaged[Cdecl]<float> hudGetClientOldTime;
         public delegate* unmanaged[Cdecl]<float> hudGetServerGravityValue;
         public delegate* unmanaged[Cdecl]<int, model_s*> hudGetModelByIndex;
         public delegate* unmanaged[Cdecl]<int, void> SetFilterMode;
         public delegate* unmanaged[Cdecl]<float, float, float, void> SetFilterColor;
         public delegate* unmanaged[Cdecl]<float, void> SetFilterBrightness;
-        public delegate* unmanaged[Cdecl]<sbyte*, sentenceEntry_s*> SequenceGet;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, sentenceEntry_s*> SequenceGet;
         public delegate* unmanaged[Cdecl]<int, int, int, int, int, int, int, void> SPR_DrawGeneric;
-        public delegate* unmanaged[Cdecl]<sbyte*, sbyte*, int, sbyte*> SequencePickSentence;
-        public delegate* unmanaged[Cdecl]<int, int, sbyte*, int> DrawString;
-        public delegate* unmanaged[Cdecl]<int, int, sbyte*, int> DrawStringReverse;
-        public delegate* unmanaged[Cdecl]<sbyte*, sbyte*> LocalPlayerInfo_ValueForKey;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, NativeInterop.NChar*, int, NativeInterop.NChar*> SequencePickSentence;
+        public delegate* unmanaged[Cdecl]<int, int, NativeInterop.NChar*, int> DrawString;
+        public delegate* unmanaged[Cdecl]<int, int, NativeInterop.NChar*, int> DrawStringReverse;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, NativeInterop.NChar*> LocalPlayerInfo_ValueForKey;
         public delegate* unmanaged[Cdecl]<int, int, int, int, int, int, int> VGUI2DrawCharacter;
         public delegate* unmanaged[Cdecl]<int, int, int, int, int, int, int> VGUI2DrawCharacterAdd;
-        public delegate* unmanaged[Cdecl]<sbyte*, float> COM_GetApproxWavePlayLength;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, float> COM_GetApproxWavePlayLength;
         public delegate* unmanaged[Cdecl]<nint> GetCareerUI;
-        public delegate* unmanaged[Cdecl]<sbyte*, sbyte*, void> Cvar_Set;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, NativeInterop.NChar*, void> Cvar_Set;
         public delegate* unmanaged[Cdecl]<int> IsCareerMatch;
-        public delegate* unmanaged[Cdecl]<sbyte*, float, int, void> PlaySoundVoiceByName;
-        public delegate* unmanaged[Cdecl]<sbyte*, int, void> PrimeMusicStream;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, float, int, void> PlaySoundVoiceByName;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, int, void> PrimeMusicStream;
         public delegate* unmanaged[Cdecl]<float> GetAbsoluteTime;
         public delegate* unmanaged[Cdecl]<int*, int*, void> ProcessTutorMessageDecayBuffer;
         public delegate* unmanaged[Cdecl]<int*, int*, void> ConstructTutorMessageDecayBuffer;
         public delegate* unmanaged[Cdecl]<void> ResetTutorMessageDecayData;
-        public delegate* unmanaged[Cdecl]<sbyte*, float, int, void> PlaySoundByNameAtPitch;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, float, int, void> PlaySoundByNameAtPitch;
         public delegate* unmanaged[Cdecl]<int, int, int, int, int, int, int, int, void> FillRGBABlend;
         public delegate* unmanaged[Cdecl]<int> GetAppID;
         public delegate* unmanaged[Cdecl]<cmdalias_t*> GetAliasList;
         public delegate* unmanaged[Cdecl]<int*, int*, void> VguiWrap2_GetMouseDelta;
-        public delegate* unmanaged[Cdecl]<sbyte*, void> FilteredClientCmd;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, void> FilteredClientCmd;
     }
 
     // Screen info structure
@@ -1244,8 +1250,8 @@ namespace GoldsrcFramework.Engine.Native
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct client_sprite_s
     {
-        public fixed sbyte szName[64];
-        public fixed sbyte szSprite[64];
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> szName;
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> szSprite;
         public int hspr;
         public int iRes;
         public Rect rc;
@@ -1255,7 +1261,7 @@ namespace GoldsrcFramework.Engine.Native
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct hud_player_info_s
     {
-        public fixed sbyte name[32];
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> name;
         public short ping;
         public byte thisplayer;  // TRUE if this is the calling player
 
@@ -1263,7 +1269,7 @@ namespace GoldsrcFramework.Engine.Native
         public byte spectator;
         public byte packetloss;
 
-        public fixed sbyte model[64];
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> model;
         public short topcolor;
         public short bottomcolor;
 
@@ -1276,12 +1282,12 @@ namespace GoldsrcFramework.Engine.Native
     public unsafe struct player_info_s
     {
         public int userid;
-        public fixed sbyte userinfo[256];  // MAX_INFO_STRING
-        public fixed sbyte name[32];       // MAX_SCOREBOARDNAME
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte256> userinfo;  // MAX_INFO_STRING
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> name;       // MAX_SCOREBOARDNAME
         public int spectator;
         public int ping;
         public int packet_loss;
-        public fixed sbyte model[64];      // MAX_QPATH
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> model;      // MAX_QPATH
         public int topcolor;
         public int bottomcolor;
         public int renderframe;
@@ -1324,8 +1330,8 @@ namespace GoldsrcFramework.Engine.Native
         public float fadeout;
         public float holdtime;
         public float fxtime;
-        public fixed sbyte pName[32];
-        public fixed sbyte pMessage[512];
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> pName;
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte512> pMessage;
     }
 
     // Console print structure
@@ -1400,7 +1406,7 @@ namespace GoldsrcFramework.Engine.Native
     {
         public const int MIPLEVELS = 4;
 
-        public fixed sbyte name[16];
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> name; // Using 32 instead of 16 for alignment
         public uint width;
         public uint height;
         public int anim_total;                // total tenths in sequence (0 = no)
@@ -1555,7 +1561,7 @@ namespace GoldsrcFramework.Engine.Native
         public const int MAX_MODEL_NAME = 64;
         public const int MAX_MAP_HULLS = 4;
 
-        public fixed sbyte name[MAX_MODEL_NAME];
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> name;
         public qboolean needload; // bmodels and sprites don't cache normally
 
         public modtype_t type;
@@ -1615,7 +1621,7 @@ namespace GoldsrcFramework.Engine.Native
 
         public color24* lightdata;
 
-        public sbyte* entities;
+        public NativeInterop.NChar* entities;
 
         // Additional model data
         public cache_user_s cache; // only access through Mod_Extradata
@@ -1698,7 +1704,7 @@ namespace GoldsrcFramework.Engine.Native
         public delegate* unmanaged[Cdecl]<float*, float*, int, int, void> R_Blood;
         public delegate* unmanaged[Cdecl]<float*, int, int, int, float, void> R_BloodSprite;
         public delegate* unmanaged[Cdecl]<float*, float*, int, int, void> R_BloodStream;
-        public delegate* unmanaged[Cdecl]<float*, float*, float*, float, float, int, int, sbyte, void> R_BreakModel;
+        public delegate* unmanaged[Cdecl]<float*, float*, float*, float, float, int, int, NativeInterop.NChar, void> R_BreakModel;
         public delegate* unmanaged[Cdecl]<float*, float*, float, int, int, float, void> R_Bubbles;
         public delegate* unmanaged[Cdecl]<float*, float*, float, int, int, float, void> R_BubbleTrail;
         public delegate* unmanaged[Cdecl]<float*, void> R_BulletImpactParticles;
@@ -1743,7 +1749,7 @@ namespace GoldsrcFramework.Engine.Native
 
         // 贴花相关
         public delegate* unmanaged[Cdecl]<int, int> Draw_DecalIndex;
-        public delegate* unmanaged[Cdecl]<sbyte*, int> Draw_DecalIndexFromName;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, int> Draw_DecalIndexFromName;
         public delegate* unmanaged[Cdecl]<int, int, int, float*, int, void> R_DecalShoot;
 
         // 附着和光束相关
@@ -1780,9 +1786,9 @@ namespace GoldsrcFramework.Engine.Native
     public unsafe struct event_api_s
     {
         public int version;
-        public delegate* unmanaged[Cdecl]<int, float*, int, sbyte*, float, float, int, int, void> EV_PlaySound;
-        public delegate* unmanaged[Cdecl]<int, int, sbyte*, void> EV_StopSound;
-        public delegate* unmanaged[Cdecl]<sbyte*, int> EV_FindModelIndex;
+        public delegate* unmanaged[Cdecl]<int, float*, int, NativeInterop.NChar*, float, float, int, int, void> EV_PlaySound;
+        public delegate* unmanaged[Cdecl]<int, int, NativeInterop.NChar*, void> EV_StopSound;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, int> EV_FindModelIndex;
         public delegate* unmanaged[Cdecl]<int, int> EV_IsLocal;
         public delegate* unmanaged[Cdecl]<int> EV_LocalPlayerDucking;
         public delegate* unmanaged[Cdecl]<float*, void> EV_LocalPlayerViewheight;
@@ -1796,7 +1802,7 @@ namespace GoldsrcFramework.Engine.Native
         public delegate* unmanaged[Cdecl]<int, void> EV_SetTraceHull;
         public delegate* unmanaged[Cdecl]<float*, float*, int, int, pmtrace_s*, void> EV_PlayerTrace;
         public delegate* unmanaged[Cdecl]<int, float*, float*, float*, float*, void> EV_WeaponAnimation;
-        public delegate* unmanaged[Cdecl]<int, sbyte*, int> EV_PrecacheEvent;
+        public delegate* unmanaged[Cdecl]<int, NativeInterop.NChar*, int> EV_PrecacheEvent;
         public delegate* unmanaged[Cdecl]<int, int, float, event_args_s*, void> EV_PlaybackEvent;
     }
 
@@ -1817,12 +1823,12 @@ namespace GoldsrcFramework.Engine.Native
     {
         public int version;
         public delegate* unmanaged[Cdecl]<netadr_s*, void> InitNetworking;
-        public delegate* unmanaged[Cdecl]<netadr_s*, sbyte*, void> Status;
-        public delegate* unmanaged[Cdecl]<netadr_s*, sbyte*, void> SendRequest;
+        public delegate* unmanaged[Cdecl]<netadr_s*, NativeInterop.NChar*, void> Status;
+        public delegate* unmanaged[Cdecl]<netadr_s*, NativeInterop.NChar*, void> SendRequest;
         public delegate* unmanaged[Cdecl]<void> CancelRequest;
         public delegate* unmanaged[Cdecl]<void> ClearRequestQueue;
-        public delegate* unmanaged[Cdecl]<netadr_s*, sbyte*, void> SendResponse;
-        public delegate* unmanaged[Cdecl]<netadr_s*, sbyte*, void> GetResponse;
+        public delegate* unmanaged[Cdecl]<netadr_s*, NativeInterop.NChar*, void> SendResponse;
+        public delegate* unmanaged[Cdecl]<netadr_s*, NativeInterop.NChar*, void> GetResponse;
     }
 
     // Voice Tweak interface (simplified)
@@ -1841,7 +1847,7 @@ namespace GoldsrcFramework.Engine.Native
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct sentenceEntry_s
     {
-        public fixed sbyte data[512];
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte512> data;
         public int length;
         public int index;
     }
@@ -1851,8 +1857,8 @@ namespace GoldsrcFramework.Engine.Native
     public unsafe struct cmdalias_t
     {
         public nint next;         // cmdalias_t* next;
-        public fixed sbyte name[32];
-        public fixed sbyte value[1024];
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> name;
+        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte1024> value;
     }
 
     // Server engine functions structure (enginefuncs_t)
@@ -1861,13 +1867,13 @@ namespace GoldsrcFramework.Engine.Native
     {
         // This structure matches the ServerEngineFuncs structure exactly
         // We use the same layout as defined in ServerEngineFuncs.cs
-        public delegate* unmanaged[Cdecl]<sbyte*, int> PrecacheModel;
-        public delegate* unmanaged[Cdecl]<sbyte*, int> PrecacheSound;
-        public delegate* unmanaged[Cdecl]<edict_t*, sbyte*, void> SetModel;
-        public delegate* unmanaged[Cdecl]<sbyte*, int> ModelIndex;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, int> PrecacheModel;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, int> PrecacheSound;
+        public delegate* unmanaged[Cdecl]<edict_t*, NativeInterop.NChar*, void> SetModel;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, int> ModelIndex;
         public delegate* unmanaged[Cdecl]<int, int> ModelFrames;
         public delegate* unmanaged[Cdecl]<edict_t*, float*, float*, void> SetSize;
-        public delegate* unmanaged[Cdecl]<sbyte*, sbyte*, void> ChangeLevel;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, NativeInterop.NChar*, void> ChangeLevel;
         public delegate* unmanaged[Cdecl]<edict_t*, void> GetSpawnParms;
         public delegate* unmanaged[Cdecl]<edict_t*, void> SaveSpawnParms;
         public delegate* unmanaged[Cdecl]<float*, float> VecToYaw;
@@ -1875,9 +1881,9 @@ namespace GoldsrcFramework.Engine.Native
         public delegate* unmanaged[Cdecl]<edict_t*, float*, float, int, void> MoveToOrigin;
         public delegate* unmanaged[Cdecl]<edict_t*, void> ChangeYaw;
         public delegate* unmanaged[Cdecl]<edict_t*, void> ChangePitch;
-        public delegate* unmanaged[Cdecl]<sbyte*, edict_t*> FindEntityByString;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, edict_t*> FindEntityByString;
         public delegate* unmanaged[Cdecl]<edict_t*, int> GetEntityIllum;
-        public delegate* unmanaged[Cdecl]<sbyte*, edict_t*> FindEntityInSphere;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, edict_t*> FindEntityInSphere;
         public delegate* unmanaged[Cdecl]<edict_t*, edict_t*> FindClientInPVS;
         public delegate* unmanaged[Cdecl]<edict_t*, edict_t*> EntitiesInPVS;
         public delegate* unmanaged[Cdecl]<float*, void> MakeVectors;
@@ -1897,38 +1903,38 @@ namespace GoldsrcFramework.Engine.Native
         public delegate* unmanaged[Cdecl]<float*, float*, int, float*, float*, edict_t*, TraceResult*, int> TraceMonsterHull;
         public delegate* unmanaged[Cdecl]<float*, float*, int, edict_t*, TraceResult*, void> TraceHull;
         public delegate* unmanaged[Cdecl]<edict_t*, float*, float*, TraceResult*, void> TraceModel;
-        public delegate* unmanaged[Cdecl]<float*, sbyte*> TraceTexture;
+        public delegate* unmanaged[Cdecl]<float*, NativeInterop.NChar*> TraceTexture;
         public delegate* unmanaged[Cdecl]<float*, float*, void> TraceSphere;
         public delegate* unmanaged[Cdecl]<float*, void> GetAimVector;
-        public delegate* unmanaged[Cdecl]<sbyte*, void> ServerCommand;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, void> ServerCommand;
         public delegate* unmanaged[Cdecl]<void> ServerExecute;
-        public delegate* unmanaged[Cdecl]<edict_t*, sbyte*, void> ClientCommand;
+        public delegate* unmanaged[Cdecl]<edict_t*, NativeInterop.NChar*, void> ClientCommand;
         public delegate* unmanaged[Cdecl]<int, int, float*, void> ParticleEffect;
         public delegate* unmanaged[Cdecl]<float*, void> LightStyle;
-        public delegate* unmanaged[Cdecl]<sbyte*, int> DecalIndex;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, int> DecalIndex;
         public delegate* unmanaged[Cdecl]<float*, int> PointContents;
-        public delegate* unmanaged[Cdecl]<edict_t*, int, sbyte*, void> MessageBegin;
+        public delegate* unmanaged[Cdecl]<edict_t*, int, NativeInterop.NChar*, void> MessageBegin;
         public delegate* unmanaged[Cdecl]<void> MessageEnd;
         public delegate* unmanaged[Cdecl]<byte, void> WriteByte;
-        public delegate* unmanaged[Cdecl]<sbyte, void> WriteChar;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar, void> WriteChar;
         public delegate* unmanaged[Cdecl]<short, void> WriteShort;
         public delegate* unmanaged[Cdecl]<int, void> WriteLong;
         public delegate* unmanaged[Cdecl]<float, void> WriteAngle;
         public delegate* unmanaged[Cdecl]<float, void> WriteCoord;
-        public delegate* unmanaged[Cdecl]<sbyte*, void> WriteString;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, void> WriteString;
         public delegate* unmanaged[Cdecl]<edict_t*, void> WriteEntity;
-        public delegate* unmanaged[Cdecl]<sbyte*, void> CVarRegister;
-        public delegate* unmanaged[Cdecl]<sbyte*, float> CVarGetFloat;
-        public delegate* unmanaged[Cdecl]<sbyte*, sbyte*> CVarGetString;
-        public delegate* unmanaged[Cdecl]<sbyte*, float, void> CVarSetFloat;
-        public delegate* unmanaged[Cdecl]<sbyte*, sbyte*, void> CVarSetString;
-        public delegate* unmanaged[Cdecl]<int, sbyte*, void> AlertMessage;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, void> CVarRegister;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, float> CVarGetFloat;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, NativeInterop.NChar*> CVarGetString;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, float, void> CVarSetFloat;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, NativeInterop.NChar*, void> CVarSetString;
+        public delegate* unmanaged[Cdecl]<int, NativeInterop.NChar*, void> AlertMessage;
         public delegate* unmanaged[Cdecl]<nint, void> EngineFprintf; // void* pfile
         public delegate* unmanaged[Cdecl]<edict_t*, nint> PvAllocEntPrivateData;
         public delegate* unmanaged[Cdecl]<edict_t*, nint> PvEntPrivateData;
         public delegate* unmanaged[Cdecl]<edict_t*, void> FreeEntPrivateData;
-        public delegate* unmanaged[Cdecl]<int, sbyte*> SzFromIndex;
-        public delegate* unmanaged[Cdecl]<sbyte*, int> AllocString;
+        public delegate* unmanaged[Cdecl]<int, NativeInterop.NChar*> SzFromIndex;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, int> AllocString;
         public delegate* unmanaged[Cdecl]<edict_t*, entvars_t*> GetVarsOfEnt;
         public delegate* unmanaged[Cdecl]<entvars_t*, edict_t*> PEntityOfEntOffset;
         public delegate* unmanaged[Cdecl]<edict_t*, int> EntOffsetOfPEntity;
@@ -1936,16 +1942,16 @@ namespace GoldsrcFramework.Engine.Native
         public delegate* unmanaged[Cdecl]<int, edict_t*> PEntityOfEntIndex;
         public delegate* unmanaged[Cdecl]<edict_t*, edict_t*> FindEntityByVars;
         public delegate* unmanaged[Cdecl]<edict_t*, nint> GetModelPtr; // model_s*
-        public delegate* unmanaged[Cdecl]<sbyte*, int> RegUserMsg;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, int> RegUserMsg;
         public delegate* unmanaged[Cdecl]<void> AnimationAutomove;
         public delegate* unmanaged[Cdecl]<edict_t*, void> GetBonePosition;
         public delegate* unmanaged[Cdecl]<uint, uint> FunctionFromName;
-        public delegate* unmanaged[Cdecl]<uint, sbyte*> NameForFunction;
-        public delegate* unmanaged[Cdecl]<edict_t*, sbyte*, void> ClientPrintf;
-        public delegate* unmanaged[Cdecl]<sbyte*, void> ServerPrint;
+        public delegate* unmanaged[Cdecl]<uint, NativeInterop.NChar*> NameForFunction;
+        public delegate* unmanaged[Cdecl]<edict_t*, NativeInterop.NChar*, void> ClientPrintf;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, void> ServerPrint;
         public delegate* unmanaged[Cdecl]<int> Cmd_Args;
         public delegate* unmanaged[Cdecl]<int> Cmd_Argc;
-        public delegate* unmanaged[Cdecl]<int, sbyte*> Cmd_Argv;
+        public delegate* unmanaged[Cdecl]<int, NativeInterop.NChar*> Cmd_Argv;
         public delegate* unmanaged[Cdecl]<edict_t*, int, void> GetAttachment;
         public delegate* unmanaged[Cdecl]<void> CRC32_Init;
         public delegate* unmanaged[Cdecl]<uint*, byte, void> CRC32_ProcessBuffer;
@@ -1956,33 +1962,33 @@ namespace GoldsrcFramework.Engine.Native
         public delegate* unmanaged[Cdecl]<edict_t*, int, void> SetView;
         public delegate* unmanaged[Cdecl]<float> Time;
         public delegate* unmanaged[Cdecl]<edict_t*, edict_t*, void> CrosshairAngle;
-        public delegate* unmanaged[Cdecl]<sbyte*, int*, byte*> LoadFileForMe;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, int*, byte*> LoadFileForMe;
         public delegate* unmanaged[Cdecl]<nint, void> FreeFile; // void* pFile
         public delegate* unmanaged[Cdecl]<void> EndSection;
-        public delegate* unmanaged[Cdecl]<sbyte*, sbyte*, int> CompareFileTime;
-        public delegate* unmanaged[Cdecl]<sbyte*, void> GetGameDir;
-        public delegate* unmanaged[Cdecl]<sbyte*, void> Cvar_RegisterVariable;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, NativeInterop.NChar*, int> CompareFileTime;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, void> GetGameDir;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, void> Cvar_RegisterVariable;
         public delegate* unmanaged[Cdecl]<edict_t*, float*, void> FadeClientVolume;
         public delegate* unmanaged[Cdecl]<edict_t*, int, void> SetClientMaxspeed;
         public delegate* unmanaged[Cdecl]<int, edict_t*> CreateFakeClient;
-        public delegate* unmanaged[Cdecl]<edict_t*, sbyte*, float, void> RunPlayerMove;
+        public delegate* unmanaged[Cdecl]<edict_t*, NativeInterop.NChar*, float, void> RunPlayerMove;
         public delegate* unmanaged[Cdecl]<edict_t*, int> NumberOfEntities;
-        public delegate* unmanaged[Cdecl]<edict_t*, sbyte*> GetInfoKeyBuffer;
-        public delegate* unmanaged[Cdecl]<sbyte*, sbyte*, sbyte*> InfoKeyValue;
-        public delegate* unmanaged[Cdecl]<sbyte*, sbyte*, sbyte*, void> SetKeyValue;
-        public delegate* unmanaged[Cdecl]<sbyte*, sbyte*, sbyte*, void> SetClientKeyValue;
-        public delegate* unmanaged[Cdecl]<sbyte*, int> IsMapValid;
+        public delegate* unmanaged[Cdecl]<edict_t*, NativeInterop.NChar*> GetInfoKeyBuffer;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, NativeInterop.NChar*, NativeInterop.NChar*> InfoKeyValue;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, NativeInterop.NChar*, NativeInterop.NChar*, void> SetKeyValue;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, NativeInterop.NChar*, NativeInterop.NChar*, void> SetClientKeyValue;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, int> IsMapValid;
         public delegate* unmanaged[Cdecl]<float*, float*, void> StaticDecal;
         public delegate* unmanaged[Cdecl]<int, int> PrecacheGeneric;
         public delegate* unmanaged[Cdecl]<edict_t*, int> GetPlayerUserId;
         public delegate* unmanaged[Cdecl]<int, float*, void> BuildSoundMsg;
         public delegate* unmanaged[Cdecl]<int> IsDedicatedServer;
-        public delegate* unmanaged[Cdecl]<sbyte*, cvar_s*> CVarGetPointer;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, cvar_s*> CVarGetPointer;
         public delegate* unmanaged[Cdecl]<edict_t*, uint> GetPlayerWONId;
-        public delegate* unmanaged[Cdecl]<sbyte*, void> Info_RemoveKey;
-        public delegate* unmanaged[Cdecl]<sbyte*, sbyte*> GetPhysicsKeyValue;
-        public delegate* unmanaged[Cdecl]<sbyte*, sbyte*, void> SetPhysicsKeyValue;
-        public delegate* unmanaged[Cdecl]<edict_t*, sbyte*> GetPhysicsInfoString;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, void> Info_RemoveKey;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, NativeInterop.NChar*> GetPhysicsKeyValue;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, NativeInterop.NChar*, void> SetPhysicsKeyValue;
+        public delegate* unmanaged[Cdecl]<edict_t*, NativeInterop.NChar*> GetPhysicsInfoString;
         public delegate* unmanaged[Cdecl]<ushort, int> PrecacheEvent;
         public delegate* unmanaged[Cdecl]<int, edict_t*, ushort, float, float*, float*, float, float, int, int, int, int, void> PlaybackEvent;
         public delegate* unmanaged[Cdecl]<byte*, int, void> SetFatPVS;
@@ -1998,16 +2004,16 @@ namespace GoldsrcFramework.Engine.Native
         public delegate* unmanaged[Cdecl]<void> DeltaUnsetFieldByIndex;
         public delegate* unmanaged[Cdecl]<edict_t*, int, void> SetGroupMask;
         public delegate* unmanaged[Cdecl]<int, int, void> engCreateInstancedBaseline;
-        public delegate* unmanaged[Cdecl]<sbyte*, void> Cvar_DirectSet;
-        public delegate* unmanaged[Cdecl]<edict_t*, sbyte*, void> ForceUnmodified;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, void> Cvar_DirectSet;
+        public delegate* unmanaged[Cdecl]<edict_t*, NativeInterop.NChar*, void> ForceUnmodified;
         public delegate* unmanaged[Cdecl]<edict_t*, void> GetPlayerStats;
-        public delegate* unmanaged[Cdecl]<sbyte*, void> AddServerCommand;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, void> AddServerCommand;
         public delegate* unmanaged[Cdecl]<int> Voice_GetClientListening;
         public delegate* unmanaged[Cdecl]<int, int, int> Voice_SetClientListening;
-        public delegate* unmanaged[Cdecl]<edict_t*, sbyte*> GetPlayerAuthId;
+        public delegate* unmanaged[Cdecl]<edict_t*, NativeInterop.NChar*> GetPlayerAuthId;
         public delegate* unmanaged[Cdecl]<nint, int*, nint> SequenceGet; // sentenceEntry_s*
-        public delegate* unmanaged[Cdecl]<nint, sbyte*, int, sbyte*> SequencePickSentence; // sentenceEntry_s*
-        public delegate* unmanaged[Cdecl]<sbyte*, int> GetFileSize;
+        public delegate* unmanaged[Cdecl]<nint, NativeInterop.NChar*, int, NativeInterop.NChar*> SequencePickSentence; // sentenceEntry_s*
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, int> GetFileSize;
         public delegate* unmanaged[Cdecl]<edict_t*, uint> GetApproxWavePlayLen;
         public delegate* unmanaged[Cdecl]<int> IsCareerMatch;
         public delegate* unmanaged[Cdecl]<int> GetLocalizedStringLength;
@@ -2016,8 +2022,8 @@ namespace GoldsrcFramework.Engine.Native
         public delegate* unmanaged[Cdecl]<int*, int*, void> ProcessTutorMessageDecayBuffer;
         public delegate* unmanaged[Cdecl]<int*, int*, void> ConstructTutorMessageDecayBuffer;
         public delegate* unmanaged[Cdecl]<void> ResetTutorMessageDecayData;
-        public delegate* unmanaged[Cdecl]<edict_t*, sbyte*, sbyte*, void> QueryClientCvarValue;
-        public delegate* unmanaged[Cdecl]<edict_t*, int, sbyte*, sbyte*, void> QueryClientCvarValue2;
+        public delegate* unmanaged[Cdecl]<edict_t*, NativeInterop.NChar*, NativeInterop.NChar*, void> QueryClientCvarValue;
+        public delegate* unmanaged[Cdecl]<edict_t*, int, NativeInterop.NChar*, NativeInterop.NChar*, void> QueryClientCvarValue2;
         public delegate* unmanaged[Cdecl]<int*, int> EngCheckParm;
     }
 
@@ -2025,8 +2031,8 @@ namespace GoldsrcFramework.Engine.Native
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct cvar_s
     {
-        public sbyte* name;
-        public sbyte* @string;  // using @ to escape C# keyword
+        public NativeInterop.NChar* name;
+        public NativeInterop.NChar* @string;  // using @ to escape C# keyword
         public int flags;
         public float value;
         public nint next;     // cvar_s* next;
@@ -2061,11 +2067,11 @@ namespace GoldsrcFramework.Engine.Native
         public delegate* unmanaged[Cdecl]<cache_user_s*, nint> Cache_Check;
 
         // void (*LoadCacheFile)(char* path, struct cache_user_s* cu);
-        public delegate* unmanaged[Cdecl]<sbyte*, cache_user_s*, void> LoadCacheFile;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, cache_user_s*, void> LoadCacheFile;
 
         // Model management
         // struct model_s* (*Mod_ForName)(const char* name, int crash_if_missing);
-        public delegate* unmanaged[Cdecl]<sbyte*, int, model_s*> Mod_ForName;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, int, model_s*> Mod_ForName;
 
         // void* (*Mod_Extradata)(struct model_s* mod);
         public delegate* unmanaged[Cdecl]<model_s*, nint> Mod_Extradata;
@@ -2091,7 +2097,7 @@ namespace GoldsrcFramework.Engine.Native
         public delegate* unmanaged[Cdecl]<int*, double*, double*, void> GetTimes;
 
         // struct cvar_s* (*GetCvar)(const char* name);
-        public delegate* unmanaged[Cdecl]<sbyte*, cvar_s*> GetCvar;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, cvar_s*> GetCvar;
 
         // void (*GetViewInfo)(float* origin, float* upv, float* rightv, float* vpnv);
         public delegate* unmanaged[Cdecl]<float*, float*, float*, float*, void> GetViewInfo;
@@ -2169,7 +2175,7 @@ namespace GoldsrcFramework.Engine.Native
         public delegate* unmanaged[Cdecl]<int, void> SetForceFaceFlags;
 
         // void (*StudioSetHeader)(void* header);
-        public delegate* unmanaged[Cdecl]<nint, void> StudioSetHeader;
+        public delegate* unmanaged[Cdecl]<studiohdr_t*, void> StudioSetHeader;
 
         // void (*SetRenderModel)(struct model_s* model);
         public delegate* unmanaged[Cdecl]<model_s*, void> SetRenderModel;
@@ -2214,7 +2220,7 @@ namespace GoldsrcFramework.Engine.Native
         // Memory management
         public delegate* unmanaged[Cdecl]<int, nuint, nint> Mem_Calloc;
         public delegate* unmanaged[Cdecl]<cache_user_s*, nint> Cache_Check;
-        public delegate* unmanaged[Cdecl]<sbyte*, cache_user_s*, void> LoadCacheFile;
+        public delegate* unmanaged[Cdecl]<NativeInterop.NChar*, cache_user_s*, void> LoadCacheFile;
         public delegate* unmanaged[Cdecl]<model_s*, nint> Mod_Extradata;
     }
 

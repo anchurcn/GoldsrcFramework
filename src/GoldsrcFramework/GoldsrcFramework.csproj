@@ -12,6 +12,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\GoldsrcFramework.Engine\GoldsrcFramework.Engine.csproj" />
+		<ProjectReference Include="..\GoldsrcFramework.Math\GoldsrcFramework.Math.csproj" />
 	</ItemGroup>
 
 	<!-- Include MSBuild.deps.json and MSBuild.runtimeconfig.json in ContentWithTargetPath so they will be copied to the output folder of projects

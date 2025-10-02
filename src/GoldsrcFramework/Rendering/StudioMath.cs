@@ -249,6 +249,18 @@ public static unsafe class StudioMath
         quaternion[3] = cr * cp * cy + sr * sp * sy; // W
     }
 
+    // ConcatTransforms
+    public static void ConcatTransforms(ref Matrix3x4 in1, ref Matrix3x4 in2, out Matrix3x4 @out)
+    {
+        @out = new Matrix3x4();
+        fixed (float* pIn1 = &in1.M11)
+        fixed (float* pIn2 = &in2.M11)
+        fixed (float* pOut = &@out.M11)
+        {
+            ConcatTransforms(pIn1, pIn2, pOut);
+        }
+    }
+
     /// <summary>
     /// Matrix concatenation (R = A * B)
     /// </summary>
@@ -303,6 +315,15 @@ public static unsafe class StudioMath
         @out[0] = in1[0] * in2[0] + in1[1] * in2[1] + in1[2] * in2[2];
         @out[1] = in1[0] * in2[4] + in1[1] * in2[5] + in1[2] * in2[6];
         @out[2] = in1[0] * in2[8] + in1[1] * in2[9] + in1[2] * in2[10];
+    }
+
+    public static void AngleMatrix(ref Vector3 angles, ref Matrix3x4 matrix)
+    {
+        fixed (float* pAngles = &angles.X)
+        fixed (float* pMatrix = &matrix.M11)
+        {
+            AngleMatrix(pAngles, pMatrix);
+        }
     }
 
     /// <summary>

@@ -40,6 +40,30 @@ public struct FixedBuffer<TElement, TLength> where TLength : unmanaged, IFixedBu
             }
         }
     }
+
+    public unsafe TElement* AsPointer()
+    {
+        unsafe
+        {
+            fixed (TLength* p = &Data)
+            {
+                return (TElement*)p;
+            }
+        }
+    }
+
+    public unsafe override string? ToString()
+    {
+        if (typeof(TElement) == typeof(NChar))
+        {
+            fixed(TLength* p = &Data)
+            {
+                byte* pBuf = (byte*)p;
+                return Encoding.UTF8.GetString(pBuf, sizeof(TLength));
+            }
+        }
+        return base.ToString();
+    }
 }
 
 public struct DemoUsageOfFixedBuffer
@@ -64,6 +88,7 @@ public struct DemoUsageOfFixedBuffer
 
 #region Built-in buffer holders
 // From 64 bytes (16 floats) up to 4096 bytes (1024 floats)
+public unsafe struct BufferByte32 : IFixedBufferHolder { public fixed byte M[32]; }
 public unsafe struct BufferByte64 : IFixedBufferHolder { public fixed byte M[64]; }
 public unsafe struct BufferByte128 : IFixedBufferHolder { public fixed byte M[128]; }
 public unsafe struct BufferByte256 : IFixedBufferHolder { public fixed byte M[256]; }

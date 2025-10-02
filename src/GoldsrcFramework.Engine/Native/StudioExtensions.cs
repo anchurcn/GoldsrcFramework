@@ -203,18 +203,19 @@ public static unsafe class StudioExtensions
     }
 
     /// <summary>
-    /// Helper to convert fixed sbyte array to string
+    /// Helper to convert fixed NChar array to string
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static string GetString(sbyte* ptr, int maxLength)
+    public static string GetString(NativeInterop.NChar* ptr, int maxLength)
     {
         if (ptr == null) return string.Empty;
-        
+
         int length = 0;
-        while (length < maxLength && ptr[length] != 0)
+        byte* bytePtr = (byte*)ptr;
+        while (length < maxLength && bytePtr[length] != 0)
             length++;
-        
-        return new string(ptr, 0, length, System.Text.Encoding.UTF8);
+
+        return System.Text.Encoding.UTF8.GetString(bytePtr, length);
     }
 
     /// <summary>
@@ -223,10 +224,7 @@ public static unsafe class StudioExtensions
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static string GetName(this ref studiohdr_t header)
     {
-        fixed (sbyte* ptr = header.name)
-        {
-            return GetString(ptr, 64);
-        }
+        return header.name.ToString() ?? string.Empty;
     }
 
     /// <summary>
@@ -235,10 +233,7 @@ public static unsafe class StudioExtensions
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static string GetName(this ref mstudiobone_t bone)
     {
-        fixed (sbyte* ptr = bone.name)
-        {
-            return GetString(ptr, 32);
-        }
+        return bone.name.ToString() ?? string.Empty;
     }
 
     /// <summary>
@@ -247,10 +242,7 @@ public static unsafe class StudioExtensions
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static string GetLabel(this ref mstudioseqdesc_t seqdesc)
     {
-        fixed (sbyte* ptr = seqdesc.label)
-        {
-            return GetString(ptr, 32);
-        }
+        return seqdesc.label.ToString() ?? string.Empty;
     }
 }
 

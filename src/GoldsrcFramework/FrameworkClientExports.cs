@@ -1,6 +1,7 @@
 using System.Text;
 using GoldsrcFramework.LinearMath;
 using GoldsrcFramework.Rendering;
+using NativeInterop;
 
 namespace GoldsrcFramework.Engine.Native;
 
@@ -28,11 +29,11 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
 
     public virtual int HUD_Redraw(float flTime, int intermission)
     {
-        sbyte* msg = stackalloc sbyte[100];
+        byte* msg = stackalloc byte[100];
         var span = new Span<byte>(msg, 100);
         span.Clear();
         Encoding.UTF8.GetBytes("GoldsrcFramworkDemo",span);
-        EngineApi.PClient->CenterPrint(msg);
+        EngineApi.PClient->CenterPrint((NChar*)msg);
         return LegacyClientInterop.HUD_Redraw(flTime, intermission);
     }
 
@@ -213,6 +214,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
 
     public virtual int HUD_GetStudioModelInterface(int version, r_studio_interface_s** ppinterface, engine_studio_api_s* pstudio)
     {
+        return LegacyClientInterop.HUD_GetStudioModelInterface(version, ppinterface, pstudio);
         return StudioModelRenderer.GetStudioModelInterface(version, ppinterface, pstudio);
     }
 
