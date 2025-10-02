@@ -5,6 +5,7 @@ using System.Runtime.Loader;
 using System.Text.Json;
 using GoldsrcFramework.Engine;
 using GoldsrcFramework.Engine.Native;
+using GoldsrcFramework.LinearMath;
 
 namespace GoldsrcFramework
 {
@@ -198,7 +199,7 @@ namespace GoldsrcFramework
         }
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static void CL_GetCameraOffset(Vector3f* ofs)
+        static void CL_GetCameraOffset(Vector3* ofs)
         {
             s_client.CL_GetCameraOffsets(ofs);
         }

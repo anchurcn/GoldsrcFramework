@@ -1,6 +1,6 @@
 ﻿
 using GoldsrcFramework.Engine.Native;
-
+using GoldsrcFramework.LinearMath;
 using System.Runtime.InteropServices;
 
 /// <summary>
@@ -14,11 +14,11 @@ public unsafe class TypeUsageExample: FrameworkClientExports
     public void VectorExample()
     {
         // Create vectors
-        var origin = new Vector3f(100.0f, 200.0f, 50.0f);
-        var velocity = new Vector3f(0.0f, 0.0f, -9.8f);
+        var origin = new Vector3(100.0f, 200.0f, 50.0f);
+        var velocity = new Vector3(0.0f, 0.0f, -9.8f);
 
         // Vector operations
-        var newPosition = new Vector3f(
+        var newPosition = new Vector3(
             origin.X + velocity.X,
             origin.Y + velocity.Y,
             origin.Z + velocity.Z
@@ -47,8 +47,8 @@ public unsafe class TypeUsageExample: FrameworkClientExports
         {
             entityType = 1,
             number = 100,
-            origin = new Vector3f(0, 0, 0),
-            angles = new Vector3f(0, 90, 0),
+            origin = new Vector3(0, 0, 0),
+            angles = new Vector3(0, 90, 0),
             modelindex = 1,
             sequence = 0,
             frame = 0.0f,
@@ -59,7 +59,7 @@ public unsafe class TypeUsageExample: FrameworkClientExports
         // Access user fields
         entityState.iuser1 = 42;
         entityState.fuser1 = 3.14f;
-        entityState.vuser1 = new Vector3f(1, 2, 3);
+        entityState.vuser1 = new Vector3(1, 2, 3);
     }
 
     /// <summary>
@@ -69,8 +69,8 @@ public unsafe class TypeUsageExample: FrameworkClientExports
     {
         var clientData = new clientdata_s
         {
-            origin = new Vector3f(100, 200, 50),
-            velocity = new Vector3f(0, 0, -9.8f),
+            origin = new Vector3(100, 200, 50),
+            velocity = new Vector3(0, 0, -9.8f),
             health = 100.0f,
             fov = 90.0f,
             maxspeed = 320.0f,
@@ -81,7 +81,7 @@ public unsafe class TypeUsageExample: FrameworkClientExports
         // Access mod-specific fields
         clientData.iuser1 = 1;
         clientData.fuser1 = 1.5f;
-        clientData.vuser1 = new Vector3f(0, 0, 1);
+        clientData.vuser1 = new Vector3(0, 0, 1);
     }
 
     /// <summary>
@@ -92,7 +92,7 @@ public unsafe class TypeUsageExample: FrameworkClientExports
         var userCmd = new usercmd_s
         {
             msec = 16, // 16ms frame
-            viewangles = new Vector3f(0, 90, 0),
+            viewangles = new Vector3(0, 90, 0),
             forwardmove = 400.0f,
             sidemove = 0.0f,
             upmove = 0.0f,
@@ -252,8 +252,8 @@ public unsafe class TypeUsageExample: FrameworkClientExports
             fInOpen = new qboolean { Value = 1 },
             fInWater = new qboolean { Value = 0 },
             flFraction = 1.0f, // Didn't hit anything
-            vecEndPos = new Vector3f(100, 200, 50),
-            vecPlaneNormal = new Vector3f(0, 0, 1), // Up
+            vecEndPos = new Vector3(100, 200, 50),
+            vecPlaneNormal = new Vector3(0, 0, 1), // Up
             iHitgroup = 0 // Generic
         };
     }
@@ -473,8 +473,8 @@ public unsafe class TypeUsageExample: FrameworkClientExports
             var model = new model_s();
             float frame = 0.0f;
             int sequence = 0;
-            Vector3f angles = new(0, 90, 0);
-            Vector3f origin = new(100, 200, 50);
+            Vector3 angles = new(0, 90, 0);
+            Vector3 origin = new(100, 200, 50);
 
             byte[] controllers = new byte[4] { 0, 0, 0, 0 };
             byte[] blending = new byte[2] { 0, 0 };

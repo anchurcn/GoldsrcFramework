@@ -1,4 +1,5 @@
 using GoldsrcFramework.Engine.Native;
+using GoldsrcFramework.LinearMath;
 using System;
 using System.Runtime.InteropServices;
 
@@ -61,7 +62,7 @@ namespace GoldsrcFramework
         public static extern int CL_IsThirdPerson();
 
         [DllImport(LegacyClientDll, CallingConvention = CallingConvention.Cdecl)]
-        public static extern void CL_GetCameraOffsets(Vector3f* ofs);
+        public static extern void CL_GetCameraOffsets(Vector3* ofs);
 
         [DllImport(LegacyClientDll, CallingConvention = CallingConvention.Cdecl)]
         public static extern kbutton_s* KB_Find(sbyte* name);

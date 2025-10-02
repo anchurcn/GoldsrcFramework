@@ -1,3 +1,4 @@
+using GoldsrcFramework.LinearMath;
 using System;
 
 namespace GoldsrcFramework.Engine.Native;
@@ -90,7 +91,7 @@ public unsafe interface IClientExportFuncs
     /// <summary>
     /// Get camera offsets
     /// </summary>
-    void CL_GetCameraOffsets(Vector3f* ofs);
+    void CL_GetCameraOffsets(Vector3* ofs);
 
     /// <summary>
     /// Find key button

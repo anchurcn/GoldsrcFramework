@@ -1,4 +1,5 @@
 using System.Text;
+using GoldsrcFramework.LinearMath;
 using GoldsrcFramework.Rendering;
 
 namespace GoldsrcFramework.Engine.Native;
@@ -8,9 +9,6 @@ namespace GoldsrcFramework.Engine.Native;
 /// </summary>
 public unsafe class FrameworkClientExports : IClientExportFuncs
 {
-    // Studio model renderer instance
-    private StudioModelRenderer? _studioRenderer;
-
     // IClientExportFuncs implementation - all based on LegacyClientInterop
     public virtual int Initialize(cl_enginefunc_t* pEnginefuncs, int iVersion)
     {
@@ -98,7 +96,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         return LegacyClientInterop.CL_IsThirdPerson();
     }
 
-    public virtual void CL_GetCameraOffsets(Vector3f* ofs)
+    public virtual void CL_GetCameraOffsets(Vector3* ofs)
     {
         LegacyClientInterop.CL_GetCameraOffsets(ofs);
     }

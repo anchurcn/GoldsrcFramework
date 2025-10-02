@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using GoldsrcFramework.LinearMath;
 
 namespace GoldsrcFramework.Engine.Native;
 
@@ -61,7 +62,7 @@ public unsafe struct ServerExportFuncs
     public delegate* unmanaged[Cdecl]<edict_t*, edict_t*, byte**, byte**, void> SetupVisibility;
     public delegate* unmanaged[Cdecl]<edict_t*, int, clientdata_s*, void> UpdateClientData;
     public delegate* unmanaged[Cdecl]<entity_state_s*, int, edict_t*, edict_t*, int, int, byte*, int> AddToFullPack;
-    public delegate* unmanaged[Cdecl]<int, int, entity_state_s*, edict_t*, int, Vector3f*, Vector3f*, void> CreateBaseline;
+    public delegate* unmanaged[Cdecl]<int, int, entity_state_s*, edict_t*, int, Vector3*, Vector3*, void> CreateBaseline;
     public delegate* unmanaged[Cdecl]<void> RegisterEncoders;
     public delegate* unmanaged[Cdecl]<edict_t*, weapon_data_s*, int> GetWeaponData;
 

@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using GoldsrcFramework.LinearMath;
 
 namespace GoldsrcFramework.Engine.Native;
 
@@ -260,7 +261,7 @@ public unsafe class FrameworkServerExports : IServerExportFuncs
         return LegacyServerInterop.AddToFullPack(state, e, ent, host, hostflags, player, pSet);
     }
 
-    public virtual void CreateBaseline(int player, int eindex, entity_state_s* baseline, edict_t* entity, int playermodelindex, Vector3f* player_mins, Vector3f* player_maxs)
+    public virtual void CreateBaseline(int player, int eindex, entity_state_s* baseline, edict_t* entity, int playermodelindex, Vector3* player_mins, Vector3* player_maxs)
     {
         Log(nameof(CreateBaseline));
         LegacyServerInterop.CreateBaseline(player, eindex, baseline, entity, playermodelindex, player_mins, player_maxs);

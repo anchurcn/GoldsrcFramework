@@ -9,6 +9,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using GoldsrcFramework.Engine.Native;
+using GoldsrcFramework.LinearMath;
 
 namespace GoldsrcFramework
 {
@@ -330,7 +331,7 @@ namespace GoldsrcFramework
             => s_server.AddToFullPack(state, e, ent, host, hostflags, player, pSet);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static void CreateBaseline(int player, int eindex, entity_state_s* baseline, edict_t* entity, int playermodelindex, Vector3f* player_mins, Vector3f* player_maxs)
+        static void CreateBaseline(int player, int eindex, entity_state_s* baseline, edict_t* entity, int playermodelindex, Vector3* player_mins, Vector3* player_maxs)
             => s_server.CreateBaseline(player, eindex, baseline, entity, playermodelindex, player_mins, player_maxs);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]

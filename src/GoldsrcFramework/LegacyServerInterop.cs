@@ -1,4 +1,5 @@
 ﻿using GoldsrcFramework.Engine.Native;
+using GoldsrcFramework.LinearMath;
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -163,7 +164,7 @@ namespace GoldsrcFramework
         public static int AddToFullPack(entity_state_s* state, int e, edict_t* ent, edict_t* host, int hostflags, int player, byte* pSet)
             => LegacyServerApiPtr->AddToFullPack(state, e, ent, host, hostflags, player, pSet);
 
-        public static void CreateBaseline(int player, int eindex, entity_state_s* baseline, edict_t* entity, int playermodelindex, Vector3f* player_mins, Vector3f* player_maxs)
+        public static void CreateBaseline(int player, int eindex, entity_state_s* baseline, edict_t* entity, int playermodelindex, Vector3* player_mins, Vector3* player_maxs)
             => LegacyServerApiPtr->CreateBaseline(player, eindex, baseline, entity, playermodelindex, player_mins, player_maxs);
 
         public static void RegisterEncoders() => LegacyServerApiPtr->RegisterEncoders();

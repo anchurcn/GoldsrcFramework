@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using GoldsrcFramework.LinearMath;
 
 namespace GoldsrcFramework.Engine.Native;
 
@@ -25,7 +26,7 @@ public unsafe struct ClientExportFuncs
     public delegate* unmanaged[Cdecl]<void> IN_Accumulate;
     public delegate* unmanaged[Cdecl]<float, usercmd_s*, int, void> CL_CreateMove;
     public delegate* unmanaged[Cdecl]<int> CL_IsThirdPerson;
-    public delegate* unmanaged[Cdecl]<Vector3f*, void> CL_GetCameraOffsets;
+    public delegate* unmanaged[Cdecl]<Vector3*, void> CL_GetCameraOffsets;
     public delegate* unmanaged[Cdecl]<sbyte*, kbutton_s*> KB_Find;
     public delegate* unmanaged[Cdecl]<void> CAM_Think;
     public delegate* unmanaged[Cdecl]<ref_params_s*, void> V_CalcRefdef;

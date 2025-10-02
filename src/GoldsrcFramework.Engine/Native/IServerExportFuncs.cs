@@ -1,4 +1,5 @@
 using System;
+using GoldsrcFramework.LinearMath;
 
 namespace GoldsrcFramework.Engine.Native;
 
@@ -60,7 +61,7 @@ public unsafe interface IServerExportFuncs
     void SetupVisibility(edict_t* pViewEntity, edict_t* pClient, byte** pvs, byte** pas);
     void UpdateClientData(edict_t* ent, int sendweapons, clientdata_s* cd);
     int AddToFullPack(entity_state_s* state, int e, edict_t* ent, edict_t* host, int hostflags, int player, byte* pSet);
-    void CreateBaseline(int player, int eindex, entity_state_s* baseline, edict_t* entity, int playermodelindex, Vector3f* player_mins, Vector3f* player_maxs);
+    void CreateBaseline(int player, int eindex, entity_state_s* baseline, edict_t* entity, int playermodelindex, Vector3* player_mins, Vector3* player_maxs);
     void RegisterEncoders();
     int GetWeaponData(edict_t* player, weapon_data_s* info);
 

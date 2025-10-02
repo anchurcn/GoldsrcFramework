@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using GoldsrcFramework.LinearMath;
 
 namespace GoldsrcFramework.Engine.Native
 {
@@ -22,21 +23,6 @@ namespace GoldsrcFramework.Engine.Native
     [StructLayout(LayoutKind.Sequential)]
     public struct qboolean { public int Value; }
 
-    // Vector type from CustomTypeMapping.txt
-    [StructLayout(LayoutKind.Sequential)]
-    public struct Vector3f
-    {
-        public float X;
-        public float Y;
-        public float Z;
-
-        public Vector3f(float x, float y, float z)
-        {
-            X = x;
-            Y = y;
-            Z = z;
-        }
-    }
 
     // Color type
     [StructLayout(LayoutKind.Sequential)]
@@ -101,7 +87,7 @@ namespace GoldsrcFramework.Engine.Native
     {
         public short lerp_msec;   // Interpolation time on client
         public byte msec;         // Duration in ms of command
-        public Vector3f viewangles; // Command view angles.
+        public Vector3 viewangles; // Command view angles.
 
         // intended velocities
         public float forwardmove;   // Forward velocity.
@@ -114,7 +100,7 @@ namespace GoldsrcFramework.Engine.Native
 
         // Experimental player impact stuff.
         public int impact_index;
-        public Vector3f impact_position;
+        public Vector3 impact_position;
     }
 
     // Client data structure (simple version from cdll_int.h)
@@ -122,10 +108,10 @@ namespace GoldsrcFramework.Engine.Native
     public struct client_data_t
     {
         // fields that cannot be modified  (ie. have no effect if changed)
-        public Vector3f origin;
+        public Vector3 origin;
 
         // fields that can be changed by the cldll
-        public Vector3f viewangles;
+        public Vector3 viewangles;
         public int iWeaponBits;
         public float fov; // field of view
     }
@@ -166,15 +152,15 @@ namespace GoldsrcFramework.Engine.Native
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct clientdata_s
     {
-        public Vector3f origin;
-        public Vector3f velocity;
+        public Vector3 origin;
+        public Vector3 velocity;
 
         public int viewmodel;
-        public Vector3f punchangle;
+        public Vector3 punchangle;
         public int flags;
         public int waterlevel;
         public int watertype;
-        public Vector3f view_ofs;
+        public Vector3 view_ofs;
         public float health;
 
         public int bInDuck;
@@ -215,10 +201,10 @@ namespace GoldsrcFramework.Engine.Native
         public float fuser2;
         public float fuser3;
         public float fuser4;
-        public Vector3f vuser1;
-        public Vector3f vuser2;
-        public Vector3f vuser3;
-        public Vector3f vuser4;
+        public Vector3 vuser1;
+        public Vector3 vuser2;
+        public Vector3 vuser3;
+        public Vector3 vuser4;
     }
 
     // Entity state structure
@@ -235,8 +221,8 @@ namespace GoldsrcFramework.Engine.Native
         public int messagenum;
 
         // Fields which can be transitted and reconstructed over the network stream
-        public Vector3f origin;
-        public Vector3f angles;
+        public Vector3 origin;
+        public Vector3 angles;
 
         public int modelindex;
         public int sequence;
@@ -261,11 +247,11 @@ namespace GoldsrcFramework.Engine.Native
         public int body;
         public fixed byte controller[4];
         public fixed byte blending[4];
-        public Vector3f velocity;
+        public Vector3 velocity;
 
         // Send bbox down to client for use during prediction.
-        public Vector3f mins;
-        public Vector3f maxs;
+        public Vector3 mins;
+        public Vector3 maxs;
 
         public int aiment;
         // If owned by a player, the index of that player ( for projectiles ).
@@ -284,7 +270,7 @@ namespace GoldsrcFramework.Engine.Native
         public int weaponmodel;
         public int gaitsequence;
         // If standing on conveyor, e.g.
-        public Vector3f basevelocity;
+        public Vector3 basevelocity;
         // Use the crouched hull, or the regular player hull.
         public int usehull;
         // Latched buttons last time state updated.
@@ -307,10 +293,10 @@ namespace GoldsrcFramework.Engine.Native
         public float fuser2;
         public float fuser3;
         public float fuser4;
-        public Vector3f vuser1;
-        public Vector3f vuser2;
-        public Vector3f vuser3;
-        public Vector3f vuser4;
+        public Vector3 vuser1;
+        public Vector3 vuser2;
+        public Vector3 vuser3;
+        public Vector3 vuser4;
     }
 
     // Local state structure
@@ -415,12 +401,12 @@ namespace GoldsrcFramework.Engine.Native
     {
         public fixed sbyte name[32];    // Name of model, or "player" or "world".
         public int player;
-        public Vector3f origin;         // Model's origin in world coordinates.
+        public Vector3 origin;         // Model's origin in world coordinates.
         public nint model;            // only for bsp models
         public nint studiomodel;      // SOLID_BBOX, but studio clip intersections.
-        public Vector3f mins, maxs;     // only for non-bsp models
+        public Vector3 mins, maxs;     // only for non-bsp models
         public int info;                // For client or server to use to identify (index into edicts or cl_entities)
-        public Vector3f angles;         // rotated entities need this info for hull testing to work.
+        public Vector3 angles;         // rotated entities need this info for hull testing to work.
 
         public int solid;               // Triggers and func_door type WATER brushes are SOLID_NOT
         public int skin;                // BSP Contents for such things like fun_door water brushes.
@@ -447,10 +433,10 @@ namespace GoldsrcFramework.Engine.Native
         public float fuser2;
         public float fuser3;
         public float fuser4;
-        public Vector3f vuser1;
-        public Vector3f vuser2;
-        public Vector3f vuser3;
-        public Vector3f vuser4;
+        public Vector3 vuser1;
+        public Vector3 vuser2;
+        public Vector3 vuser3;
+        public Vector3 vuser4;
     }
 
     // PM trace structure
@@ -461,10 +447,10 @@ namespace GoldsrcFramework.Engine.Native
         public qboolean startsolid;     // if true, the initial point was in a solid area
         public qboolean inopen, inwater;
         public float fraction;          // time completed, 1.0 = didn't hit anything
-        public Vector3f endpos;         // final position
+        public Vector3 endpos;         // final position
         public pmplane_t plane;         // surface normal at impact
         public int ent;                 // entity the surface is on
-        public Vector3f deltavelocity;  // Change in player's velocity caused by impact.
+        public Vector3 deltavelocity;  // Change in player's velocity caused by impact.
                                         // Only run on server.
         public int hitgroup;
     }
@@ -473,7 +459,7 @@ namespace GoldsrcFramework.Engine.Native
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct pmplane_t
     {
-        public Vector3f normal;
+        public Vector3 normal;
         public float dist;
         public byte type;           // for fast side tests
         public byte signbits;       // signx + (signy<<1) + (signz<<1)
@@ -491,17 +477,17 @@ namespace GoldsrcFramework.Engine.Native
         public float time;           // realtime on host, for reckoning duck timing
         public float frametime;      // Duration of this frame
 
-        public Vector3f forward, right, up; // Vectors for angles
+        public Vector3 forward, right, up; // Vectors for angles
         // player state
-        public Vector3f origin;      // Movement origin.
-        public Vector3f angles;      // Movement view angles.
-        public Vector3f oldangles;   // Angles before movement view angles were looked at.
-        public Vector3f velocity;    // Current movement direction.
-        public Vector3f movedir;     // For waterjumping, a forced forward velocity so we can fly over lip of ledge.
-        public Vector3f basevelocity; // Velocity of the conveyor we are standing, e.g.
+        public Vector3 origin;      // Movement origin.
+        public Vector3 angles;      // Movement view angles.
+        public Vector3 oldangles;   // Angles before movement view angles were looked at.
+        public Vector3 velocity;    // Current movement direction.
+        public Vector3 movedir;     // For waterjumping, a forced forward velocity so we can fly over lip of ledge.
+        public Vector3 basevelocity; // Velocity of the conveyor we are standing, e.g.
 
         // For ducking/dead
-        public Vector3f view_ofs;    // Our eye position.
+        public Vector3 view_ofs;    // Our eye position.
         public float flDuckTime;     // Time we started duck
         public qboolean bInDuck;     // In process of ducking or ducked already?
 
@@ -510,7 +496,7 @@ namespace GoldsrcFramework.Engine.Native
         public int iStepLeft;
 
         public float flFallVelocity;
-        public Vector3f punchangle;
+        public Vector3 punchangle;
 
         public float flSwimTime;
 
@@ -549,10 +535,10 @@ namespace GoldsrcFramework.Engine.Native
         public float fuser2;
         public float fuser3;
         public float fuser4;
-        public Vector3f vuser1;
-        public Vector3f vuser2;
-        public Vector3f vuser3;
-        public Vector3f vuser4;
+        public Vector3 vuser1;
+        public Vector3 vuser2;
+        public Vector3 vuser3;
+        public Vector3 vuser4;
         // world state
         // Number of entities to clip against.
         public int numphysent;
@@ -622,8 +608,8 @@ namespace GoldsrcFramework.Engine.Native
         public float prevanimtime;
         public float sequencetime;
         public fixed byte prevseqblending[2];
-        public Vector3f prevorigin;
-        public Vector3f prevangles;
+        public Vector3 prevorigin;
+        public Vector3 prevangles;
 
         public int prevsequence;
         public float prevframe;
@@ -639,8 +625,8 @@ namespace GoldsrcFramework.Engine.Native
         // Time stamp for this movement
         public float animtime;
 
-        public Vector3f origin;
-        public Vector3f angles;
+        public Vector3 origin;
+        public Vector3 angles;
     }
 
     // Client entity structure
@@ -667,8 +653,8 @@ namespace GoldsrcFramework.Engine.Native
         public float lastmove;
 
         // Actual render position and angles
-        public Vector3f origin;
-        public Vector3f angles;
+        public Vector3 origin;
+        public Vector3 angles;
 
         // Attachment points
         public fixed float attachment[4 * 3]; // Vector3f attachment[4];
@@ -708,22 +694,22 @@ namespace GoldsrcFramework.Engine.Native
         public fixed sbyte classname[32];
         public fixed sbyte globalname[32];
 
-        public Vector3f origin;
-        public Vector3f oldorigin;
-        public Vector3f velocity;
-        public Vector3f basevelocity;
-        public Vector3f clbasevelocity;  // Base velocity that was passed in to server physics so
+        public Vector3 origin;
+        public Vector3 oldorigin;
+        public Vector3 velocity;
+        public Vector3 basevelocity;
+        public Vector3 clbasevelocity;  // Base velocity that was passed in to server physics so
                                          //  client can predict conveyors correctly.  Server zeroes it, so we need to store here, too.
-        public Vector3f movedir;
+        public Vector3 movedir;
 
-        public Vector3f angles;          // Model angles
-        public Vector3f avelocity;       // angle velocity (degrees per second)
-        public Vector3f punchangle;      // auto-decaying view angle adjustment
-        public Vector3f v_angle;         // Viewing angle (player only)
+        public Vector3 angles;          // Model angles
+        public Vector3 avelocity;       // angle velocity (degrees per second)
+        public Vector3 punchangle;      // auto-decaying view angle adjustment
+        public Vector3 v_angle;         // Viewing angle (player only)
 
         // For parametric entities
-        public Vector3f endpos;
-        public Vector3f startpos;
+        public Vector3 endpos;
+        public Vector3 startpos;
         public float impacttime;
         public float starttime;
 
@@ -739,11 +725,11 @@ namespace GoldsrcFramework.Engine.Native
         public int viewmodel;            // player's viewmodel
         public int weaponmodel;          // what other players see
 
-        public Vector3f absmin;          // BB max translated to world coord
-        public Vector3f absmax;          // BB max translated to world coord
-        public Vector3f mins;            // local BB min
-        public Vector3f maxs;            // local BB max
-        public Vector3f size;            // maxs - mins
+        public Vector3 absmin;          // BB max translated to world coord
+        public Vector3 absmax;          // BB max translated to world coord
+        public Vector3 mins;            // local BB min
+        public Vector3 maxs;            // local BB max
+        public Vector3 size;            // maxs - mins
 
         public float ltime;
         public float nextthink;
@@ -772,7 +758,7 @@ namespace GoldsrcFramework.Engine.Native
 
         public int rendermode;
         public float renderamt;
-        public Vector3f rendercolor;
+        public Vector3 rendercolor;
         public int renderfx;
 
         public float health;
@@ -781,7 +767,7 @@ namespace GoldsrcFramework.Engine.Native
         public float takedamage;
 
         public int deadflag;
-        public Vector3f view_ofs;        // eye position
+        public Vector3 view_ofs;        // eye position
 
         public int button;
         public int impulse;
@@ -858,10 +844,10 @@ namespace GoldsrcFramework.Engine.Native
         public float fuser2;
         public float fuser3;
         public float fuser4;
-        public Vector3f vuser1;
-        public Vector3f vuser2;
-        public Vector3f vuser3;
-        public Vector3f vuser4;
+        public Vector3 vuser1;
+        public Vector3 vuser2;
+        public Vector3 vuser3;
+        public Vector3 vuser4;
         public nint euser1;
         public nint euser2;
         public nint euser3;
@@ -954,7 +940,7 @@ namespace GoldsrcFramework.Engine.Native
         public fixed sbyte mapName[32];
         public fixed sbyte landmarkName[32];
         public edict_t* pentLandmark;
-        public Vector3f vecLandmarkOrigin;
+        public Vector3 vecLandmarkOrigin;
     }
 
     // Save/Restore data structure
@@ -977,7 +963,7 @@ namespace GoldsrcFramework.Engine.Native
         // smooth transition
         public int fUseLandmark;
         public fixed sbyte szLandmarkName[20];  // landmark we'll spawn near in next level
-        public Vector3f vecLandmarkOffset;      // for landmark transitions
+        public Vector3 vecLandmarkOffset;      // for landmark transitions
         public float time;
         public fixed sbyte szCurrentMapName[32]; // To check global entities
     }
@@ -1032,14 +1018,14 @@ namespace GoldsrcFramework.Engine.Native
         public float teamplay;
         public float serverflags;
         public float found_secrets;
-        public Vector3f v_forward;
-        public Vector3f v_up;
-        public Vector3f v_right;
+        public Vector3 v_forward;
+        public Vector3 v_up;
+        public Vector3 v_right;
         public float trace_allsolid;
         public float trace_startsolid;
         public float trace_fraction;
-        public Vector3f trace_endpos;
-        public Vector3f trace_plane_normal;
+        public Vector3 trace_endpos;
+        public Vector3 trace_plane_normal;
         public float trace_plane_dist;
         public edict_t* trace_ent;
         public float trace_inopen;
@@ -1052,7 +1038,7 @@ namespace GoldsrcFramework.Engine.Native
         public int maxEntities;
         public sbyte* pStringBase;
         public nint pSaveData;        // void* pSaveData;
-        public Vector3f vecLandmarkOffset;
+        public Vector3 vecLandmarkOffset;
     }
 
     // Temporary entity structure
@@ -1074,7 +1060,7 @@ namespace GoldsrcFramework.Engine.Native
         public int priority;
         public short clientIndex;       // if attached, this is the index of the client to stick to
 
-        public Vector3f tentOffset;     // if attached, client origin + tentOffset = tent origin.
+        public Vector3 tentOffset;     // if attached, client origin + tentOffset = tent origin.
         public cl_entity_s entity;
     }
 
@@ -1283,7 +1269,7 @@ namespace GoldsrcFramework.Engine.Native
         public int gaitsequence;
         public float gaitframe;
         public float gaityaw;
-        public Vector3f prevgaitorigin;
+        public Vector3 prevgaitorigin;
 
         // Customization data (not used in Studio renderer)
         // public customization_t customdata;
@@ -1855,7 +1841,7 @@ namespace GoldsrcFramework.Engine.Native
     public unsafe struct sv_blending_interface_s
     {
         public int version;
-        public delegate* unmanaged[Cdecl]<model_s*, float, int, Vector3f*, Vector3f*, byte*, byte*, int, edict_t*, void> SV_StudioSetupBones;
+        public delegate* unmanaged[Cdecl]<model_s*, float, int, Vector3*, Vector3*, byte*, byte*, int, edict_t*, void> SV_StudioSetupBones;
     }
 
     // Trace result structure
@@ -1867,9 +1853,9 @@ namespace GoldsrcFramework.Engine.Native
         public qboolean fInOpen;
         public qboolean fInWater;
         public float flFraction;        // time completed, 1.0 = didn't hit anything
-        public Vector3f vecEndPos;      // final position
+        public Vector3 vecEndPos;      // final position
         public float flPlaneDist;
-        public Vector3f vecPlaneNormal; // surface normal at impact
+        public Vector3 vecPlaneNormal; // surface normal at impact
         public nint pHit;             // entity the surface is on
         public int iHitgroup;           // 0 == generic, non zero is specific body part
     }
