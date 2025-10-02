@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using GoldsrcFramework.LinearMath;
 
 namespace GoldsrcFramework.Rendering;
 
@@ -98,6 +99,28 @@ public static unsafe class StudioMath
         @out[0] = a[0] - b[0];
         @out[1] = a[1] - b[1];
         @out[2] = a[2] - b[2];
+    }
+
+    /// <summary>
+    /// Compare two vectors for equality
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool VectorCompare(float* v1, float* v2)
+    {
+        return v1[0] == v2[0] && v1[1] == v2[1] && v1[2] == v2[2];
+    }
+
+    /// <summary>
+    /// Transform a vector by a 3x4 matrix
+    /// Original: VectorTransform(in1, matrix, out)
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void VectorTransform(ref Vector3 in1, Matrix3x4* matrix, ref Vector3 @out)
+    {
+        float* pMatrix = (float*)matrix;
+        @out.X = in1.X * pMatrix[0 * 4 + 0] + in1.Y * pMatrix[1 * 4 + 0] + in1.Z * pMatrix[2 * 4 + 0] + pMatrix[0 * 4 + 3];
+        @out.Y = in1.X * pMatrix[0 * 4 + 1] + in1.Y * pMatrix[1 * 4 + 1] + in1.Z * pMatrix[2 * 4 + 1] + pMatrix[1 * 4 + 3];
+        @out.Z = in1.X * pMatrix[0 * 4 + 2] + in1.Y * pMatrix[1 * 4 + 2] + in1.Z * pMatrix[2 * 4 + 2] + pMatrix[2 * 4 + 3];
     }
 
     /// <summary>

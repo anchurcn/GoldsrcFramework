@@ -24,13 +24,34 @@ namespace GoldsrcFramework.Engine.Native
     public struct qboolean { public int Value; }
 
 
-    // Color type
+    // Color types
+    // Original: typedef struct { byte r, g, b; } color24; from const.h
     [StructLayout(LayoutKind.Sequential)]
     public struct color24
     {
         public byte r;
         public byte g;
         public byte b;
+    }
+
+    // Original: typedef struct { unsigned r, g, b, a; } colorVec; from const.h
+    [StructLayout(LayoutKind.Sequential)]
+    public struct colorVec
+    {
+        public uint r;
+        public uint g;
+        public uint b;
+        public uint a;
+    }
+
+    // Original: typedef struct { unsigned short r, g, b, a; } PackedColorVec; from const.h
+    [StructLayout(LayoutKind.Sequential)]
+    public struct PackedColorVec
+    {
+        public ushort r;
+        public ushort g;
+        public ushort b;
+        public ushort a;
     }
 
     // Rectangle type
@@ -630,6 +651,7 @@ namespace GoldsrcFramework.Engine.Native
     }
 
     // Client entity structure
+    // Original: struct cl_entity_s from cl_entity.h
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct cl_entity_s
     {
@@ -642,14 +664,13 @@ namespace GoldsrcFramework.Engine.Native
         public entity_state_s curstate;  // The state information from the last message received from server
 
         public int current_position;                                // Last received history update index
-        public fixed byte ph[EngineConstants.HISTORY_MAX * 20]; // position_history_t ph[HISTORY_MAX]; // History of position and angle updates for this player // sizeof(position_history_t) = 20
+        public NativeInterop.FixedBuffer<position_history_t, _HistoryMax> ph; // History of position and angle updates for this player
 
         public mouth_t mouth; // For synchronizing mouth movements.
 
         public latchedvars_t latched; // Variables used by studio model rendering routines
 
         // Information based on interplocation, extrapolation, prediction, or just copied from last msg received.
-        //
         public float lastmove;
 
         // Actual render position and angles
@@ -657,24 +678,24 @@ namespace GoldsrcFramework.Engine.Native
         public Vector3 angles;
 
         // Attachment points
-        public fixed float attachment[4 * 3]; // Vector3f attachment[4];
+        public NativeInterop.FixedBuffer<Vector3, _AttachmentCount> attachment; // Vector3 attachment[4];
 
         // Other entity local information
         public int trivial_accept;
 
-        public nint model;           // cl.model_precache[ curstate.modelindex ];  all visible entities have a model
-        public nint efrag;           // linked list of efrags
-        public nint mnode;           // for bmodels, first world node that splits bmodel, or NULL if not split
-        public float syncbase;         // for client-side animations -- used by obsolete alias animation system, remove?
-        public int visframe;           // last frame this entity was found in an active leaf
-        public colorVec cvFloorColor;
-    }
+        public model_s* model;   // cl.model_precache[ curstate.modelindex ];  all visible entities have a model
+        public efrag_t* efrag;   // linked list of efrags
+        public mnode_t* topnode; // for bmodels, first world node that splits bmodel, or NULL if not split
 
-    // Color vector structure
-    [StructLayout(LayoutKind.Sequential)]
-    public struct colorVec
-    {
-        public uint r, g, b, a;
+        public float syncbase; // for client-side animations -- used by obsolete alias animation system, remove?
+        public int visframe;   // last frame this entity was found in an active leaf
+        public colorVec cvFloorColor; // rgba
+
+        // Nested types for fixed buffer sizes
+        public struct _HistoryMax : NativeInterop.IFixedBufferHolder
+        { public fixed float Buffer[(1 + 3 * 2) * EngineConstants.HISTORY_MAX]; }
+        public struct _AttachmentCount : NativeInterop.IFixedBufferHolder
+        { public fixed float Buffer[3 * 4]; }
     }
 
     // Server-side structures
@@ -1279,6 +1300,17 @@ namespace GoldsrcFramework.Engine.Native
         public ulong m_nSteamID;
     }
 
+    // Lighting structure for studio models
+    // Original: typedef struct alight_s from com_model.h
+    [StructLayout(LayoutKind.Sequential)]
+    public unsafe struct alight_s
+    {
+        public int ambientlight;  // clip at 128
+        public int shadelight;    // clip at 192 - ambientlight
+        public Vector3 color;
+        public float* plightvec;
+    }
+
     // Client text message structure
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct client_textmessage_s
@@ -1305,9 +1337,293 @@ namespace GoldsrcFramework.Engine.Native
         public fixed float color[3]; // RGB colors ( 0.0 -> 1.0 scale )
     }
 
-    // Model structure
+    // Model types and enums
+    // Original: typedef enum { mod_brush, mod_sprite, mod_alias, mod_studio } modtype_t; from com_model.h
+    public enum modtype_t
+    {
+        mod_brush,
+        mod_sprite,
+        mod_alias,
+        mod_studio
+    }
+
+    // Original: typedef enum { ST_SYNC = 0, ST_RAND } synctype_t; from com_model.h
+    public enum synctype_t
+    {
+        ST_SYNC = 0,
+        ST_RAND
+    }
+
+    // BSP/Model related structures
+    // Original: typedef struct { float mins[3], maxs[3]; float origin[3]; int headnode[MAX_MAP_HULLS]; int visleafs; int firstface, numfaces; } dmodel_t; from com_model.h
     [StructLayout(LayoutKind.Sequential)]
-    public struct model_s { }
+    public unsafe struct dmodel_t
+    {
+        public fixed float mins[3];
+        public fixed float maxs[3];
+        public fixed float origin[3];
+        public fixed int headnode[4]; // MAX_MAP_HULLS
+        public int visleafs; // not including the solid leaf 0
+        public int firstface;
+        public int numfaces;
+    }
+
+    // Original: typedef struct mplane_s from com_model.h
+    [StructLayout(LayoutKind.Sequential)]
+    public unsafe struct mplane_t
+    {
+        public Vector3 normal; // surface normal
+        public float dist;     // closest approach to origin
+        public byte type;      // for texture axis selection and fast side tests
+        public byte signbits;  // signx + signy<<1 + signz<<2
+        public fixed byte pad[2];
+    }
+
+    // Original: typedef struct { Vector position; } mvertex_t; from com_model.h
+    [StructLayout(LayoutKind.Sequential)]
+    public struct mvertex_t
+    {
+        public Vector3 position;
+    }
+
+    // Original: typedef struct { unsigned short v[2]; unsigned int cachededgeoffset; } medge_t; from com_model.h
+    [StructLayout(LayoutKind.Sequential)]
+    public unsafe struct medge_t
+    {
+        public fixed ushort v[2];
+        public uint cachededgeoffset;
+    }
+
+    // Original: typedef struct texture_s from com_model.h
+    [StructLayout(LayoutKind.Sequential)]
+    public unsafe struct texture_t
+    {
+        public const int MIPLEVELS = 4;
+
+        public fixed sbyte name[16];
+        public uint width;
+        public uint height;
+        public int anim_total;                // total tenths in sequence (0 = no)
+        public int anim_min;
+        public int anim_max;                  // time for this frame min <=time< max
+        public texture_t* anim_next;          // in the animation sequence
+        public texture_t* alternate_anims;    // bmodels in frame 1 use these
+        public fixed uint offsets[MIPLEVELS]; // four mip maps stored
+        public uint paloffset;
+    }
+
+    // Original: typedef struct { float vecs[2][4]; float mipadjust; texture_t* texture; int flags; } mtexinfo_t; from com_model.h
+    [StructLayout(LayoutKind.Sequential)]
+    public unsafe struct mtexinfo_t
+    {
+        public fixed float vecs[2 * 4]; // [s/t] unit vectors in world space. [i][3] is the s/t offset relative to the origin.
+        public float mipadjust;         // mipmap limits for very small surfaces
+        public texture_t* texture;
+        public int flags;               // sky or slime, no lightmap or 256 subdivision
+    }
+
+    // Original: typedef struct { int planenum; short children[2]; } dclipnode_t; from com_model.h
+    [StructLayout(LayoutKind.Sequential)]
+    public unsafe struct dclipnode_t
+    {
+        public int planenum;
+        public fixed short children[2]; // negative numbers are contents
+    }
+
+    // Original: typedef struct hull_s from com_model.h
+    [StructLayout(LayoutKind.Sequential)]
+    public unsafe struct hull_t
+    {
+        public dclipnode_t* clipnodes;
+        public mplane_t* planes;
+        public int firstclipnode;
+        public int lastclipnode;
+        public Vector3 clip_mins;
+        public Vector3 clip_maxs;
+    }
+
+    // Forward declarations for circular references
+    [StructLayout(LayoutKind.Sequential)]
+    public unsafe struct mnode_t
+    {
+        // Common with leaf
+        public int contents;  // 0, to differentiate from leafs
+        public int visframe; // node needs to be traversed if current
+
+        public fixed short minmaxs[6]; // for bounding box culling
+
+        public mnode_t* parent;
+
+        // Node specific
+        public mplane_t* plane;
+        public mnode_t* children0;
+        public mnode_t* children1;
+
+        public ushort firstsurface;
+        public ushort numsurfaces;
+    }
+
+    // Original: typedef struct mleaf_s from com_model.h
+    [StructLayout(LayoutKind.Sequential)]
+    public unsafe struct mleaf_t
+    {
+        public const int NUM_AMBIENTS = 4;
+
+        // Common with node
+        public int contents;  // will be a negative contents number
+        public int visframe; // node needs to be traversed if current
+
+        public fixed short minmaxs[6]; // for bounding box culling
+
+        public mnode_t* parent;
+
+        // Leaf specific
+        public byte* compressed_vis;
+        public efrag_t* efrags;
+
+        public msurface_t** firstmarksurface;
+        public int nummarksurfaces;
+        public int key; // BSP sequence number for leaf's contents
+        public fixed byte ambient_sound_level[NUM_AMBIENTS];
+    }
+
+    // Original: typedef struct efrag_s from cl_entity.h
+    [StructLayout(LayoutKind.Sequential)]
+    public unsafe struct efrag_t
+    {
+        public mleaf_t* leaf;
+        public efrag_t* leafnext;
+        public cl_entity_s* entity;
+        public efrag_t* entnext;
+    }
+
+    // Forward declaration for decal
+    [StructLayout(LayoutKind.Sequential)]
+    public unsafe struct decal_t
+    {
+        public decal_t* pnext;        // linked list for each surface
+        public msurface_t* psurface;  // Surface id for persistence / unlinking
+        public short dx;              // Offsets into surface texture (in texture coordinates)
+        public short dy;
+        public short texture;         // Decal texture
+        public byte scale;            // Pixel scale
+        public byte flags;            // Decal flags
+        public short entityIndex;     // Entity this is attached to
+    }
+
+    // Original: struct msurface_s from com_model.h
+    [StructLayout(LayoutKind.Sequential)]
+    public unsafe struct msurface_t
+    {
+        public const int MIPLEVELS = 4;
+        public const int MAXLIGHTMAPS = 4;
+
+        public int visframe; // should be drawn when node is crossed
+
+        public int dlightframe; // last frame the surface was checked by an animated light
+        public int dlightbits;  // dynamically generated. Indicates if the surface illumination is modified by an animated light.
+
+        public mplane_t* plane; // pointer to shared plane
+        public int flags;       // see SURF_ #defines
+
+        public int firstedge; // look up in model->surfedges[], negative numbers
+        public int numedges;  // are backwards edges
+
+        // Surface generation data
+        public nint cachespots0; // surfcache_s* cachespots[MIPLEVELS];
+        public nint cachespots1;
+        public nint cachespots2;
+        public nint cachespots3;
+
+        public fixed short texturemins[2]; // smallest s/t position on the surface.
+        public fixed short extents[2];     // s/t texture size, 1..256 for all non-sky surfaces
+
+        public mtexinfo_t* texinfo;
+
+        // Lighting info
+        public fixed byte styles[MAXLIGHTMAPS]; // index into d_lightstylevalue[] for animated lights
+        public color24* samples;
+
+        public decal_t* pdecals;
+    }
+
+    // Model structure
+    // Original: typedef struct model_s from com_model.h
+    [StructLayout(LayoutKind.Sequential)]
+    public unsafe struct model_s
+    {
+        public const int MAX_MODEL_NAME = 64;
+        public const int MAX_MAP_HULLS = 4;
+
+        public fixed sbyte name[MAX_MODEL_NAME];
+        public qboolean needload; // bmodels and sprites don't cache normally
+
+        public modtype_t type;
+        public int numframes;
+        public synctype_t synctype;
+
+        public int flags;
+
+        // Volume occupied by the model
+        public Vector3 mins;
+        public Vector3 maxs;
+        public float radius;
+
+        // Brush model
+        public int firstmodelsurface;
+        public int nummodelsurfaces;
+
+        public int numsubmodels;
+        public dmodel_t* submodels;
+
+        public int numplanes;
+        public mplane_t* planes;
+
+        public int numleafs; // number of visible leafs, not counting 0
+        public mleaf_t* leafs;
+
+        public int numvertexes;
+        public mvertex_t* vertexes;
+
+        public int numedges;
+        public medge_t* edges;
+
+        public int numnodes;
+        public mnode_t* nodes;
+
+        public int numtexinfo;
+        public mtexinfo_t* texinfo;
+
+        public int numsurfaces;
+        public msurface_t* surfaces;
+
+        public int numsurfedges;
+        public int* surfedges;
+
+        public int numclipnodes;
+        public dclipnode_t* clipnodes;
+
+        public int nummarksurfaces;
+        public msurface_t** marksurfaces;
+
+        public NativeInterop.FixedBuffer<hull_t, _MaxMapHulls> hulls;
+
+        public int numtextures;
+        public texture_t** textures;
+
+        public byte* visdata;
+
+        public color24* lightdata;
+
+        public sbyte* entities;
+
+        // Additional model data
+        public cache_user_s cache; // only access through Mod_Extradata
+
+        // Nested type for hull array size
+        public struct _MaxMapHulls : NativeInterop.IFixedBufferHolder
+        { public fixed byte Buffer[40 * MAX_MAP_HULLS]; }
+    }
 
     // Event args structure
     [StructLayout(LayoutKind.Sequential)]
@@ -1733,95 +2049,161 @@ namespace GoldsrcFramework.Engine.Native
     }
 
     // Engine Studio API structure
+    // Original: typedef struct engine_studio_api_s from r_studioint.h
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct engine_studio_api_s
     {
         // Memory management
+        // void* (*Mem_Calloc)(int number, size_t size);
         public delegate* unmanaged[Cdecl]<int, nuint, nint> Mem_Calloc;
+
+        // void* (*Cache_Check)(struct cache_user_s* c);
         public delegate* unmanaged[Cdecl]<cache_user_s*, nint> Cache_Check;
+
+        // void (*LoadCacheFile)(char* path, struct cache_user_s* cu);
         public delegate* unmanaged[Cdecl]<sbyte*, cache_user_s*, void> LoadCacheFile;
 
         // Model management
+        // struct model_s* (*Mod_ForName)(const char* name, int crash_if_missing);
         public delegate* unmanaged[Cdecl]<sbyte*, int, model_s*> Mod_ForName;
+
+        // void* (*Mod_Extradata)(struct model_s* mod);
         public delegate* unmanaged[Cdecl]<model_s*, nint> Mod_Extradata;
+
+        // struct model_s* (*GetModelByIndex)(int index);
         public delegate* unmanaged[Cdecl]<int, model_s*> GetModelByIndex;
+
+        // struct cl_entity_s* (*GetCurrentEntity)(void);
         public delegate* unmanaged[Cdecl]<cl_entity_s*> GetCurrentEntity;
 
         // Player info
-        public delegate* unmanaged[Cdecl]<int, hud_player_info_s*> PlayerInfo;
-        public delegate* unmanaged[Cdecl]<int, int> PlayerIndex;
+        // struct player_info_s* (*PlayerInfo)(int index);
+        public delegate* unmanaged[Cdecl]<int, player_info_s*> PlayerInfo;
 
-        // Angles and vectors
-        public delegate* unmanaged[Cdecl]<float*, float*, void> GetPlayerState;
+        // struct entity_state_s* (*GetPlayerState)(int index);
+        public delegate* unmanaged[Cdecl]<int, entity_state_s*> GetPlayerState;
 
-        // View info
-        public delegate* unmanaged[Cdecl]<float*, void> GetViewEntity;
-        public delegate* unmanaged[Cdecl]<int*, int*, void> GetTimes;
-        public delegate* unmanaged[Cdecl]<cvar_s*> GetCvar;
-        public delegate* unmanaged[Cdecl]<float*, void> GetCvarFloat;
-        public delegate* unmanaged[Cdecl]<sbyte*> GetCvarString;
+        // struct cl_entity_s* (*GetViewEntity)(void);
+        public delegate* unmanaged[Cdecl]<cl_entity_s*> GetViewEntity;
 
-        // Aliasing
-        public delegate* unmanaged[Cdecl]<float*, void> SetEventIndex;
-        public delegate* unmanaged[Cdecl]<float*, void> GetEventIndex;
+        // Time and frame info
+        // void (*GetTimes)(int* framecount, double* current, double* old);
+        public delegate* unmanaged[Cdecl]<int*, double*, double*, void> GetTimes;
 
-        // Lighting
-        public delegate* unmanaged[Cdecl]<float*, float*, void> StudioGetLighting;
-        public delegate* unmanaged[Cdecl]<float*, float*, void> StudioGetLightingPoint;
+        // struct cvar_s* (*GetCvar)(const char* name);
+        public delegate* unmanaged[Cdecl]<sbyte*, cvar_s*> GetCvar;
 
-        // Chrome
-        public delegate* unmanaged[Cdecl]<float*, float*, void> StudioGetChromeOrigin;
+        // void (*GetViewInfo)(float* origin, float* upv, float* rightv, float* vpnv);
+        public delegate* unmanaged[Cdecl]<float*, float*, float*, float*, void> GetViewInfo;
 
-        // Model rendering
-        public delegate* unmanaged[Cdecl]<model_s*, void> GetModelCounters;
-        public delegate* unmanaged[Cdecl]<int, void> GetAliasScale;
+        // struct model_s* (*GetChromeSprite)(void);
+        public delegate* unmanaged[Cdecl]<model_s*> GetChromeSprite;
 
-        // Interpolation
-        public delegate* unmanaged[Cdecl]<float*, void> StudioGetRotationMatrix;
-        public delegate* unmanaged[Cdecl]<float*, void> StudioGetBoneTransform;
+        // void (*GetModelCounters)(int** s, int** a);
+        public delegate* unmanaged[Cdecl]<int**, int**, void> GetModelCounters;
 
-        // Decals
-        public delegate* unmanaged[Cdecl]<float*, void> StudioSetupBones;
-        public delegate* unmanaged[Cdecl]<void> StudioCheckBBox;
+        // void (*GetAliasScale)(float* x, float* y);
+        public delegate* unmanaged[Cdecl]<float*, float*, void> GetAliasScale;
 
-        // Dynamic lighting
-        public delegate* unmanaged[Cdecl]<float*, void> StudioDynamicLight;
-        public delegate* unmanaged[Cdecl]<float*, void> StudioEntityLight;
-        public delegate* unmanaged[Cdecl]<float*, void> StudioSetupLighting;
+        // Get bone, light, alias, and rotation matrices
+        // float**** (*StudioGetBoneTransform)(void);
+        public delegate* unmanaged[Cdecl]<nint> StudioGetBoneTransform;
 
-        // GL Specific
+        // float**** (*StudioGetLightTransform)(void);
+        public delegate* unmanaged[Cdecl]<nint> StudioGetLightTransform;
+
+        // float*** (*StudioGetAliasTransform)(void);
+        public delegate* unmanaged[Cdecl]<nint> StudioGetAliasTransform;
+
+        // float*** (*StudioGetRotationMatrix)(void);
+        public delegate* unmanaged[Cdecl]<nint> StudioGetRotationMatrix;
+
+        // Set up body part, and get submodel pointers
+        // void (*StudioSetupModel)(int bodypart, void** ppbodypart, void** ppsubmodel);
+        public delegate* unmanaged[Cdecl]<int, nint*, nint*, void> StudioSetupModel;
+
+        // int (*StudioCheckBBox)(void);
+        public delegate* unmanaged[Cdecl]<int> StudioCheckBBox;
+
+        // Apply lighting effects to model
+        // void (*StudioDynamicLight)(struct cl_entity_s* ent, struct alight_s* plight);
+        public delegate* unmanaged[Cdecl]<cl_entity_s*, alight_s*, void> StudioDynamicLight;
+
+        // void (*StudioEntityLight)(struct alight_s* plight);
+        public delegate* unmanaged[Cdecl]<alight_s*, void> StudioEntityLight;
+
+        // void (*StudioSetupLighting)(struct alight_s* plighting);
+        public delegate* unmanaged[Cdecl]<alight_s*, void> StudioSetupLighting;
+
+        // Draw mesh vertices
+        // void (*StudioDrawPoints)(void);
         public delegate* unmanaged[Cdecl]<void> StudioDrawPoints;
+
+        // Draw hulls around bones
+        // void (*StudioDrawHulls)(void);
         public delegate* unmanaged[Cdecl]<void> StudioDrawHulls;
+
+        // void (*StudioDrawAbsBBox)(void);
         public delegate* unmanaged[Cdecl]<void> StudioDrawAbsBBox;
+
+        // void (*StudioDrawBones)(void);
         public delegate* unmanaged[Cdecl]<void> StudioDrawBones;
+
+        // void (*StudioSetupSkin)(void* ptexturehdr, int index);
         public delegate* unmanaged[Cdecl]<nint, int, void> StudioSetupSkin;
+
+        // void (*StudioSetRemapColors)(int top, int bottom);
         public delegate* unmanaged[Cdecl]<int, int, void> StudioSetRemapColors;
+
+        // struct model_s* (*SetupPlayerModel)(int index);
         public delegate* unmanaged[Cdecl]<int, model_s*> SetupPlayerModel;
+
+        // void (*StudioClientEvents)(void);
         public delegate* unmanaged[Cdecl]<void> StudioClientEvents;
 
-        // Render state
+        // Retrieve/set forced render effects flags
+        // int (*GetForceFaceFlags)(void);
         public delegate* unmanaged[Cdecl]<int> GetForceFaceFlags;
+
+        // void (*SetForceFaceFlags)(int flags);
         public delegate* unmanaged[Cdecl]<int, void> SetForceFaceFlags;
+
+        // void (*StudioSetHeader)(void* header);
         public delegate* unmanaged[Cdecl]<nint, void> StudioSetHeader;
+
+        // void (*SetRenderModel)(struct model_s* model);
         public delegate* unmanaged[Cdecl]<model_s*, void> SetRenderModel;
 
         // Final state setup and restore for rendering
+        // void (*SetupRenderer)(int rendermode);
         public delegate* unmanaged[Cdecl]<int, void> SetupRenderer;
+
+        // void (*RestoreRenderer)(void);
         public delegate* unmanaged[Cdecl]<void> RestoreRenderer;
 
         // Set render origin for applying chrome effect
+        // void (*SetChromeOrigin)(void);
         public delegate* unmanaged[Cdecl]<void> SetChromeOrigin;
 
         // True if using D3D/OpenGL
+        // int (*IsHardware)(void);
         public delegate* unmanaged[Cdecl]<int> IsHardware;
 
         // Only called by hardware interface
+        // void (*GL_StudioDrawShadow)(void);
         public delegate* unmanaged[Cdecl]<void> GL_StudioDrawShadow;
+
+        // void (*GL_SetRenderMode)(int mode);
         public delegate* unmanaged[Cdecl]<int, void> GL_SetRenderMode;
 
         // Counter-Strike specific additions
+        // void (*StudioSetRenderamt)(int iRenderamt);
         public delegate* unmanaged[Cdecl]<int, void> StudioSetRenderamt;
+
+        // void (*StudioSetCullState)(int iCull);
         public delegate* unmanaged[Cdecl]<int, void> StudioSetCullState;
+
+        // void (*StudioRenderShadow)(int iSprite, float* p1, float* p2, float* p3, float* p4);
         public delegate* unmanaged[Cdecl]<int, float*, float*, float*, float*, void> StudioRenderShadow;
     }
 
