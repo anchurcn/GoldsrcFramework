@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace GoldsrcFramework.Memory;
+namespace NativeInterop;
 
 /// <summary>
 /// Marker interface for structs that can be used as fixed-size buffer's backing storage.
