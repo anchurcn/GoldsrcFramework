@@ -1244,7 +1244,7 @@ namespace GoldsrcFramework.Engine.Native
         public Rect rc;
     }
 
-    // HUD player info structure
+    // HUD player info structure (used by HUD system)
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct hud_player_info_s
     {
@@ -1260,6 +1260,36 @@ namespace GoldsrcFramework.Engine.Native
         public short topcolor;
         public short bottomcolor;
 
+        public ulong m_nSteamID;
+    }
+
+    // Player info structure (used by Studio renderer for gait animation)
+    // This is different from hud_player_info_s!
+    [StructLayout(LayoutKind.Sequential)]
+    public unsafe struct player_info_s
+    {
+        public int userid;
+        public fixed sbyte userinfo[256];  // MAX_INFO_STRING
+        public fixed sbyte name[32];       // MAX_SCOREBOARDNAME
+        public int spectator;
+        public int ping;
+        public int packet_loss;
+        public fixed sbyte model[64];      // MAX_QPATH
+        public int topcolor;
+        public int bottomcolor;
+        public int renderframe;
+
+        // Gait frame estimation (for player animation)
+        public int gaitsequence;
+        public float gaitframe;
+        public float gaityaw;
+        public Vector3f prevgaitorigin;
+
+        // Customization data (not used in Studio renderer)
+        // public customization_t customdata;
+        public fixed byte customdata[32];  // Placeholder for customization_t
+
+        public fixed byte hashedcdkey[16];
         public ulong m_nSteamID;
     }
 

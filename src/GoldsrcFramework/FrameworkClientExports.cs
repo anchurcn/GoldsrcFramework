@@ -1,4 +1,5 @@
 using System.Text;
+using GoldsrcFramework.Rendering;
 
 namespace GoldsrcFramework.Engine.Native;
 
@@ -7,11 +8,13 @@ namespace GoldsrcFramework.Engine.Native;
 /// </summary>
 public unsafe class FrameworkClientExports : IClientExportFuncs
 {
-    cl_enginefunc_t* EngineClientApis;
+    // Studio model renderer instance
+    private StudioModelRenderer? _studioRenderer;
+
     // IClientExportFuncs implementation - all based on LegacyClientInterop
     public virtual int Initialize(cl_enginefunc_t* pEnginefuncs, int iVersion)
     {
-        EngineClientApis = pEnginefuncs;
+        EngineApi.ClientApiInit(pEnginefuncs);
         return LegacyClientInterop.Initialize(pEnginefuncs, iVersion);
     }
 
@@ -31,7 +34,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         var span = new Span<byte>(msg, 100);
         span.Clear();
         Encoding.UTF8.GetBytes("GoldsrcFramworkDemo",span);
-        EngineClientApis->CenterPrint(msg);
+        EngineApi.PClient->CenterPrint(msg);
         return LegacyClientInterop.HUD_Redraw(flTime, intermission);
     }
 
@@ -212,7 +215,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
 
     public virtual int HUD_GetStudioModelInterface(int version, r_studio_interface_s** ppinterface, engine_studio_api_s* pstudio)
     {
-        return LegacyClientInterop.HUD_GetStudioModelInterface(version, ppinterface, pstudio);
+        return StudioModelRenderer.GetStudioModelInterface(version, ppinterface, pstudio);
     }
 
     public virtual void HUD_ChatInputPosition(int* x, int* y)
