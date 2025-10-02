@@ -12,16 +12,34 @@ namespace GoldsrcFramework.Rendering;
 /// </summary>
 public unsafe class StudioModelRenderer
 {
-    #region Constants
+    #region Constants and Enums
 
-    private const int MOVETYPE_NONE = 0;
-    private const int MOVETYPE_STEP = 4;
-    private const int MOVETYPE_FOLLOW = 10;
+    // Move type enumeration
+    private enum MoveType
+    {
+        MOVETYPE_NONE = 0,
+        MOVETYPE_WALK = 3,
+        MOVETYPE_STEP = 4,
+        MOVETYPE_FLY = 5,
+        MOVETYPE_TOSS = 6,
+        MOVETYPE_PUSH = 7,
+        MOVETYPE_NOCLIP = 8,
+        MOVETYPE_FLYMISSILE = 9,
+        MOVETYPE_BOUNCE = 10,
+        MOVETYPE_BOUNCEMISSILE = 11,
+        MOVETYPE_FOLLOW = 12,
+        MOVETYPE_PUSHSTEP = 13
+    }
+
+    // Entity flags
+    [Flags]
+    private enum EntityFlags
+    {
+        EFLAG_SLERP = 1
+    }
 
     private const int STUDIO_RENDER = 0x0001;
     private const int STUDIO_EVENTS = 0x0002;
-
-    private const int EFLAG_SLERP = 1;
 
     private const float ZISCALE = 0x8000;
 
@@ -96,8 +114,8 @@ public unsafe class StudioModelRenderer
     // Names of cached bones
     private NChar[,] m_nCachedBoneNames = new NChar[StudioConstants.MAXSTUDIOBONES, 32];
     // Cached bone & light transformation matrices
-    private NativeInterop.FixedBuffer<Matrix3x4, StudioConstants.MaxStudioBones> m_rgCachedBoneTransform;
-    private NativeInterop.FixedBuffer<Matrix3x4, StudioConstants.MaxStudioBones> m_rgCachedLightTransform;
+    private Matrix3x4[] m_rgCachedBoneTransform = new Matrix3x4[StudioConstants.MAXSTUDIOBONES];
+    private Matrix3x4[] m_rgCachedLightTransform = new Matrix3x4[StudioConstants.MAXSTUDIOBONES];
 
     #endregion
 
@@ -744,8 +762,193 @@ public unsafe class StudioModelRenderer
     /// </summary>
     private void StudioSetUpTransform(bool trivial_accept)
     {
-        // TODO: Implement transform setup
-        // This is a complex method that handles entity positioning and rotation
+        int i;
+        Vector3 angles;
+        Vector3 modelpos;
+
+        // Copy model origin
+        modelpos = m_pCurrentEntity->origin;
+
+        // Get entity angles
+        angles.X = m_pCurrentEntity->curstate.angles.X; // ROLL
+        angles.Y = m_pCurrentEntity->curstate.angles.Y; // PITCH
+        angles.Z = m_pCurrentEntity->curstate.angles.Z; // YAW
+
+        // Handle MOVETYPE_STEP interpolation
+        if (m_pCurrentEntity->curstate.movetype == MoveType.MOVETYPE_STEP)
+        {
+            float f = 0;
+            float d;
+
+            // Don't do it if the goalstarttime hasn't updated in a while.
+            // NOTE: Because we need to interpolate multiplayer characters, the interpolation time limit
+            // was increased to 1.0 s., which is 2x the max lag we are accounting for.
+
+            if ((m_clTime < m_pCurrentEntity->curstate.animtime + 1.0f) &&
+                (m_pCurrentEntity->curstate.animtime != m_pCurrentEntity->latched.prevanimtime))
+            {
+                f = (float)((m_clTime - m_pCurrentEntity->curstate.animtime) /
+                    (m_pCurrentEntity->curstate.animtime - m_pCurrentEntity->latched.prevanimtime));
+            }
+
+            if (m_fDoInterp)
+            {
+                // Ugly hack to interpolate angle, position. current is reached 0.1 seconds after being set
+                f = f - 1.0f;
+            }
+            else
+            {
+                f = 0;
+            }
+
+            mstudioseqdesc_t* pseqdesc = m_pStudioHeader->GetSequences() + m_pCurrentEntity->curstate.sequence;
+
+            if (((int)pseqdesc->motiontype & (int)StudioMotionFlags.STUDIO_LX) != 0 ||
+                (m_pCurrentEntity->curstate.eflags & EntityFlags.EFLAG_SLERP) != 0)
+            {
+                modelpos.X += (m_pCurrentEntity->origin.X - m_pCurrentEntity->latched.prevorigin.X) * f;
+                modelpos.Y += (m_pCurrentEntity->origin.Y - m_pCurrentEntity->latched.prevorigin.Y) * f;
+                modelpos.Z += (m_pCurrentEntity->origin.Z - m_pCurrentEntity->latched.prevorigin.Z) * f;
+            }
+
+            // Interpolate angles
+            for (i = 0; i < 3; i++)
+            {
+                float ang1, ang2;
+
+                ang1 = i == 0 ? m_pCurrentEntity->angles.X : (i == 1 ? m_pCurrentEntity->angles.Y : m_pCurrentEntity->angles.Z);
+                ang2 = i == 0 ? m_pCurrentEntity->latched.prevangles.X : (i == 1 ? m_pCurrentEntity->latched.prevangles.Y : m_pCurrentEntity->latched.prevangles.Z);
+
+                d = ang1 - ang2;
+                if (d > 180)
+                {
+                    d -= 360;
+                }
+                else if (d < -180)
+                {
+                    d += 360;
+                }
+
+                if (i == 0)
+                    angles.X += d * f;
+                else if (i == 1)
+                    angles.Y += d * f;
+                else
+                    angles.Z += d * f;
+            }
+        }
+        else if (m_pCurrentEntity->curstate.movetype != MoveType.MOVETYPE_NONE)
+        {
+            angles = m_pCurrentEntity->angles;
+        }
+
+        // Flip pitch
+        angles.Y = -angles.Y;
+        StudioMath.AngleMatrix(ref angles, m_protationmatrix);
+
+        if (IEngineStudio->IsHardware() == 0)
+        {
+            // Software rendering path
+            Span<float> viewmatrix = stackalloc float[3 * 4];
+
+            fixed (float* pViewMatrix = viewmatrix)
+            {
+                // Copy view vectors
+                pViewMatrix[0 * 4 + 0] = m_vRight.X;
+                pViewMatrix[0 * 4 + 1] = m_vRight.Y;
+                pViewMatrix[0 * 4 + 2] = m_vRight.Z;
+                pViewMatrix[0 * 4 + 3] = 0;
+
+                pViewMatrix[1 * 4 + 0] = -m_vUp.X; // VectorInverse
+                pViewMatrix[1 * 4 + 1] = -m_vUp.Y;
+                pViewMatrix[1 * 4 + 2] = -m_vUp.Z;
+                pViewMatrix[1 * 4 + 3] = 0;
+
+                pViewMatrix[2 * 4 + 0] = m_vNormal.X;
+                pViewMatrix[2 * 4 + 1] = m_vNormal.Y;
+                pViewMatrix[2 * 4 + 2] = m_vNormal.Z;
+                pViewMatrix[2 * 4 + 3] = 0;
+
+                m_protationmatrix->M03 = modelpos.X - m_vRenderOrigin.X;
+                m_protationmatrix->M13 = modelpos.Y - m_vRenderOrigin.Y;
+                m_protationmatrix->M23 = modelpos.Z - m_vRenderOrigin.Z;
+
+                Matrix3x4.ConcatTransforms((Matrix3x4*)pViewMatrix, m_protationmatrix, m_paliastransform);
+
+                // Do the scaling up of x and y to screen coordinates as part of the transform
+                // for the unclipped case (it would mess up clipping in the clipped case).
+                if (trivial_accept)
+                {
+                    const float ZISCALE = 32768.0f;
+                    for (i = 0; i < 4; i++)
+                    {
+                        float* pAlias = (float*)m_paliastransform;
+                        pAlias[0 * 4 + i] *= m_fSoftwareXScale * (1.0f / (ZISCALE * 0x10000));
+                        pAlias[1 * 4 + i] *= m_fSoftwareYScale * (1.0f / (ZISCALE * 0x10000));
+                        pAlias[2 * 4 + i] *= 1.0f / (ZISCALE * 0x10000);
+                    }
+                }
+            }
+        }
+
+        m_protationmatrix->M03 = modelpos.X;
+        m_protationmatrix->M13 = modelpos.Y;
+        m_protationmatrix->M23 = modelpos.Z;
+    }
+
+    /// <summary>
+    /// Apply special effects to transformation matrix
+    /// Original: void CStudioModelRenderer::StudioFxTransform(cl_entity_t* ent, float transform[3][4])
+    /// </summary>
+    private void StudioFxTransform(cl_entity_s* ent, Matrix3x4* transform)
+    {
+        switch ((RenderFx)ent->curstate.renderfx)
+        {
+            case RenderFx.kRenderFxDistort:
+            case RenderFx.kRenderFxHologram:
+                if (IEngineStudio->pfnRandomLong(0, 49) == 0)
+                {
+                    int axis = IEngineStudio->pfnRandomLong(0, 1);
+                    if (axis == 1) // Choose between x & z
+                        axis = 2;
+
+                    float scale = IEngineStudio->pfnRandomFloat(1, 1.484f);
+                    float* pTransform = (float*)transform;
+
+                    // VectorScale(transform[axis], scale, transform[axis])
+                    pTransform[axis * 4 + 0] *= scale;
+                    pTransform[axis * 4 + 1] *= scale;
+                    pTransform[axis * 4 + 2] *= scale;
+                }
+                else if (IEngineStudio->pfnRandomLong(0, 49) == 0)
+                {
+                    float offset;
+                    int axis = IEngineStudio->pfnRandomLong(0, 1);
+                    if (axis == 1) // Choose between x & z
+                        axis = 2;
+                    offset = IEngineStudio->pfnRandomFloat(-10, 10);
+
+                    float* pTransform = (float*)transform;
+                    int randomAxis = IEngineStudio->pfnRandomLong(0, 2);
+                    pTransform[randomAxis * 4 + 3] += offset;
+                }
+                break;
+
+            case RenderFx.kRenderFxExplode:
+                {
+                    float scale;
+
+                    scale = 1.0f + (float)(m_clTime - ent->curstate.animtime) * 10.0f;
+                    if (scale > 2) // Don't blow up more than 200%
+                        scale = 2;
+
+                    float* pTransform = (float*)transform;
+                    pTransform[0 * 4 + 1] *= scale;
+                    pTransform[1 * 4 + 1] *= scale;
+                    pTransform[2 * 4 + 1] *= scale;
+                }
+                break;
+        }
     }
 
     /// <summary>
@@ -927,7 +1130,24 @@ public unsafe class StudioModelRenderer
     /// </summary>
     private void StudioCalcAttachments()
     {
-        // TODO: Implement attachment calculation
+        int i;
+        mstudioattachment_t* pattachment;
+
+        if (m_pStudioHeader->numattachments > 4)
+        {
+            // TODO: gEngfuncs.Con_DPrintf("Too many attachments on %s\n", m_pCurrentEntity->model->name);
+            // exit(-1);
+            return;
+        }
+
+        // Calculate attachment points
+        pattachment = m_pStudioHeader->GetAttachments();
+        for (i = 0; i < m_pStudioHeader->numattachments; i++)
+        {
+            // VectorTransform(pattachment[i].org, (*m_plighttransform)[pattachment[i].bone], m_pCurrentEntity->attachment[i])
+            StudioMath.VectorTransform(ref pattachment[i].org, m_plighttransform + pattachment[i].bone,
+                ref m_pCurrentEntity->attachment[i]);
+        }
     }
 
     /// <summary>
@@ -936,7 +1156,24 @@ public unsafe class StudioModelRenderer
     /// </summary>
     private void StudioSaveBones()
     {
-        // TODO: Implement bone saving for caching
+        int i;
+
+        mstudiobone_t* pbones = m_pStudioHeader->GetBones();
+
+        m_nCachedBones = m_pStudioHeader->numbones;
+
+        for (i = 0; i < m_pStudioHeader->numbones; i++)
+        {
+            // Copy bone name
+            for (int j = 0; j < 32 && pbones[i].name[j] != 0; j++)
+            {
+                m_nCachedBoneNames[i, j] = new NChar((sbyte)pbones[i].name[j]);
+            }
+
+            // Copy matrices
+            m_rgCachedBoneTransform[i] = m_pbonetransform[i];
+            m_rgCachedLightTransform[i] = m_plighttransform[i];
+        }
     }
 
     /// <summary>
@@ -945,7 +1182,101 @@ public unsafe class StudioModelRenderer
     /// </summary>
     private void StudioMergeBones(model_s* pSubModel)
     {
-        // TODO: Implement bone merging for MOVETYPE_FOLLOW entities
+        int i, j;
+        double f;
+
+        mstudiobone_t* pbones;
+        mstudioseqdesc_t* pseqdesc;
+        mstudioanim_t* panim;
+
+        Span<float> pos = stackalloc float[StudioConstants.MAXSTUDIOBONES * 3];
+        Span<float> bonematrix = stackalloc float[3 * 4];
+        Span<float> q = stackalloc float[StudioConstants.MAXSTUDIOBONES * 4];
+
+        if (m_pCurrentEntity->curstate.sequence >= m_pStudioHeader->numseq)
+        {
+            m_pCurrentEntity->curstate.sequence = 0;
+        }
+
+        pseqdesc = m_pStudioHeader->GetSequences() + m_pCurrentEntity->curstate.sequence;
+
+        f = StudioEstimateFrame(pseqdesc);
+
+        if (m_pCurrentEntity->latched.prevframe > f)
+        {
+            // Frame wrapped
+        }
+
+        panim = StudioGetAnim(pSubModel, pseqdesc);
+
+        fixed (float* pPos = pos, pQ = q, pBonematrix = bonematrix)
+        {
+            StudioCalcRotations(pPos, pQ, pseqdesc, panim, (float)f);
+
+            pbones = m_pStudioHeader->GetBones();
+
+            for (i = 0; i < m_pStudioHeader->numbones; i++)
+            {
+                // Try to find cached bone
+                for (j = 0; j < m_nCachedBones; j++)
+                {
+                    // Compare bone names
+                    bool match = true;
+                    for (int k = 0; k < 32; k++)
+                    {
+                        if (pbones[i].name[k] != m_nCachedBoneNames[j, k].Value)
+                        {
+                            if (pbones[i].name[k] == 0 && m_nCachedBoneNames[j, k].Value == 0)
+                                break;
+                            match = false;
+                            break;
+                        }
+                        if (pbones[i].name[k] == 0)
+                            break;
+                    }
+
+                    if (match)
+                    {
+                        // Use cached bone
+                        m_pbonetransform[i] = m_rgCachedBoneTransform[j];
+                        m_plighttransform[i] = m_rgCachedLightTransform[j];
+                        break;
+                    }
+                }
+
+                if (j >= m_nCachedBones)
+                {
+                    // Bone not cached, calculate it
+                    StudioMath.QuaternionMatrix(pQ + (i * 4), pBonematrix);
+
+                    pBonematrix[0 * 4 + 3] = pPos[i * 3 + 0];
+                    pBonematrix[1 * 4 + 3] = pPos[i * 3 + 1];
+                    pBonematrix[2 * 4 + 3] = pPos[i * 3 + 2];
+
+                    if (pbones[i].parent == -1)
+                    {
+                        if (IEngineStudio->IsHardware() != 0)
+                        {
+                            Matrix3x4.ConcatTransforms(m_protationmatrix, (Matrix3x4*)pBonematrix, m_pbonetransform + i);
+                            Matrix3x4.MatrixCopy((Matrix3x4*)pBonematrix, m_plighttransform + i);
+                        }
+                        else
+                        {
+                            Matrix3x4.ConcatTransforms(m_paliastransform, (Matrix3x4*)pBonematrix, m_pbonetransform + i);
+                            Matrix3x4.ConcatTransforms(m_protationmatrix, (Matrix3x4*)pBonematrix, m_plighttransform + i);
+                        }
+
+                        // Apply client-side effects to the transformation matrix
+                        StudioFxTransform(m_pCurrentEntity, m_pbonetransform + i);
+                    }
+                    else
+                    {
+                        Matrix3x4.ConcatTransforms(m_pbonetransform + pbones[i].parent, (Matrix3x4*)pBonematrix, m_pbonetransform + i);
+                        Matrix3x4.ConcatTransforms(m_plighttransform + pbones[i].parent, (Matrix3x4*)pBonematrix, m_plighttransform + i);
+                    }
+                }
+            }
+        }
     }
 
     #endregion
@@ -1011,7 +1342,46 @@ public unsafe class StudioModelRenderer
     /// </summary>
     private void StudioRenderFinal_Software()
     {
-        // TODO: Implement software rendering path
+        int i;
+
+        // Note, rendermode set here has effect in SW
+        IEngineStudio->SetupRenderer(0);
+
+        if (m_pCvarDrawEntities->value == 2)
+        {
+            IEngineStudio->StudioDrawBones();
+        }
+        else if (m_pCvarDrawEntities->value == 3)
+        {
+            IEngineStudio->StudioDrawHulls();
+        }
+        else
+        {
+            for (i = 0; i < m_pStudioHeader->numbodyparts; i++)
+            {
+                nint pBodyPart = (nint)m_pBodyPart;
+                nint pSubModel = (nint)m_pSubModel;
+                IEngineStudio->StudioSetupModel(i, &pBodyPart, &pSubModel);
+                m_pBodyPart = (mstudiobodyparts_t*)pBodyPart;
+                m_pSubModel = (mstudiomodel_t*)pSubModel;
+
+                IEngineStudio->StudioDrawPoints();
+            }
+        }
+
+        if (m_pCvarDrawEntities->value == 4)
+        {
+            // TODO: gEngfuncs.pTriAPI->RenderMode(kRenderTransAdd);
+            IEngineStudio->StudioDrawHulls();
+            // TODO: gEngfuncs.pTriAPI->RenderMode(kRenderNormal);
+        }
+
+        if (m_pCvarDrawEntities->value == 5)
+        {
+            IEngineStudio->StudioDrawAbsBBox();
+        }
+
+        IEngineStudio->RestoreRenderer();
     }
 
     /// <summary>
@@ -1020,7 +1390,50 @@ public unsafe class StudioModelRenderer
     /// </summary>
     private void StudioRenderFinal_Hardware()
     {
-        // TODO: Implement hardware rendering path
+        int i;
+        int rendermode;
+
+        rendermode = IEngineStudio->GetForceFaceFlags() != 0 ? (int)RenderMode.kRenderTransAdd : m_pCurrentEntity->curstate.rendermode;
+        IEngineStudio->SetupRenderer(rendermode);
+
+        if (m_pCvarDrawEntities->value == 2)
+        {
+            IEngineStudio->StudioDrawBones();
+        }
+        else if (m_pCvarDrawEntities->value == 3)
+        {
+            IEngineStudio->StudioDrawHulls();
+        }
+        else
+        {
+            for (i = 0; i < m_pStudioHeader->numbodyparts; i++)
+            {
+                nint pBodyPart = (nint)m_pBodyPart;
+                nint pSubModel = (nint)m_pSubModel;
+                IEngineStudio->StudioSetupModel(i, &pBodyPart, &pSubModel);
+                m_pBodyPart = (mstudiobodyparts_t*)pBodyPart;
+                m_pSubModel = (mstudiomodel_t*)pSubModel;
+
+                if (m_fDoInterp)
+                {
+                    // Interpolation messes up bounding boxes.
+                    m_pCurrentEntity->trivial_accept = 0;
+                }
+
+                IEngineStudio->GL_SetRenderMode(rendermode);
+                IEngineStudio->StudioDrawPoints();
+                IEngineStudio->GL_StudioDrawShadow();
+            }
+        }
+
+        if (m_pCvarDrawEntities->value == 4)
+        {
+            // TODO: gEngfuncs.pTriAPI->RenderMode(kRenderTransAdd);
+            IEngineStudio->StudioDrawHulls();
+            // TODO: gEngfuncs.pTriAPI->RenderMode(kRenderNormal);
+        }
+
+        IEngineStudio->RestoreRenderer();
     }
 
     #endregion
@@ -1081,6 +1494,202 @@ public unsafe class StudioModelRenderer
         _instance.Init();
 
         return 1;
+    }
+
+    #endregion
+
+    #region Player-specific Methods
+
+    /// <summary>
+    /// Determine pitch and blending amounts for players
+    /// Original: void CStudioModelRenderer::StudioPlayerBlend(mstudioseqdesc_t* pseqdesc, int* pBlend, float* pPitch)
+    /// </summary>
+    private void StudioPlayerBlend(mstudioseqdesc_t* pseqdesc, int* pBlend, float* pPitch)
+    {
+        // Calc up/down pointing
+        *pBlend = (int)(*pPitch * 3);
+
+        if (*pBlend < pseqdesc->blendstart_0)
+        {
+            *pPitch -= pseqdesc->blendstart_0 / 3.0f;
+            *pBlend = 0;
+        }
+        else if (*pBlend > pseqdesc->blendend_0)
+        {
+            *pPitch -= pseqdesc->blendend_0 / 3.0f;
+            *pBlend = 255;
+        }
+        else
+        {
+            if (pseqdesc->blendend_0 - pseqdesc->blendstart_0 < 0.1f) // catch qc error
+                *pBlend = 127;
+            else
+                *pBlend = (int)(255 * (*pBlend - pseqdesc->blendstart_0) / (pseqdesc->blendend_0 - pseqdesc->blendstart_0));
+            *pPitch = 0;
+        }
+    }
+
+    /// <summary>
+    /// Estimate gait frame for player
+    /// Original: void CStudioModelRenderer::StudioEstimateGait(entity_state_t* pplayer)
+    /// </summary>
+    private void StudioEstimateGait(entity_state_s* pplayer)
+    {
+        float dt;
+        Vector3 est_velocity;
+
+        dt = (float)(m_clTime - m_clOldTime);
+        if (dt < 0)
+            dt = 0;
+        else if (dt > 1.0f)
+            dt = 1;
+
+        if (dt == 0 || m_pPlayerInfo->renderframe == m_nFrameCount)
+        {
+            m_flGaitMovement = 0;
+            return;
+        }
+
+        if (m_fGaitEstimation)
+        {
+            est_velocity = m_pCurrentEntity->origin - m_pPlayerInfo->prevgaitorigin;
+            m_pPlayerInfo->prevgaitorigin = m_pCurrentEntity->origin;
+            m_flGaitMovement = est_velocity.Length();
+
+            if (dt <= 0 || m_flGaitMovement / dt < 5)
+            {
+                m_flGaitMovement = 0;
+                est_velocity.X = 0;
+                est_velocity.Y = 0;
+            }
+        }
+        else
+        {
+            est_velocity = pplayer->velocity;
+            m_flGaitMovement = est_velocity.Length() * dt;
+        }
+
+        if (est_velocity.Y == 0 && est_velocity.X == 0)
+        {
+            float flYawDiff = m_pCurrentEntity->angles.Z - m_pPlayerInfo->gaityaw; // YAW
+            flYawDiff = flYawDiff - (int)(flYawDiff / 360) * 360;
+            if (flYawDiff > 180)
+                flYawDiff -= 360;
+            if (flYawDiff < -180)
+                flYawDiff += 360;
+
+            if (dt < 0.25f)
+                flYawDiff *= dt * 4;
+            else
+                flYawDiff *= dt;
+
+            m_pPlayerInfo->gaityaw += flYawDiff;
+            m_pPlayerInfo->gaityaw = m_pPlayerInfo->gaityaw - (int)(m_pPlayerInfo->gaityaw / 360) * 360;
+
+            m_flGaitMovement = 0;
+        }
+        else
+        {
+            m_pPlayerInfo->gaityaw = (float)(Math.Atan2(est_velocity.Y, est_velocity.X) * 180 / Math.PI);
+            if (m_pPlayerInfo->gaityaw > 180)
+                m_pPlayerInfo->gaityaw = 180;
+            if (m_pPlayerInfo->gaityaw < -180)
+                m_pPlayerInfo->gaityaw = -180;
+        }
+    }
+
+    /// <summary>
+    /// Process movement of player
+    /// Original: void CStudioModelRenderer::StudioProcessGait(entity_state_t* pplayer)
+    /// </summary>
+    private void StudioProcessGait(entity_state_s* pplayer)
+    {
+        mstudioseqdesc_t* pseqdesc;
+        float dt;
+        int iBlend;
+        float flYaw; // view direction relative to movement
+
+        if (m_pCurrentEntity->curstate.sequence >= m_pStudioHeader->numseq)
+        {
+            m_pCurrentEntity->curstate.sequence = 0;
+        }
+
+        pseqdesc = m_pStudioHeader->GetSequences() + m_pCurrentEntity->curstate.sequence;
+
+        float pitch = m_pCurrentEntity->angles.Y; // PITCH
+        StudioPlayerBlend(pseqdesc, &iBlend, &pitch);
+        m_pCurrentEntity->angles.Y = pitch;
+
+        m_pCurrentEntity->latched.prevangles.Y = m_pCurrentEntity->angles.Y; // PITCH
+        m_pCurrentEntity->curstate.blending_0 = (byte)iBlend;
+        m_pCurrentEntity->latched.prevblending_0 = m_pCurrentEntity->curstate.blending_0;
+        m_pCurrentEntity->latched.prevseqblending_0 = m_pCurrentEntity->curstate.blending_0;
+
+        dt = (float)(m_clTime - m_clOldTime);
+        if (dt < 0)
+            dt = 0;
+        else if (dt > 1.0f)
+            dt = 1;
+
+        StudioEstimateGait(pplayer);
+
+        // Calc side to side turning
+        flYaw = m_pCurrentEntity->angles.Z - m_pPlayerInfo->gaityaw; // YAW
+        flYaw = flYaw - (int)(flYaw / 360) * 360;
+        if (flYaw < -180)
+            flYaw = flYaw + 360;
+        if (flYaw > 180)
+            flYaw = flYaw - 360;
+
+        if (flYaw > 120)
+        {
+            m_pPlayerInfo->gaityaw = m_pPlayerInfo->gaityaw - 180;
+            m_flGaitMovement = -m_flGaitMovement;
+            flYaw = flYaw - 180;
+        }
+        else if (flYaw < -120)
+        {
+            m_pPlayerInfo->gaityaw = m_pPlayerInfo->gaityaw + 180;
+            m_flGaitMovement = -m_flGaitMovement;
+            flYaw = flYaw + 180;
+        }
+
+        // Adjust torso
+        m_pCurrentEntity->curstate.controller_0 = (byte)((flYaw / 4.0f + 30) / (60.0f / 255.0f));
+        m_pCurrentEntity->curstate.controller_1 = (byte)((flYaw / 4.0f + 30) / (60.0f / 255.0f));
+        m_pCurrentEntity->curstate.controller_2 = (byte)((flYaw / 4.0f + 30) / (60.0f / 255.0f));
+        m_pCurrentEntity->curstate.controller_3 = (byte)((flYaw / 4.0f + 30) / (60.0f / 255.0f));
+        m_pCurrentEntity->latched.prevcontroller_0 = m_pCurrentEntity->curstate.controller_0;
+        m_pCurrentEntity->latched.prevcontroller_1 = m_pCurrentEntity->curstate.controller_1;
+        m_pCurrentEntity->latched.prevcontroller_2 = m_pCurrentEntity->curstate.controller_2;
+        m_pCurrentEntity->latched.prevcontroller_3 = m_pCurrentEntity->curstate.controller_3;
+
+        m_pCurrentEntity->angles.Z = m_pPlayerInfo->gaityaw; // YAW
+        if (m_pCurrentEntity->angles.Z < 0)
+            m_pCurrentEntity->angles.Z += 360;
+        m_pCurrentEntity->latched.prevangles.Z = m_pCurrentEntity->angles.Z; // YAW
+
+        if (pplayer->gaitsequence >= m_pStudioHeader->numseq)
+        {
+            pplayer->gaitsequence = 0;
+        }
+
+        pseqdesc = m_pStudioHeader->GetSequences() + pplayer->gaitsequence;
+
+        // Calc gait frame
+        if (pseqdesc->linearmovement_0 > 0)
+        {
+            m_pPlayerInfo->gaitframe += (m_flGaitMovement / pseqdesc->linearmovement_0) * pseqdesc->numframes;
+        }
+        else
+        {
+            m_pPlayerInfo->gaitframe += pseqdesc->fps * dt;
+        }
+
+        // Do modulo
+        m_pPlayerInfo->gaitframe = m_pPlayerInfo->gaitframe - (int)(m_pPlayerInfo->gaitframe / pseqdesc->numframes) * pseqdesc->numframes;
+        if (m_pPlayerInfo->gaitframe < 0)
+            m_pPlayerInfo->gaitframe += pseqdesc->numframes;
     }
 
     #endregion
