@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -22,9 +23,18 @@ public interface IFixedBufferHolder
 /// Total size is determined by the TLength struct which must implement IFixedBufferHolder.
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
-public struct FixedBuffer<TElement, TLength> where TLength : unmanaged, IFixedBufferHolder where TElement : unmanaged
+public struct FixedBuffer<TElement, TLength> : IEnumerable<TElement> where TLength : unmanaged, IFixedBufferHolder where TElement : unmanaged
 {
     public TLength Data;
+
+    /// <summary>
+    /// Gets the number of elements in the buffer.
+    /// </summary>
+    public readonly unsafe int Length
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => sizeof(TLength) / sizeof(TElement);
+    }
     public unsafe ref TElement this[int index]
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -77,6 +87,26 @@ public struct FixedBuffer<TElement, TLength> where TLength : unmanaged, IFixedBu
         }
         return base.ToString();
     }
+
+    /// <summary>
+    /// Returns an enumerator that iterates through the buffer.
+    /// </summary>
+    public IEnumerator<TElement> GetEnumerator()
+    {
+        int length = Length;
+        for (int i = 0; i < length; i++)
+        {
+            yield return this[i];
+        }
+    }
+
+    /// <summary>
+    /// Returns an enumerator that iterates through the buffer.
+    /// </summary>
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return GetEnumerator();
+    }
 }
 
 public struct DemoUsageOfFixedBuffer
@@ -92,10 +122,34 @@ public struct DemoUsageOfFixedBuffer
 
     public void Test()
     {
+        // Index-based access
         ref var element = ref FixedBuffer[10]; // Access the 10th Matrix4x4 in the buffer.
         element = Matrix4x4.Identity; // Set it to identity matrix.
         var result = element + element;
         FixedBuffer[0] = result; // Store the result back.
+
+        // Get the length
+        int count = FixedBuffer.Length; // Returns 64
+
+        // Use foreach (IEnumerable<TElement>)
+        foreach (var matrix in FixedBuffer)
+        {
+            // Process each matrix
+            var determinant = matrix.GetDeterminant();
+        }
+
+        // Use LINQ
+        var identityMatrices = FixedBuffer.Where(m => m == Matrix4x4.Identity).ToList();
+        var firstNonIdentity = FixedBuffer.FirstOrDefault(m => m != Matrix4x4.Identity);
+        bool hasIdentity = FixedBuffer.Any(m => m == Matrix4x4.Identity);
+        int identityCount = FixedBuffer.Count(m => m == Matrix4x4.Identity);
+
+        // Use Span for high-performance scenarios
+        Span<Matrix4x4> span = FixedBuffer.AsSpan();
+        for (int i = 0; i < span.Length; i++)
+        {
+            span[i] = Matrix4x4.Identity;
+        }
     }
 }
 
