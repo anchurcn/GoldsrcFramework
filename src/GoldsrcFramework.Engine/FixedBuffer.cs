@@ -41,6 +41,17 @@ public struct FixedBuffer<TElement, TLength> where TLength : unmanaged, IFixedBu
         }
     }
 
+    public Span<TElement> AsSpan()
+    {
+        unsafe
+        {
+            fixed (TLength* p = &Data)
+            {
+                return new Span<TElement>(p, sizeof(TLength) / sizeof(TElement));
+            }
+        }
+    }
+
     public unsafe TElement* AsPointer()
     {
         unsafe
@@ -58,8 +69,10 @@ public struct FixedBuffer<TElement, TLength> where TLength : unmanaged, IFixedBu
         {
             fixed(TLength* p = &Data)
             {
-                byte* pBuf = (byte*)p;
-                return Encoding.UTF8.GetString(pBuf, sizeof(TLength));
+                Span<byte> span = MemoryMarshal.AsBytes(AsSpan());
+                int len = span.IndexOf((byte)0);
+                if (len < 0) len = span.Length;
+                return Encoding.UTF8.GetString(span[..len]);
             }
         }
         return base.ToString();

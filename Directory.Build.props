@@ -1,0 +1,43 @@
+<Project>
+  
+  <!-- 
+    ============================================================================
+    统一的 TargetFramework 版本管理
+    ============================================================================
+    这个文件会被所有子项目自动导入，用于集中管理 TargetFramework 版本。
+    
+    使用方法：
+    1. 在这里修改 DefaultTargetFramework 或 NetLoaderTargetFramework 即可影响所有项目
+    2. 各个项目的 .csproj 文件中使用 $(TargetFramework) 而不是硬编码版本号
+    3. 如果某个项目需要特殊版本，可以在项目文件中覆盖
+  -->
+  
+  <PropertyGroup>
+    <!-- 默认的 TargetFramework 版本 (用于大部分项目) -->
+    <DefaultTargetFramework>net8.0</DefaultTargetFramework>
+    
+    <!-- NetLoader 项目使用的特殊版本 (因为需要 Native AOT 支持) -->
+    <NetLoaderTargetFramework>net9.0</NetLoaderTargetFramework>
+  </PropertyGroup>
+  
+  <!-- 
+    为不同的项目设置 TargetFramework
+    如果项目没有显式设置 TargetFramework，则使用这里的默认值
+  -->
+  <PropertyGroup Condition="'$(TargetFramework)' == ''">
+    <!-- NetLoader 项目使用特殊版本 -->
+    <TargetFramework Condition="$(MSBuildProjectName.Contains('NetLoader'))">$(NetLoaderTargetFramework)</TargetFramework>
+    
+    <!-- 其他所有项目使用默认版本 -->
+    <TargetFramework Condition="'$(TargetFramework)' == ''">$(DefaultTargetFramework)</TargetFramework>
+  </PropertyGroup>
+  
+  <!-- 通用的项目属性 -->
+  <PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+</Project>
+

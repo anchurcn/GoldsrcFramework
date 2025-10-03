@@ -1,9 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net9.0</TargetFramework>
-		<ImplicitUsings>enable</ImplicitUsings>
-		<Nullable>enable</Nullable>
 		<OutputType>Library</OutputType>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
@@ -53,12 +50,13 @@
 
   -->
 	<!-- Copy GoldsrcFramework.dll and runtimeconfig.json to publish output -->
+	<!-- Note: GoldsrcFramework uses $(DefaultTargetFramework) from Directory.Build.props -->
 	<!--
   <Target Name="CopyFrameworkFiles" AfterTargets="Publish">
     <ItemGroup>
-      <FrameworkFiles Include="$(MSBuildProjectDirectory)\..\GoldsrcFramework\bin\$(Configuration)\net8.0\GoldsrcFramework.dll" />
-      <FrameworkFiles Include="$(MSBuildProjectDirectory)\..\GoldsrcFramework\bin\$(Configuration)\net8.0\GoldsrcFramework.runtimeconfig.json" />
-      <FrameworkFiles Include="$(MSBuildProjectDirectory)\..\GoldsrcFramework\bin\$(Configuration)\net8.0\GoldsrcFramework.Engine.dll" />
+      <FrameworkFiles Include="$(MSBuildProjectDirectory)\..\GoldsrcFramework\bin\$(Configuration)\$(DefaultTargetFramework)\GoldsrcFramework.dll" />
+      <FrameworkFiles Include="$(MSBuildProjectDirectory)\..\GoldsrcFramework\bin\$(Configuration)\$(DefaultTargetFramework)\GoldsrcFramework.runtimeconfig.json" />
+      <FrameworkFiles Include="$(MSBuildProjectDirectory)\..\GoldsrcFramework\bin\$(Configuration)\$(DefaultTargetFramework)\GoldsrcFramework.Engine.dll" />
     </ItemGroup>
     <Copy SourceFiles="@(FrameworkFiles)" DestinationFolder="$(PublishDir)" />
   </Target>-->

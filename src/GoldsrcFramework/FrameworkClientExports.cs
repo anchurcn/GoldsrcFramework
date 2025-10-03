@@ -29,11 +29,12 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
 
     public virtual int HUD_Redraw(float flTime, int intermission)
     {
-        byte* msg = stackalloc byte[100];
-        var span = new Span<byte>(msg, 100);
-        span.Clear();
-        Encoding.UTF8.GetBytes("GoldsrcFramworkDemo",span);
-        EngineApi.PClient->CenterPrint((NChar*)msg);
+        Span<byte> msg = stackalloc byte[32];
+        Encoding.UTF8.GetBytes("GoldsrcFrameworkDemo", msg);
+        fixed (byte* ptr = msg)
+        {
+            EngineApi.PClient->CenterPrint((NChar*)ptr);
+        }
         return LegacyClientInterop.HUD_Redraw(flTime, intermission);
     }
 
@@ -214,7 +215,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
 
     public virtual int HUD_GetStudioModelInterface(int version, r_studio_interface_s** ppinterface, engine_studio_api_s* pstudio)
     {
-        return LegacyClientInterop.HUD_GetStudioModelInterface(version, ppinterface, pstudio);
+        //return LegacyClientInterop.HUD_GetStudioModelInterface(version, ppinterface, pstudio);
         return StudioModelRenderer.GetStudioModelInterface(version, ppinterface, pstudio);
     }
 

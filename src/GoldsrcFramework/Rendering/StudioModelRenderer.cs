@@ -191,9 +191,9 @@ public unsafe class StudioModelRenderer
     public virtual void Init()
     {
         // Set up some variables shared with engine
-        m_pCvarHiModels = IEngineStudio->GetCvar((NChar*)Marshal.StringToHGlobalAnsi("cl_himodels"));
-        m_pCvarDeveloper = IEngineStudio->GetCvar((NChar*)Marshal.StringToHGlobalAnsi("developer"));
-        m_pCvarDrawEntities = IEngineStudio->GetCvar((NChar*)Marshal.StringToHGlobalAnsi("r_drawentities"));
+        m_pCvarHiModels = IEngineStudio->GetCvar((NChar*)"cl_himodels"u8.GetPointerUnsafe());
+        m_pCvarDeveloper = IEngineStudio->GetCvar((NChar*)"developer"u8.GetPointerUnsafe());
+        m_pCvarDrawEntities = IEngineStudio->GetCvar((NChar*)"r_drawentities"u8.GetPointerUnsafe());
 
         m_pChromeSprite = IEngineStudio->GetChromeSprite();
 
@@ -1320,6 +1320,54 @@ public unsafe class StudioModelRenderer
             // Build final bone matrices
             pbones = m_pStudioHeader->GetBones();
 
+            // bounds checking
+            if (m_pPlayerInfo is not null)
+            {
+                if (m_pPlayerInfo->gaitsequence >= m_pStudioHeader->numseq)
+                {
+                    m_pPlayerInfo->gaitsequence = 0;
+                }
+            }
+
+            // calc gait animation
+            if (m_pPlayerInfo is not null && m_pPlayerInfo->gaitsequence != 0)
+            {
+                // TODO: comment out for now, will be implemented later
+                //if (m_pPlayerInfo->gaitsequence >= m_pStudioHeader->numseq)
+                //{
+                //    m_pPlayerInfo->gaitsequence = 0;
+                //}
+
+                //bool copy = true;
+
+                //pseqdesc = (mstudioseqdesc_t*)((byte*)m_pStudioHeader + m_pStudioHeader->seqindex) + m_pPlayerInfo->gaitsequence;
+
+                //panim = StudioGetAnim(m_pRenderModel, pseqdesc);
+                //StudioCalcRotations(pos2, q2, pseqdesc, panim, m_pPlayerInfo->gaitframe);
+
+                //for (i = 0; i < m_pStudioHeader->numbones; i++)
+                //{
+                //    var bone = &pbones[i];
+
+                //    if (0 == strcmp(bone->name, "Bip01 Spine"))
+                //    {
+                //        copy = false;
+                //    }
+                //    else if (bone->parent >= 0 &&
+                //             bone->parent < m_pStudioHeader->numbones &&
+                //             0 == strcmp(pbones[bone->parent].name, "Bip01 Pelvis"))
+                //    {
+                //        copy = true;
+                //    }
+
+                //    if (copy)
+                //    {
+                //        memcpy(pos[i], pos2[i], sizeof(pos[i]));
+                //        memcpy(q[i], q2[i], sizeof(q[i]));
+                //    }
+                //}
+            }
+
             fixed (float* pBonematrix = bonematrix)
             {
                 for (i = 0; i < m_pStudioHeader->numbones; i++)
@@ -1386,41 +1434,16 @@ public unsafe class StudioModelRenderer
         int i;
         mstudioattachment_t* pattachment;
 
-        // Validate attachment count (engine limitation)
         if (m_pStudioHeader->numattachments > 4)
         {
-            // Output debug warning if developer mode is enabled
-            if (m_pCvarDeveloper != null && m_pCvarDeveloper->value != 0)
-            {
-                // Get engine client functions for console output
-                var engineFuncs = EngineApi.PClient;
-                if (engineFuncs != null && engineFuncs->Con_DPrintf != null)
-                {
-                    // Format warning message
-                    var modelName = m_pCurrentEntity->model != null
-                        ? Marshal.PtrToStringAnsi((nint)m_pCurrentEntity->model->name.AsPointer())
-                        : "unknown";
-
-                    var message = $"Too many attachments on {modelName}\n";
-                    var messagePtr = Marshal.StringToHGlobalAnsi(message);
-                    engineFuncs->Con_DPrintf((NChar*)messagePtr);
-                    Marshal.FreeHGlobal(messagePtr);
-                }
-            }
-
-            // Note: Original code had exit(-1) here, but that would crash the game.
-            // Instead, we just skip attachment calculation for this model.
-            return;
+            throw new InvalidOperationException($"Too many attachments on {m_pCurrentEntity->model->name}");
         }
 
-        // Calculate attachment points by transforming from model space to world space
-        pattachment = m_pStudioHeader->GetAttachments();
+        // calculate attachment points
+        pattachment = (mstudioattachment_t*)((byte*)m_pStudioHeader + m_pStudioHeader->attachmentindex);
         for (i = 0; i < m_pStudioHeader->numattachments; i++)
         {
-            // Transform attachment origin through the bone's light transformation matrix
-            // VectorTransform(pattachment[i].org, (*m_plighttransform)[pattachment[i].bone], m_pCurrentEntity->attachment[i])
-            StudioMath.VectorTransform(ref pattachment[i].org, m_plighttransform + pattachment[i].bone,
-                ref m_pCurrentEntity->attachment[i]);
+            StudioMath.VectorTransform(ref pattachment[i].org, &m_plighttransform[pattachment[i].bone], ref m_pCurrentEntity->attachment[i]);
         }
     }
 
