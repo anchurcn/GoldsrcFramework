@@ -46,23 +46,6 @@ public unsafe class StudioModelRenderer
 
     #endregion
 
-    #region Member Variables - Time and Interpolation
-
-    // Client clock
-    private double m_clTime;
-    // Old Client clock
-    private double m_clOldTime;
-
-    // Do interpolation?
-    private bool m_fDoInterp;
-    // Do gait estimation?
-    private bool m_fGaitEstimation;
-
-    // Current render frame #
-    private int m_nFrameCount;
-
-    #endregion
-
     #region Member Variables - CVars
 
     // Cvars that studio model code needs to reference
@@ -120,21 +103,7 @@ public unsafe class StudioModelRenderer
 
     #endregion
 
-    #region Member Variables - Rendering State
-
-    // Software renderer scale factors
-    private float m_fSoftwareXScale;
-    private float m_fSoftwareYScale;
-
-    // Current view vectors and render origin
-    private Vector3 m_vUp;
-    private Vector3 m_vRight;
-    private Vector3 m_vNormal;
-    private Vector3 m_vRenderOrigin;
-
-    // Model render counters (from engine)
-    private int* m_pStudioModelCount;
-    private int* m_pModelsDrawn;
+    #region Member Variables - Rendering State Output
 
     // Matrices
     // Model to world transformation (pointer to Matrix3x4)
@@ -147,6 +116,43 @@ public unsafe class StudioModelRenderer
     private Matrix3x4* m_plighttransform;
 
     #endregion
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RendererState
+    {
+        #region Member Variables - Time and Interpolation
+
+        // Client clock
+        public double m_clTime;
+        // Old Client clock
+        public double m_clOldTime;
+
+        // Current render frame #
+        public int m_nFrameCount;
+
+        #endregion
+
+        #region Render vars
+        // Software renderer scale factors
+        public float m_fSoftwareXScale;
+        public float m_fSoftwareYScale;
+
+        // Current view vectors and render origin
+        public Vector3 m_vUp;
+        public Vector3 m_vRight;
+        public Vector3 m_vNormal;
+        public Vector3 m_vRenderOrigin;
+
+        // Model render counters (from engine)
+        public int* m_pStudioModelCount;
+        public int* m_pModelsDrawn;
+        #endregion
+    }
+
+    private RendererState* _s;
+    
+    // Interpolation control flags
+    private bool m_fDoInterp;
+    private bool m_fGaitEstimation;
 
     #region Static Members
 
@@ -165,15 +171,30 @@ public unsafe class StudioModelRenderer
     /// </summary>
     public StudioModelRenderer()
     {
+        // Allocate memory for RendererState
+        _s = (RendererState*)NativeMemory.Alloc((UIntPtr)sizeof(RendererState));
+        
+        // Initialize RendererState members
         m_fDoInterp = true;
         m_fGaitEstimation = true;
+        _s->m_clTime = 0;
+        _s->m_clOldTime = 0;
+        _s->m_nFrameCount = 0;
+        _s->m_fSoftwareXScale = 0;
+        _s->m_fSoftwareYScale = 0;
+        _s->m_vUp = Vector3.Zero;
+        _s->m_vRight = Vector3.Zero;
+        _s->m_vNormal = Vector3.Zero;
+        _s->m_vRenderOrigin = Vector3.Zero;
+        _s->m_pStudioModelCount = null;
+        _s->m_pModelsDrawn = null;
+        
+        // Initialize other members
         m_pCurrentEntity = null;
         m_pCvarHiModels = null;
         m_pCvarDeveloper = null;
         m_pCvarDrawEntities = null;
         m_pChromeSprite = null;
-        m_pStudioModelCount = null;
-        m_pModelsDrawn = null;
         m_protationmatrix = null;
         m_paliastransform = null;
         m_pbonetransform = null;
@@ -197,12 +218,7 @@ public unsafe class StudioModelRenderer
 
         m_pChromeSprite = IEngineStudio->GetChromeSprite();
 
-        int* pModelCount = null;
-        int* pModelsDrawn = null;
-        IEngineStudio->GetModelCounters(&pModelCount, &pModelsDrawn);
-
-        m_pStudioModelCount = pModelCount;
-        m_pModelsDrawn = pModelsDrawn;
+        IEngineStudio->GetModelCounters(&_s->m_pStudioModelCount, &_s->m_pModelsDrawn);
 
         // Get pointers to engine data structures
         m_pbonetransform = (Matrix3x4*)IEngineStudio->StudioGetBoneTransform();
@@ -228,18 +244,10 @@ public unsafe class StudioModelRenderer
 
         m_pCurrentEntity = IEngineStudio->GetCurrentEntity();
 
-        fixed (int* pFrameCount = &m_nFrameCount)
-        fixed (double* pClTime = &m_clTime, pClOldTime = &m_clOldTime)
-        {
-            IEngineStudio->GetTimes(pFrameCount, pClTime, pClOldTime);
-        }
+        IEngineStudio->GetTimes(&_s->m_nFrameCount, &_s->m_clTime, &_s->m_clOldTime);
 
-        fixed (Vector3* pOrigin = &m_vRenderOrigin, pUp = &m_vUp, pRight = &m_vRight, pNormal = &m_vNormal)
-        fixed (float* pXScale = &m_fSoftwareXScale, pYScale = &m_fSoftwareYScale)
-        {
-            IEngineStudio->GetViewInfo((float*)pOrigin, (float*)pUp, (float*)pRight, (float*)pNormal);
-            IEngineStudio->GetAliasScale(pXScale, pYScale);
-        }
+        IEngineStudio->GetViewInfo((float*)&_s->m_vRenderOrigin, (float*)&_s->m_vUp, (float*)&_s->m_vRight, (float*)&_s->m_vNormal);
+        IEngineStudio->GetAliasScale(&_s->m_fSoftwareXScale, &_s->m_fSoftwareYScale);
 
         // Special handling for dead player rendering
         if (m_pCurrentEntity->curstate.renderfx == (int)RenderFx.kRenderFxDeadPlayer)
@@ -289,8 +297,8 @@ public unsafe class StudioModelRenderer
             if (IEngineStudio->StudioCheckBBox() == 0)
                 return false;
 
-            (*m_pModelsDrawn)++;
-            (*m_pStudioModelCount)++; // render data cache cookie
+            (*_s->m_pModelsDrawn)++;
+            (*_s->m_pStudioModelCount)++; // render data cache cookie
 
             if (m_pStudioHeader->numbodyparts == 0)
                 return true;
@@ -360,18 +368,10 @@ public unsafe class StudioModelRenderer
 
         m_pCurrentEntity = IEngineStudio->GetCurrentEntity();
 
-        fixed (int* pFrameCount = &m_nFrameCount)
-        fixed (double* pClTime = &m_clTime, pClOldTime = &m_clOldTime)
-        {
-            IEngineStudio->GetTimes(pFrameCount, pClTime, pClOldTime);
-        }
+        IEngineStudio->GetTimes(&_s->m_nFrameCount, &_s->m_clTime, &_s->m_clOldTime);
 
-        fixed (Vector3* pOrigin = &m_vRenderOrigin, pUp = &m_vUp, pRight = &m_vRight, pNormal = &m_vNormal)
-        fixed (float* pXScale = &m_fSoftwareXScale, pYScale = &m_fSoftwareYScale)
-        {
-            IEngineStudio->GetViewInfo((float*)pOrigin, (float*)pUp, (float*)pRight, (float*)pNormal);
-            IEngineStudio->GetAliasScale(pXScale, pYScale);
-        }
+        IEngineStudio->GetViewInfo((float*)&_s->m_vRenderOrigin, (float*)&_s->m_vUp, (float*)&_s->m_vRight, (float*)&_s->m_vNormal);
+        IEngineStudio->GetAliasScale(&_s->m_fSoftwareXScale, &_s->m_fSoftwareYScale);
 
         m_nPlayerIndex = pplayer->number - 1;
 
@@ -425,8 +425,8 @@ public unsafe class StudioModelRenderer
             if (IEngineStudio->StudioCheckBBox() == 0)
                 return false;
 
-            (*m_pModelsDrawn)++;
-            (*m_pStudioModelCount)++; // render data cache cookie
+            (*_s->m_pModelsDrawn)++;
+            (*_s->m_pStudioModelCount)++; // render data cache cookie
 
             if (m_pStudioHeader->numbodyparts == 0)
                 return true;
@@ -435,7 +435,7 @@ public unsafe class StudioModelRenderer
         m_pPlayerInfo = IEngineStudio->PlayerInfo(m_nPlayerIndex);
         StudioSetupBones();
         StudioSaveBones();
-        m_pPlayerInfo->renderframe = m_nFrameCount;
+        m_pPlayerInfo->renderframe = _s->m_nFrameCount;
 
         m_pPlayerInfo = null;
 
@@ -877,7 +877,7 @@ public unsafe class StudioModelRenderer
 
         if (m_fDoInterp && (m_pCurrentEntity->curstate.animtime >= m_pCurrentEntity->latched.prevanimtime + 0.01))
         {
-            dadt = (float)((m_clTime - m_pCurrentEntity->curstate.animtime) / 0.1);
+            dadt = (float)((_s->m_clTime - m_pCurrentEntity->curstate.animtime) / 0.1);
             if (dadt > 2.0f)
             {
                 dadt = 2.0f;
@@ -896,13 +896,13 @@ public unsafe class StudioModelRenderer
 
         if (m_fDoInterp)
         {
-            if (m_clTime < m_pCurrentEntity->curstate.animtime)
+            if (_s->m_clTime < m_pCurrentEntity->curstate.animtime)
             {
                 dfdt = 0;
             }
             else
             {
-                dfdt = (m_clTime - m_pCurrentEntity->curstate.animtime) * m_pCurrentEntity->curstate.framerate * pseqdesc->fps;
+                dfdt = (_s->m_clTime - m_pCurrentEntity->curstate.animtime) * m_pCurrentEntity->curstate.framerate * pseqdesc->fps;
             }
         }
         else
@@ -1011,10 +1011,10 @@ public unsafe class StudioModelRenderer
             // NOTE: Because we need to interpolate multiplayer characters, the interpolation time limit
             // was increased to 1.0 s., which is 2x the max lag we are accounting for.
 
-            if ((m_clTime < m_pCurrentEntity->curstate.animtime + 1.0f) &&
+            if ((_s->m_clTime < m_pCurrentEntity->curstate.animtime + 1.0f) &&
                 (m_pCurrentEntity->curstate.animtime != m_pCurrentEntity->latched.prevanimtime))
             {
-                f = (float)((m_clTime - m_pCurrentEntity->curstate.animtime) /
+                f = (float)((_s->m_clTime - m_pCurrentEntity->curstate.animtime) /
                     (m_pCurrentEntity->curstate.animtime - m_pCurrentEntity->latched.prevanimtime));
             }
 
@@ -1081,24 +1081,24 @@ public unsafe class StudioModelRenderer
             fixed (float* pViewMatrix = viewmatrix)
             {
                 // Copy view vectors
-                pViewMatrix[0 * 4 + 0] = m_vRight.X;
-                pViewMatrix[0 * 4 + 1] = m_vRight.Y;
-                pViewMatrix[0 * 4 + 2] = m_vRight.Z;
+                pViewMatrix[0 * 4 + 0] = _s->m_vRight.X;
+                pViewMatrix[0 * 4 + 1] = _s->m_vRight.Y;
+                pViewMatrix[0 * 4 + 2] = _s->m_vRight.Z;
                 pViewMatrix[0 * 4 + 3] = 0;
 
-                pViewMatrix[1 * 4 + 0] = -m_vUp.X; // VectorInverse
-                pViewMatrix[1 * 4 + 1] = -m_vUp.Y;
-                pViewMatrix[1 * 4 + 2] = -m_vUp.Z;
+                pViewMatrix[1 * 4 + 0] = -_s->m_vUp.X; // VectorInverse
+                pViewMatrix[1 * 4 + 1] = -_s->m_vUp.Y;
+                pViewMatrix[1 * 4 + 2] = -_s->m_vUp.Z;
                 pViewMatrix[1 * 4 + 3] = 0;
 
-                pViewMatrix[2 * 4 + 0] = m_vNormal.X;
-                pViewMatrix[2 * 4 + 1] = m_vNormal.Y;
-                pViewMatrix[2 * 4 + 2] = m_vNormal.Z;
+                pViewMatrix[2 * 4 + 0] = _s->m_vNormal.X;
+                pViewMatrix[2 * 4 + 1] = _s->m_vNormal.Y;
+                pViewMatrix[2 * 4 + 2] = _s->m_vNormal.Z;
                 pViewMatrix[2 * 4 + 3] = 0;
 
-                m_protationmatrix->M14 = modelpos.X - m_vRenderOrigin.X;
-                m_protationmatrix->M24 = modelpos.Y - m_vRenderOrigin.Y;
-                m_protationmatrix->M34 = modelpos.Z - m_vRenderOrigin.Z;
+                m_protationmatrix->M14 = modelpos.X - _s->m_vRenderOrigin.X;
+                m_protationmatrix->M24 = modelpos.Y - _s->m_vRenderOrigin.Y;
+                m_protationmatrix->M34 = modelpos.Z - _s->m_vRenderOrigin.Z;
 
                 StudioMath.ConcatTransforms(ref *(Matrix3x4*)pViewMatrix,ref  *m_protationmatrix, out *m_paliastransform);
 
@@ -1110,8 +1110,8 @@ public unsafe class StudioModelRenderer
                     for (i = 0; i < 4; i++)
                     {
                         float* pAlias = (float*)m_paliastransform;
-                        pAlias[0 * 4 + i] *= m_fSoftwareXScale * (1.0f / (ZISCALE * 0x10000));
-                        pAlias[1 * 4 + i] *= m_fSoftwareYScale * (1.0f / (ZISCALE * 0x10000));
+                        pAlias[0 * 4 + i] *= _s->m_fSoftwareXScale * (1.0f / (ZISCALE * 0x10000));
+                        pAlias[1 * 4 + i] *= _s->m_fSoftwareYScale * (1.0f / (ZISCALE * 0x10000));
                         pAlias[2 * 4 + i] *= 1.0f / (ZISCALE * 0x10000);
                     }
                 }
@@ -1165,7 +1165,7 @@ public unsafe class StudioModelRenderer
                 {
                     float scale;
 
-                    scale = 1.0f + (float)(m_clTime - ent->curstate.animtime) * 10.0f;
+                    scale = 1.0f + (float)(_s->m_clTime - ent->curstate.animtime) * 10.0f;
                     if (scale > 2) // Don't blow up more than 200%
                         scale = 2;
 
@@ -1255,7 +1255,7 @@ public unsafe class StudioModelRenderer
             // Blend with previous sequence if interpolating
             if (m_fDoInterp &&
                 m_pCurrentEntity->latched.sequencetime != 0 &&
-                (m_pCurrentEntity->latched.sequencetime + 0.2 > m_clTime) &&
+                (m_pCurrentEntity->latched.sequencetime + 0.2 > _s->m_clTime) &&
                 (m_pCurrentEntity->latched.prevsequence < m_pStudioHeader->numseq))
             {
                 // blend from last sequence
@@ -1300,7 +1300,7 @@ public unsafe class StudioModelRenderer
                         }
                     }
 
-                    s = 1.0f - (float)((m_clTime - m_pCurrentEntity->latched.sequencetime) / 0.2);
+                    s = 1.0f - (float)((_s->m_clTime - m_pCurrentEntity->latched.sequencetime) / 0.2);
                     StudioSlerpBones(pQ, pPos, pQ1b, pPos1b, s);
                 }
             }
@@ -1918,13 +1918,13 @@ public unsafe class StudioModelRenderer
         float dt;
         Vector3 est_velocity;
 
-        dt = (float)(m_clTime - m_clOldTime);
+        dt = (float)(_s->m_clTime - _s->m_clOldTime);
         if (dt < 0)
             dt = 0;
         else if (dt > 1.0f)
             dt = 1;
 
-        if (dt == 0 || m_pPlayerInfo->renderframe == m_nFrameCount)
+        if (dt == 0 || m_pPlayerInfo->renderframe == _s->m_nFrameCount)
         {
             m_flGaitMovement = 0;
             return;
@@ -2005,7 +2005,7 @@ public unsafe class StudioModelRenderer
         m_pCurrentEntity->latched.prevblending[0] = m_pCurrentEntity->curstate.blending[0];
         m_pCurrentEntity->latched.prevseqblending[0] = m_pCurrentEntity->curstate.blending[0];
 
-        dt = (float)(m_clTime - m_clOldTime);
+        dt = (float)(_s->m_clTime - _s->m_clOldTime);
         if (dt < 0)
             dt = 0;
         else if (dt > 1.0f)

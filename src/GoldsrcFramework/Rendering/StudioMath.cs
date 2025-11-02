@@ -334,30 +334,30 @@ public static unsafe class StudioMath
         float angle;
         float sr, sp, sy, cr, cp, cy;
 
-        angle = angles[2] * (float)(Math.PI * 2 / 360);
+        angle = angles[1] * (float)(Math.PI * 2 / 360);
         sy = (float)Math.Sin(angle);
         cy = (float)Math.Cos(angle);
-        angle = angles[1] * (float)(Math.PI * 2 / 360);
+        angle = angles[0] * (float)(Math.PI * 2 / 360);
         sp = (float)Math.Sin(angle);
         cp = (float)Math.Cos(angle);
-        angle = angles[0] * (float)(Math.PI * 2 / 360);
+        angle = angles[2] * (float)(Math.PI * 2 / 360);
         sr = (float)Math.Sin(angle);
         cr = (float)Math.Cos(angle);
 
         // matrix = (Z * Y) * X
-        matrix[0] = cp * cy;
-        matrix[1] = cp * sy;
-        matrix[2] = -sp;
-        matrix[4] = sr * sp * cy + cr * -sy;
-        matrix[5] = sr * sp * sy + cr * cy;
-        matrix[6] = sr * cp;
-        matrix[8] = (cr * sp * cy + -sr * -sy);
-        matrix[9] = (cr * sp * sy + -sr * cy);
-        matrix[10] = cr * cp;
+        matrix[0] = cp * cy;     // [0][0]
+        matrix[4] = cp * sy;     // [1][0]
+        matrix[8] = -sp;         // [2][0]
+        matrix[1] = sr * sp * cy + cr * -sy;  // [0][1]
+        matrix[5] = sr * sp * sy + cr * cy;   // [1][1]
+        matrix[9] = sr * cp;     // [2][1]
+        matrix[2] = (cr * sp * cy + -sr * -sy);  // [0][2]
+        matrix[6] = (cr * sp * sy + -sr * cy);   // [1][2]
+        matrix[10] = cr * cp;    // [2][2]
 
-        matrix[3] = 0.0f;
-        matrix[7] = 0.0f;
-        matrix[11] = 0.0f;
+        matrix[3] = 0.0f;        // [0][3]
+        matrix[7] = 0.0f;        // [1][3]
+        matrix[11] = 0.0f;       // [2][3]
     }
 
     /// <summary>
@@ -430,4 +430,3 @@ public static unsafe class StudioMath
         return i == str2.Length && str1[i] == 0;
     }
 }
-
