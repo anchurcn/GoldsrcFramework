@@ -18,4 +18,7 @@ public static class UnsafeMemoryExtensions
             return ptr;
         }
     }
+
+    public static unsafe NChar* GetNCharPointerUnsafe(this ReadOnlySpan<byte> span)
+        => (NChar*)span.GetPointerUnsafe();
 }

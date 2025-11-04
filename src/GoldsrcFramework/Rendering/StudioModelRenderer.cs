@@ -191,9 +191,9 @@ public unsafe class StudioModelRenderer
     public virtual void Init()
     {
         // Set up some variables shared with engine
-        m_pCvarHiModels = IEngineStudio->GetCvar((NChar*)"cl_himodels"u8.GetPointerUnsafe());
-        m_pCvarDeveloper = IEngineStudio->GetCvar((NChar*)"developer"u8.GetPointerUnsafe());
-        m_pCvarDrawEntities = IEngineStudio->GetCvar((NChar*)"r_drawentities"u8.GetPointerUnsafe());
+        m_pCvarHiModels = IEngineStudio->GetCvar("cl_himodels"u8.GetNCharPointerUnsafe());
+        m_pCvarDeveloper = IEngineStudio->GetCvar("developer"u8.GetNCharPointerUnsafe());
+        m_pCvarDrawEntities = IEngineStudio->GetCvar("r_drawentities"u8.GetNCharPointerUnsafe());
 
         m_pChromeSprite = IEngineStudio->GetChromeSprite();
 
