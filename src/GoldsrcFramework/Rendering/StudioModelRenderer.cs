@@ -243,9 +243,7 @@ public unsafe class StudioModelRenderer
         Vector3 dir;
 
         m_pCurrentEntity = IEngineStudio->GetCurrentEntity();
-
         IEngineStudio->GetTimes(&_s->m_nFrameCount, &_s->m_clTime, &_s->m_clOldTime);
-
         IEngineStudio->GetViewInfo((float*)&_s->m_vRenderOrigin, (float*)&_s->m_vUp, (float*)&_s->m_vRight, (float*)&_s->m_vNormal);
         IEngineStudio->GetAliasScale(&_s->m_fSoftwareXScale, &_s->m_fSoftwareYScale);
 
@@ -324,11 +322,7 @@ public unsafe class StudioModelRenderer
             {
                 cl_entity_s* ent = EngineApi.PClient->GetEntityByIndex(m_pCurrentEntity->index);
 
-                // Copy 4 attachment points
-                for (int i = 0; i < 4; i++)
-                {
-                    ent->attachment[i] = m_pCurrentEntity->attachment[i];
-                }
+                ent->attachment = m_pCurrentEntity->attachment;
             }
         }
 
@@ -1070,7 +1064,7 @@ public unsafe class StudioModelRenderer
         }
 
         // Flip pitch
-        angles.Y = -angles.Y;
+        angles.X = -angles.X;
         StudioMath.AngleMatrix(ref angles, ref *m_protationmatrix);
 
         if (IEngineStudio->IsHardware() == 0)
@@ -1819,7 +1813,7 @@ public unsafe class StudioModelRenderer
     #endregion
 
     #region Static Export Functions
-
+    static bool useLegacy = false;
     /// <summary>
     /// Static wrapper for StudioDrawModel - called by engine
     /// Original: int R_StudioDrawModel(int flags)
@@ -1829,8 +1823,10 @@ public unsafe class StudioModelRenderer
     {
         if (_instance == null)
             return 0;
-
-        return _instance.StudioDrawModel(flags) ? 1 : 0;
+        if (useLegacy)
+            return nativeRenderer->StudioDrawModel(flags);
+        else
+            return _instance.StudioDrawModel(flags) ? 1 : 0;
     }
 
     /// <summary>
@@ -1845,13 +1841,17 @@ public unsafe class StudioModelRenderer
 
         return _instance.StudioDrawPlayer(flags, pplayer) ? 1 : 0;
     }
-
+    static r_studio_interface_s* nativeRenderer = null;
     /// <summary>
     /// Get studio model interface - called by engine
     /// Original: int HUD_GetStudioModelInterface(int version, r_studio_interface_s** ppinterface, engine_studio_api_s* pstudio)
     /// </summary>
     public static int GetStudioModelInterface(int version, r_studio_interface_s** ppinterface, engine_studio_api_s* pstudio)
     {
+        fixed(r_studio_interface_s** p =  &nativeRenderer)
+        {
+            var res = LegacyClientInterop.HUD_GetStudioModelInterface(version, p, pstudio);
+        }
         const int STUDIO_INTERFACE_VERSION = 1;
 
         if (version != STUDIO_INTERFACE_VERSION)

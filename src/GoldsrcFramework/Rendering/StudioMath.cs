@@ -1,6 +1,5 @@
 using System.Runtime.CompilerServices;
 using GoldsrcFramework.LinearMath;
-
 namespace GoldsrcFramework.Rendering;
 
 /// <summary>
@@ -150,18 +149,9 @@ public static unsafe class StudioMath
     /// </summary>
     public static void QuaternionMatrix(float* q, float* matrix)
     {
-        // matrix is float[3][4]
-        matrix[0] = 1.0f - 2.0f * q[1] * q[1] - 2.0f * q[2] * q[2];
-        matrix[1] = 2.0f * q[0] * q[1] + 2.0f * q[3] * q[2];
-        matrix[2] = 2.0f * q[0] * q[2] - 2.0f * q[3] * q[1];
-
-        matrix[4] = 2.0f * q[0] * q[1] - 2.0f * q[3] * q[2];
-        matrix[5] = 1.0f - 2.0f * q[0] * q[0] - 2.0f * q[2] * q[2];
-        matrix[6] = 2.0f * q[1] * q[2] + 2.0f * q[3] * q[0];
-
-        matrix[8] = 2.0f * q[0] * q[2] + 2.0f * q[3] * q[1];
-        matrix[9] = 2.0f * q[1] * q[2] - 2.0f * q[3] * q[0];
-        matrix[10] = 1.0f - 2.0f * q[0] * q[0] - 2.0f * q[1] * q[1];
+        Quaternion q0 = *(Quaternion*)q;
+        ref var mm = ref Unsafe.AsRef<Matrix3x4>(matrix);
+        QuaternionMatrix(q0, out mm);
     }
 
     /// <summary>
@@ -428,5 +418,73 @@ public static unsafe class StudioMath
             i++;
         }
         return i == str2.Length && str1[i] == 0;
+    }
+
+    public static void ConcatTransformsI(in Matrix3x4 lhs, in Matrix3x4 rhs, out Matrix3x4 result)
+    {
+        Matrix3x4 res = new Matrix3x4();
+        res.M[0] = lhs[0 * 4 + 0] * rhs[0 * 4 + 0] + lhs[0 * 4 + 1] * rhs[1 * 4 + 0] +
+            lhs[0 * 4 + 2] * rhs[2 * 4 + 0];
+        res.M[1] = lhs[0 * 4 + 0] * rhs[0 * 4 + 1] + lhs[0 * 4 + 1] * rhs[1 * 4 + 1] +
+            lhs[0 * 4 + 2] * rhs[2 * 4 + 1];
+        res.M[2] = lhs[0 * 4 + 0] * rhs[0 * 4 + 2] + lhs[0 * 4 + 1] * rhs[1 * 4 + 2] +
+            lhs[0 * 4 + 2] * rhs[2 * 4 + 2];
+        res.M[3] = lhs[0 * 4 + 0] * rhs[0 * 4 + 3] + lhs[0 * 4 + 1] * rhs[1 * 4 + 3] +
+            lhs[0 * 4 + 2] * rhs[2 * 4 + 3] + lhs[0 * 4 + 3];
+        res.M[4] = lhs[1 * 4 + 0] * rhs[0 * 4 + 0] + lhs[1 * 4 + 1] * rhs[1 * 4 + 0] +
+            lhs[1 * 4 + 2] * rhs[2 * 4 + 0];
+        res.M[5] = lhs[1 * 4 + 0] * rhs[0 * 4 + 1] + lhs[1 * 4 + 1] * rhs[1 * 4 + 1] +
+            lhs[1 * 4 + 2] * rhs[2 * 4 + 1];
+        res.M[6] = lhs[1 * 4 + 0] * rhs[0 * 4 + 2] + lhs[1 * 4 + 1] * rhs[1 * 4 + 2] +
+            lhs[1 * 4 + 2] * rhs[2 * 4 + 2];
+        res.M[7] = lhs[1 * 4 + 0] * rhs[0 * 4 + 3] + lhs[1 * 4 + 1] * rhs[1 * 4 + 3] +
+            lhs[1 * 4 + 2] * rhs[2 * 4 + 3] + lhs[1 * 4 + 3];
+        res.M[8] = lhs[2 * 4 + 0] * rhs[0 * 4 + 0] + lhs[2 * 4 + 1] * rhs[1 * 4 + 0] +
+            lhs[2 * 4 + 2] * rhs[2 * 4 + 0];
+        res.M[9] = lhs[2 * 4 + 0] * rhs[0 * 4 + 1] + lhs[2 * 4 + 1] * rhs[1 * 4 + 1] +
+            lhs[2 * 4 + 2] * rhs[2 * 4 + 1];
+        res.M[10] = lhs[2 * 4 + 0] * rhs[0 * 4 + 2] + lhs[2 * 4 + 1] * rhs[1 * 4 + 2] +
+            lhs[2 * 4 + 2] * rhs[2 * 4 + 2];
+        res.M[11] = lhs[2 * 4 + 0] * rhs[0 * 4 + 3] + lhs[2 * 4 + 1] * rhs[1 * 4 + 3] +
+            lhs[2 * 4 + 2] * rhs[2 * 4 + 3] + lhs[2 * 4 + 3];
+        result = res;
+    }
+    public static void AngleQuaternion(float* angles, out Quaternion quaternion)
+    {
+        quaternion = new Quaternion();
+        float angle;
+        float sr, sp, sy, cr, cp, cy;
+
+        // FIXME: rescale the inputs to 1/2 angle
+        angle = angles[2] * 0.5f;
+        sy = (float)Math.Sin(angle);
+        cy = (float)Math.Cos(angle);
+        angle = angles[1] * 0.5f;
+        sp = (float)Math.Sin(angle);
+        cp = (float)Math.Cos(angle);
+        angle = angles[0] * 0.5f;
+        sr = (float)Math.Sin(angle);
+        cr = (float)Math.Cos(angle);
+
+        quaternion[0] = sr * cp * cy - cr * sp * sy; // X
+        quaternion[1] = cr * sp * cy + sr * cp * sy; // Y
+        quaternion[2] = cr * cp * sy - sr * sp * cy; // Z
+        quaternion[3] = cr * cp * cy + sr * sp * sy; // W
+    }
+    public static void QuaternionMatrix(Quaternion quaternion, out Matrix3x4 result)
+    {
+        Matrix3x4 matrix = new Matrix3x4();
+        matrix.M[0 * 4 + 0] = (float)(1.0 - 2.0 * quaternion[1] * quaternion[1] - 2.0 * quaternion[2] * quaternion[2]);
+        matrix.M[1 * 4 + 0] = (float)(2.0 * quaternion[0] * quaternion[1] + 2.0 * quaternion[3] * quaternion[2]);
+        matrix.M[2 * 4 + 0] = (float)(2.0 * quaternion[0] * quaternion[2] - 2.0 * quaternion[3] * quaternion[1]);
+
+        matrix.M[0 * 4 + 1] = (float)(2.0 * quaternion[0] * quaternion[1] - 2.0 * quaternion[3] * quaternion[2]);
+        matrix.M[1 * 4 + 1] = (float)(1.0 - 2.0 * quaternion[0] * quaternion[0] - 2.0 * quaternion[2] * quaternion[2]);
+        matrix.M[2 * 4 + 1] = (float)(2.0 * quaternion[1] * quaternion[2] + 2.0 * quaternion[3] * quaternion[0]);
+
+        matrix.M[0 * 4 + 2] = (float)(2.0 * quaternion[0] * quaternion[2] + 2.0 * quaternion[3] * quaternion[1]);
+        matrix.M[1 * 4 + 2] = (float)(2.0 * quaternion[1] * quaternion[2] - 2.0 * quaternion[3] * quaternion[0]);
+        matrix.M[2 * 4 + 2] = (float)(1.0 - 2.0 * quaternion[0] * quaternion[0] - 2.0 * quaternion[1] * quaternion[1]);
+        result = matrix;
     }
 }

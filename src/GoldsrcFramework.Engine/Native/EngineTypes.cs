@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using GoldsrcFramework.LinearMath;
+using NativeInterop;
 
 namespace GoldsrcFramework.Engine.Native
 {
@@ -684,7 +685,7 @@ namespace GoldsrcFramework.Engine.Native
         public Vector3 angles;
 
         // Attachment points
-        public NativeInterop.FixedBuffer<Vector3, _AttachmentCount> attachment; // Vector3 attachment[4];
+        public InlineArray4<Vector3> attachment; // Vector3 attachment[4];
 
         // Other entity local information
         public int trivial_accept;

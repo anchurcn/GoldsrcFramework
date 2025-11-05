@@ -53,7 +53,7 @@ public unsafe struct Matrix3x4
     [FieldOffset(44)] public float M34;
 
     /// <summary>
-    /// Gets or sets the origin (translation) component of the matrix.
+    /// Gets or sets the translation component of the matrix.
     /// This corresponds to the last column: (M14, M24, M34) or (M[3], M[7], M[11])
     /// </summary>
     public Vector3 Origin
