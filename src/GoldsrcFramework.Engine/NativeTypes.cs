@@ -1,4 +1,5 @@
 ﻿using System.Runtime.InteropServices;
+using System.Text;
 
 namespace NativeInterop;
 
@@ -114,5 +115,10 @@ public readonly struct NChar : IEquatable<NChar>
     public static bool operator !=(NChar left, NChar right)
     {
         return !left.Equals(right);
+    }
+
+    public static void GetUtf8String(ReadOnlySpan<char> str, Span<NChar> outBuffer)
+    {
+        Encoding.UTF8.GetBytes(str, MemoryMarshal.Cast<NChar, byte>(outBuffer));
     }
 }
