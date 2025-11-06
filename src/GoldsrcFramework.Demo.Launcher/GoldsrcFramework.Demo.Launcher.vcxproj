@@ -2,6 +2,8 @@
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <HalfLifeInstallDir>$(registry:HKEY_CURRENT_USER\Software\Valve\Steam@ModInstallPath)</HalfLifeInstallDir>
+    <!-- TargetFramework for C# projects is managed in Directory.Build.props -->
+    <CSharpTargetFramework>net8.0</CSharpTargetFramework>
   </PropertyGroup>
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -95,10 +97,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy /E /Y /I /F "$()" ""
-xcopy /E /Y /I /F "$()" ""
-
-</Command>
+      <Command>"$(SolutionDir)..\copy_demo.bat" "$(SolutionDir)GoldsrcFramework.Demo\bin\$(Configuration)\$(TargetFramework)\" </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -116,6 +115,9 @@ xcopy /E /Y /I /F "$()" ""
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <PostBuildEvent>
+      <Command>"$(SolutionDir)..\copy_demo.bat" "$(SolutionDir)GoldsrcFramework.Demo\bin\$(Configuration)\$(TargetFramework)\" </Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>

@@ -14,7 +14,7 @@
   
   <PropertyGroup>
     <!-- 默认的 TargetFramework 版本 (用于大部分项目) -->
-    <DefaultTargetFramework>net8.0</DefaultTargetFramework>
+    <DefaultTargetFramework>net9.0</DefaultTargetFramework>
     
     <!-- NetLoader 项目使用的特殊版本 (因为需要 Native AOT 支持) -->
     <NetLoaderTargetFramework>net9.0</NetLoaderTargetFramework>
