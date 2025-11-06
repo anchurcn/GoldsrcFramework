@@ -289,8 +289,6 @@ public unsafe class StudioModelRenderer
 
         if ((flags & STUDIO_RENDER) != 0)
         {
-            Debug.WriteLine("studio ent: " + (IntPtr)m_pCurrentEntity);
-            Debug.WriteLine("studio api size: " + (IntPtr)m_pStudioHeader);
             // see if the bounding box lets us trivially reject, also sets
             if (IEngineStudio->StudioCheckBBox() == 0)
                 return false;
@@ -1814,6 +1812,7 @@ public unsafe class StudioModelRenderer
 
     #region Static Export Functions
     static bool useLegacy = false;
+    static Stopwatch _sw = new Stopwatch();
     /// <summary>
     /// Static wrapper for StudioDrawModel - called by engine
     /// Original: int R_StudioDrawModel(int flags)
@@ -1821,12 +1820,14 @@ public unsafe class StudioModelRenderer
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
     private static int R_StudioDrawModel(int flags)
     {
-        if (_instance == null)
-            return 0;
+        var r = 0;
         if (useLegacy)
-            return nativeRenderer->StudioDrawModel(flags);
+            r = nativeRenderer->StudioDrawModel(flags);
+        if (_instance is null)
+            r = 0;
         else
-            return _instance.StudioDrawModel(flags) ? 1 : 0;
+            r = _instance.StudioDrawModel(flags) ? 1 : 0;
+        return r;
     }
 
     /// <summary>
