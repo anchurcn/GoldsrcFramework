@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
 
 [assembly: DisableRuntimeMarshalling]
 
@@ -172,7 +173,10 @@ namespace GoldsrcFramework.NetLoader
                 string moduleDir = AppContext.BaseDirectory;
                 moduleDir = Path.Combine(moduleDir, "gsfdemo","cl_dlls");
                 string gsfPath = Path.Combine(moduleDir, "GoldsrcFramework.dll");
-                string runtimeConfigPath = Path.Combine(moduleDir, "GoldsrcFramework.runtimeconfig.json");
+                var modSettings = JsonDocument.Parse(File.ReadAllText(Path.Combine(moduleDir, "modSettings.json")));
+                var modAssemblyName = modSettings.RootElement.GetProperty("GameClientAssembly").GetString();
+                var modRuntimeConfigName = Path.ChangeExtension(modAssemblyName, "runtimeconfig.json")!;
+                string runtimeConfigPath = Path.Combine(moduleDir, modRuntimeConfigName);
                 s_frameworkPath = gsfPath;
 
                 Debug.WriteLine($"[Debug] Trying to load GoldsrcFramework from: {gsfPath}");
