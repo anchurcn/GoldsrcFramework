@@ -39,70 +39,72 @@ namespace GoldsrcFramework.Rendering
             }
             return (mstudioanim_t*)((byte*)paSequences[pseqdesc->seqgroup].data + pseqdesc->animindex);
         }
-    }
 
-    void CStudioModelRenderer::StudioCalcBoneAdj(float dadt, float* adj, const byte* pcontroller1, const byte* pcontroller2, byte mouthopen)
+        /// <summary>
+        /// Calculate bone controller adjustments
+        /// Original: void CStudioModelRenderer::StudioCalcBoneAdj(float dadt, float* adj, const byte* pcontroller1, const byte* pcontroller2, byte mouthopen)
+        /// </summary>
+        public static void StudioCalcBoneAdj(studiohdr_t* pStudioHeader, float dadt, float* adj, byte* pcontroller1, byte* pcontroller2, byte mouthopen)
         {
             int i, j;
             float value;
             mstudiobonecontroller_t* pbonecontroller;
 
-            pbonecontroller = (mstudiobonecontroller_t*)((byte*)m_pStudioHeader + m_pStudioHeader->bonecontrollerindex);
+            pbonecontroller = (mstudiobonecontroller_t*)((byte*)pStudioHeader + pStudioHeader->bonecontrollerindex);
 
-            for (j = 0; j < m_pStudioHeader->numbonecontrollers; j++)
+            for (j = 0; j < pStudioHeader->numbonecontrollers; j++)
             {
                 i = pbonecontroller[j].index;
                 if (i <= 3)
                 {
                     // check for 360% wrapping
-                    if ((pbonecontroller[j].type & STUDIO_RLOOP) != 0)
+                    if ((pbonecontroller[j].type & (int)StudioMotionFlags.STUDIO_RLOOP) != 0)
                     {
-                        if (abs(pcontroller1[i] - pcontroller2[i]) > 128)
+                        if (Math.Abs(pcontroller1[i] - pcontroller2[i]) > 128)
                         {
                             int a, b;
                             a = (pcontroller1[j] + 128) % 256;
                             b = (pcontroller2[j] + 128) % 256;
-                            value = ((a * dadt) + (b * (1 - dadt)) - 128) * (360.0 / 256.0) + pbonecontroller[j].start;
+                            value = ((a * dadt) + (b * (1 - dadt)) - 128) * (360.0f / 256.0f) + pbonecontroller[j].start;
                         }
                         else
                         {
-                            value = ((pcontroller1[i] * dadt + (pcontroller2[i]) * (1.0 - dadt))) * (360.0 / 256.0) + pbonecontroller[j].start;
+                            value = ((pcontroller1[i] * dadt + (pcontroller2[i]) * (1.0f - dadt))) * (360.0f / 256.0f) + pbonecontroller[j].start;
                         }
                     }
                     else
                     {
-                        value = (pcontroller1[i] * dadt + pcontroller2[i] * (1.0 - dadt)) / 255.0;
+                        value = (pcontroller1[i] * dadt + pcontroller2[i] * (1.0f - dadt)) / 255.0f;
                         if (value < 0)
                             value = 0;
-                        if (value > 1.0)
-                            value = 1.0;
-                        value = (1.0 - value) * pbonecontroller[j].start + value * pbonecontroller[j].end;
+                        if (value > 1.0f)
+                            value = 1.0f;
+                        value = (1.0f - value) * pbonecontroller[j].start + value * pbonecontroller[j].end;
                     }
                     // Con_DPrintf( "%d %d %f : %f\n", m_pCurrentEntity->curstate.controller[j], m_pCurrentEntity->latched.prevcontroller[j], value, dadt );
                 }
                 else
                 {
-                    value = mouthopen / 64.0;
-                    if (value > 1.0)
-                        value = 1.0;
-                    value = (1.0 - value) * pbonecontroller[j].start + value * pbonecontroller[j].end;
+                    value = mouthopen / 64.0f;
+                    if (value > 1.0f)
+                        value = 1.0f;
+                    value = (1.0f - value) * pbonecontroller[j].start + value * pbonecontroller[j].end;
                     // Con_DPrintf("%d %f\n", mouthopen, value );
                 }
-                switch (pbonecontroller[j].type & STUDIO_TYPES)
+                switch (pbonecontroller[j].type & (int)StudioMotionFlags.STUDIO_TYPES)
                 {
-                    case STUDIO_XR:
-                    case STUDIO_YR:
-                    case STUDIO_ZR:
-                        adj[j] = value * (M_PI / 180.0);
+                    case (int)StudioMotionFlags.STUDIO_XR:
+                    case (int)StudioMotionFlags.STUDIO_YR:
+                    case (int)StudioMotionFlags.STUDIO_ZR:
+                        adj[j] = value * (MathF.PI / 180.0f);
                         break;
-                    case STUDIO_X:
-                    case STUDIO_Y:
-                    case STUDIO_Z:
+                    case (int)StudioMotionFlags.STUDIO_X:
+                    case (int)StudioMotionFlags.STUDIO_Y:
+                    case (int)StudioMotionFlags.STUDIO_Z:
                         adj[j] = value;
                         break;
                 }
             }
         }
-
-
     }
+}
