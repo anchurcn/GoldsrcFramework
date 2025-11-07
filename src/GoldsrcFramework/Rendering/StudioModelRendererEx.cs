@@ -7,6 +7,9 @@ using System.Threading.Tasks;
 
 namespace GoldsrcFramework.Rendering
 {
+    /// <summary>
+    /// Reimplmentaion of StudioModelRenderer.
+    /// </summary>
     public unsafe class StudioModelRendererEx
     {
         private static engine_studio_api_s* pIEngineStudio;

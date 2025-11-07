@@ -966,7 +966,7 @@ public unsafe class StudioModelRenderer
             pSubModel->submodels = (dmodel_t*)paSequences;
         }
 
-        if (IEngineStudio->Cache_Check((cache_user_s*)&paSequences[pseqdesc->seqgroup]) == null)
+        if (IEngineStudio->Cache_Check(&paSequences[pseqdesc->seqgroup]) == 0)
         {
             EngineApi.PClient->Con_DPrintf(pseqgroup->name.AsPointer());
             IEngineStudio->LoadCacheFile(pseqgroup->name.AsPointer(), (cache_user_s*)&paSequences[pseqdesc->seqgroup]);
@@ -1823,7 +1823,7 @@ public unsafe class StudioModelRenderer
         var r = 0;
         if (useLegacy)
             r = nativeRenderer->StudioDrawModel(flags);
-        if (_instance is null)
+        else if (_instance is null)
             r = 0;
         else
             r = _instance.StudioDrawModel(flags) ? 1 : 0;

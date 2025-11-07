@@ -100,7 +100,7 @@ namespace GoldsrcFramework.Engine.Native
         public int frame;
         public int @event;
         public int type;
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> options;
+        public InlineArray64<NChar> options; // char options[64];
     }
 
     // User command structure
@@ -212,7 +212,7 @@ namespace GoldsrcFramework.Engine.Native
 
         public int deadflag;
 
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte256> physinfo;
+        public InlineArray256<NChar> physinfo; // char physinfo[MAX_PHYSINFO_STRING]; (256)
 
         // For mods
         public int iuser1;
@@ -420,14 +420,14 @@ namespace GoldsrcFramework.Engine.Native
         public float skyvec_x;          // Sky vector
         public float skyvec_y;          //
         public float skyvec_z;          //
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> skyName; // Name of the sky map
+        public InlineArray32<NChar> skyName; // char skyName[32]; Name of the sky map
     }
 
     // Physics entity structure
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct physent_t
     {
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> name;    // Name of model, or "player" or "world".
+        public InlineArray32<NChar> name; // char name[32]; Name of model, or "player" or "world".
         public int player;
         public Vector3 origin;         // Model's origin in world coordinates.
         public nint model;            // only for bsp models
@@ -548,8 +548,8 @@ namespace GoldsrcFramework.Engine.Native
         public int watertype;
         public int oldwaterlevel;
 
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte256> sztexturename;
-        public NativeInterop.NChar chtexturetype;
+        public InlineArray256<NChar> sztexturename; // char sztexturename[256];
+        public NChar chtexturetype;
 
         public float maxspeed;
         public float clientmaxspeed; // Player specific maxspeed
@@ -587,7 +587,7 @@ namespace GoldsrcFramework.Engine.Native
         public int numtouch;
         public fixed byte touchindex[EngineConstants.MAX_PHYSENTS * 64]; // pmtrace_s touchindex[MAX_PHYSENTS]; // sizeof(pmtrace_s) = 64
 
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte256> physinfo; // Physics info string
+        public InlineArray256<NChar> physinfo; // char physinfo[MAX_PHYSINFO_STRING]; (256) Physics info string
 
         public movevars_s* movevars;
         public fixed float player_mins[4 * 3]; // 4 hulls, 3 coords each
@@ -671,7 +671,7 @@ namespace GoldsrcFramework.Engine.Native
         public entity_state_s curstate;  // The state information from the last message received from server
 
         public int current_position;                                // Last received history update index
-        public NativeInterop.FixedBuffer<position_history_t, _HistoryMax> ph; // History of position and angle updates for this player
+        public InlineArray64<position_history_t> ph; // position_history_t ph[HISTORY_MAX]; (64) History of position and angle updates for this player
 
         public mouth_t mouth; // For synchronizing mouth movements.
 
@@ -697,12 +697,6 @@ namespace GoldsrcFramework.Engine.Native
         public float syncbase; // for client-side animations -- used by obsolete alias animation system, remove?
         public int visframe;   // last frame this entity was found in an active leaf
         public colorVec cvFloorColor; // rgba
-
-        // Nested types for fixed buffer sizes
-        public struct _HistoryMax : NativeInterop.IFixedBufferHolder
-        { public fixed float Buffer[(1 + 3 * 2) * EngineConstants.HISTORY_MAX]; }
-        public struct _AttachmentCount : NativeInterop.IFixedBufferHolder
-        { public fixed float Buffer[3 * 4]; }
     }
 
     // Server-side structures
@@ -719,8 +713,8 @@ namespace GoldsrcFramework.Engine.Native
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct entvars_t
     {
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> classname;
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> globalname;
+        public InlineArray32<NChar> classname; // string_t classname; (stored as char[32] in C#)
+        public InlineArray32<NChar> globalname; // string_t globalname; (stored as char[32] in C#)
 
         public Vector3 origin;
         public Vector3 oldorigin;
@@ -748,7 +742,7 @@ namespace GoldsrcFramework.Engine.Native
         public float yaw_speed;
 
         public int modelindex;
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> model;
+        public InlineArray64<NChar> model; // string_t model; (stored as char[64] in C#)
 
         public int viewmodel;            // player's viewmodel
         public int weaponmodel;          // what other players see
@@ -820,20 +814,20 @@ namespace GoldsrcFramework.Engine.Native
         public int waterlevel;
         public int watertype;
 
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> target;
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> targetname;
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> netname;
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte2048> message;
+        public InlineArray32<NChar> target; // string_t target; (stored as char[32] in C#)
+        public InlineArray32<NChar> targetname; // string_t targetname; (stored as char[32] in C#)
+        public InlineArray32<NChar> netname; // string_t netname; (stored as char[32] in C#)
+        public InlineArray2048<NChar> message; // string_t message; (stored as char[2048] in C#)
 
         public float dmg_take;
         public float dmg_save;
         public float dmg;
         public float dmgtime;
 
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> noise;
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> noise1;
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> noise2;
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> noise3;
+        public InlineArray64<NChar> noise; // string_t noise; (stored as char[64] in C#)
+        public InlineArray64<NChar> noise1; // string_t noise1; (stored as char[64] in C#)
+        public InlineArray64<NChar> noise2; // string_t noise2; (stored as char[64] in C#)
+        public InlineArray64<NChar> noise3; // string_t noise3; (stored as char[64] in C#)
 
         public float speed;
         public float air_finished;
@@ -958,15 +952,15 @@ namespace GoldsrcFramework.Engine.Native
         public int location;        // Offset from the base data of this entity
         public int size;            // Byte size of this entity's data
         public int flags;           // This could be a short -- bit mask of transitions that this entity is in the PVS of
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> classname; // entity class name
+        public InlineArray64<NChar> classname; // char classname[64]; entity class name
     }
 
     // Level list structure
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct LEVELLIST
     {
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> mapName;
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> landmarkName;
+        public InlineArray32<NChar> mapName; // char mapName[32];
+        public InlineArray32<NChar> landmarkName; // char landmarkName[32];
         public edict_t* pentLandmark;
         public Vector3 vecLandmarkOrigin;
     }
@@ -990,17 +984,17 @@ namespace GoldsrcFramework.Engine.Native
 
         // smooth transition
         public int fUseLandmark;
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> szLandmarkName;  // landmark we'll spawn near in next level (20 bytes but using 32 for alignment)
+        public InlineArray32<NChar> szLandmarkName; // char szLandmarkName[32]; landmark we'll spawn near in next level (20 bytes but using 32 for alignment)
         public Vector3 vecLandmarkOffset;      // for landmark transitions
         public float time;
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> szCurrentMapName; // To check global entities
+        public InlineArray32<NChar> szCurrentMapName; // char szCurrentMapName[32]; To check global entities
     }
 
     // Resource structure
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct resource_t
     {
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> szFileName; // File name to download/precache.
+        public InlineArray64<NChar> szFileName; // char szFileName[MAX_QPATH]; (64) File name to download/precache.
         public int type;                   // t_sound, t_skin, t_model, t_decal.
         public int nIndex;                 // For t_decals
         public int nDownloadSize;          // Size in Bytes if this must be downloaded.
@@ -1251,8 +1245,8 @@ namespace GoldsrcFramework.Engine.Native
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct client_sprite_s
     {
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> szName;
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> szSprite;
+        public InlineArray64<NChar> szName; // char szName[64];
+        public InlineArray64<NChar> szSprite; // char szSprite[64];
         public int hspr;
         public int iRes;
         public Rect rc;
@@ -1262,7 +1256,7 @@ namespace GoldsrcFramework.Engine.Native
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct hud_player_info_s
     {
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> name;
+        public InlineArray32<NChar> name; // char name[MAX_SCOREBOARDNAME]; (32)
         public short ping;
         public byte thisplayer;  // TRUE if this is the calling player
 
@@ -1270,7 +1264,7 @@ namespace GoldsrcFramework.Engine.Native
         public byte spectator;
         public byte packetloss;
 
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> model;
+        public InlineArray64<NChar> model; // char model[MAX_QPATH]; (64)
         public short topcolor;
         public short bottomcolor;
 
@@ -1283,12 +1277,12 @@ namespace GoldsrcFramework.Engine.Native
     public unsafe struct player_info_s
     {
         public int userid;
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte256> userinfo;  // MAX_INFO_STRING
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> name;       // MAX_SCOREBOARDNAME
+        public InlineArray256<NChar> userinfo; // char userinfo[MAX_INFO_STRING]; (256)
+        public InlineArray32<NChar> name; // char name[MAX_SCOREBOARDNAME]; (32)
         public int spectator;
         public int ping;
         public int packet_loss;
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> model;      // MAX_QPATH
+        public InlineArray64<NChar> model; // char model[MAX_QPATH]; (64)
         public int topcolor;
         public int bottomcolor;
         public int renderframe;
@@ -1331,8 +1325,8 @@ namespace GoldsrcFramework.Engine.Native
         public float fadeout;
         public float holdtime;
         public float fxtime;
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> pName;
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte512> pMessage;
+        public InlineArray32<NChar> pName; // char pName[32];
+        public InlineArray512<NChar> pMessage; // char pMessage[512];
     }
 
     // Console print structure
@@ -1407,7 +1401,7 @@ namespace GoldsrcFramework.Engine.Native
     {
         public const int MIPLEVELS = 4;
 
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> name; // Using 32 instead of 16 for alignment
+        public InlineArray32<NChar> name; // char name[16]; but using 32 for alignment
         public uint width;
         public uint height;
         public int anim_total;                // total tenths in sequence (0 = no)
@@ -1562,7 +1556,7 @@ namespace GoldsrcFramework.Engine.Native
         public const int MAX_MODEL_NAME = 64;
         public const int MAX_MAP_HULLS = 4;
 
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte64> name;
+        public InlineArray64<NChar> name; // char name[MAX_MODEL_NAME]; (64)
         public qboolean needload; // bmodels and sprites don't cache normally
 
         public modtype_t type;
@@ -1613,7 +1607,7 @@ namespace GoldsrcFramework.Engine.Native
         public int nummarksurfaces;
         public msurface_t** marksurfaces;
 
-        public NativeInterop.FixedBuffer<hull_t, _MaxMapHulls> hulls;
+        public InlineArray4<hull_t> hulls; // hull_t hulls[MAX_MAP_HULLS]; (4)
 
         public int numtextures;
         public texture_t** textures;
@@ -1626,10 +1620,6 @@ namespace GoldsrcFramework.Engine.Native
 
         // Additional model data
         public cache_user_s cache; // only access through Mod_Extradata
-
-        // Nested type for hull array size
-        public struct _MaxMapHulls : NativeInterop.IFixedBufferHolder
-        { public fixed byte Buffer[40 * MAX_MAP_HULLS]; }
     }
 
     // Event args structure
@@ -1848,7 +1838,7 @@ namespace GoldsrcFramework.Engine.Native
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct sentenceEntry_s
     {
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte512> data;
+        public InlineArray512<NChar> data; // char data[512];
         public int length;
         public int index;
     }
@@ -1858,8 +1848,8 @@ namespace GoldsrcFramework.Engine.Native
     public unsafe struct cmdalias_t
     {
         public nint next;         // cmdalias_t* next;
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte32> name;
-        public NativeInterop.FixedBuffer<NativeInterop.NChar, NativeInterop.BufferByte1024> value;
+        public InlineArray32<NChar> name; // char name[32];
+        public InlineArray1024<NChar> value; // char value[1024];
     }
 
     // Server engine functions structure (enginefuncs_t)
