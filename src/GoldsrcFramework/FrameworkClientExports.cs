@@ -1,6 +1,10 @@
 using System.Text;
 using GoldsrcFramework.LinearMath;
 using GoldsrcFramework.Rendering;
+using GoldsrcFramework.Configuration;
+using GoldsrcFramework.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NativeInterop;
 
 namespace GoldsrcFramework.Engine.Native;
@@ -10,6 +14,9 @@ namespace GoldsrcFramework.Engine.Native;
 /// </summary>
 public unsafe class FrameworkClientExports : IClientExportFuncs
 {
+    private static int _frameCount = 0;
+    private static bool _hasLoggedConfig = false;
+
     // IClientExportFuncs implementation - all based on LegacyClientInterop
     public virtual int Initialize(cl_enginefunc_t* pEnginefuncs, int iVersion)
     {
@@ -185,6 +192,54 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
 
     public virtual void HUD_Frame(double time)
     {
+        _frameCount++;
+
+        // Log configuration info every 300 frames (approximately every 5 seconds at 60 FPS)
+        if (!_hasLoggedConfig || _frameCount % 300 == 0)
+        {
+            try
+            {
+                var logger = ServiceContainer.GetServiceOrNull<ILogger<FrameworkClientExports>>();
+                var frameworkSettings = ServiceContainer.GetServiceOrNull<IOptions<FrameworkSettings>>();
+                var gameSettings = ServiceContainer.GetServiceOrNull<IOptions<GameSettings>>();
+
+                if (logger != null)
+                {
+                    if (!_hasLoggedConfig)
+                    {
+                        logger.LogInformation("=== GoldsrcFramework DI System Initialized ===");
+                        _hasLoggedConfig = true;
+                    }
+
+                    if (frameworkSettings != null)
+                    {
+                        var settings = frameworkSettings.Value;
+                        logger.LogInformation("Framework: {Name} v{Version}, Debug: {Debug}, VerboseLogging: {Verbose}",
+                            settings.FrameworkName,
+                            settings.Version,
+                            settings.EnableDebug,
+                            settings.EnableVerboseLogging);
+                    }
+
+                    if (gameSettings != null)
+                    {
+                        var settings = gameSettings.Value;
+                        logger.LogInformation("Game: {GameName}, MaxPlayers: {MaxPlayers}, Physics: {Physics}, UpdateRate: {Rate}Hz",
+                            settings.GameName,
+                            settings.MaxPlayers,
+                            settings.EnablePhysics,
+                            settings.PhysicsUpdateRate);
+                    }
+
+                    logger.LogDebug("HUD_Frame called at time {Time}, frame {Frame}", time, _frameCount);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error in HUD_Frame logging: {ex.Message}");
+            }
+        }
+
         LegacyClientInterop.HUD_Frame(time);
     }
 

@@ -1,5 +1,6 @@
 ﻿using GoldsrcFramework.Entity;
 using GoldsrcFramework.Engine.Native;
+using GoldsrcFramework.DependencyInjection;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -17,9 +18,7 @@ namespace GoldsrcFramework
         private static bool _frameworkInitialized = false;
         private static readonly object _initLock = new object();
 
-        // Game assembly loading state
-        private static Assembly? _serverGameAssembly = null;
-        private static Assembly? _clientGameAssembly = null;
+        // Initialization state
         private static bool _serverInitialized = false;
         private static bool _clientInitialized = false;
 
@@ -120,6 +119,9 @@ namespace GoldsrcFramework
                 pathEnvVar += ";" + frameworkDir;
                 Environment.SetEnvironmentVariable("Path", pathEnvVar);
 
+                // Initialize DI container
+                ServiceContainer.Initialize();
+
                 _frameworkInitialized = true;
             }
         }
@@ -135,35 +137,8 @@ namespace GoldsrcFramework
             {
                 if (_serverInitialized) return;
 
-                try
-                {
-                    var frameworkDir = Path.GetDirectoryName(typeof(FrameworkInterop).Assembly.Location);
-                    var modSettingsPath = Path.Combine(frameworkDir!, "modsettings.json");
-
-                    if (File.Exists(modSettingsPath))
-                    {
-                        var modSettings = File.ReadAllText(modSettingsPath);
-                        var modSettingsObj = JsonSerializer.Deserialize<Dictionary<string, string>>(modSettings);
-
-                        if (modSettingsObj?.TryGetValue("GameServerAssembly", out var serverDllName) == true)
-                        {
-                            var serverAssemblyPath = Path.Combine(frameworkDir!, serverDllName);
-                            if (File.Exists(serverAssemblyPath))
-                            {
-                                _serverGameAssembly = AssemblyLoadContext.GetLoadContext(typeof(FrameworkInterop).Assembly)!
-                                    .LoadFromAssemblyPath(serverAssemblyPath);
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Server assembly loading error: {ex.Message}");
-                    _serverGameAssembly = null;
-                }
-
-                // Initialize ServerMain with the loaded assembly (or null for default)
-                ServerMain.Initialize(_serverGameAssembly);
+                // Initialize ServerMain using DI container
+                ServerMain.Initialize();
                 _serverInitialized = true;
             }
         }
@@ -179,35 +154,8 @@ namespace GoldsrcFramework
             {
                 if (_clientInitialized) return;
 
-                try
-                {
-                    var frameworkDir = Path.GetDirectoryName(typeof(FrameworkInterop).Assembly.Location);
-                    var modSettingsPath = Path.Combine(frameworkDir!, "modsettings.json");
-
-                    if (File.Exists(modSettingsPath))
-                    {
-                        var modSettings = File.ReadAllText(modSettingsPath);
-                        var modSettingsObj = JsonSerializer.Deserialize<Dictionary<string, string>>(modSettings);
-
-                        if (modSettingsObj?.TryGetValue("GameClientAssembly", out var clientDllName) == true)
-                        {
-                            var clientAssemblyPath = Path.Combine(frameworkDir!, clientDllName);
-                            if (File.Exists(clientAssemblyPath))
-                            {
-                                _clientGameAssembly = AssemblyLoadContext.GetLoadContext(typeof(FrameworkInterop).Assembly)!
-                                    .LoadFromAssemblyPath(clientAssemblyPath);
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Client assembly loading error: {ex.Message}");
-                    _clientGameAssembly = null;
-                }
-
-                // Initialize ClientMain with the loaded assembly (or null for default)
-                ClientMain.Initialize(_clientGameAssembly);
+                // Initialize ClientMain using DI container
+                ClientMain.Initialize();
                 _clientInitialized = true;
             }
         }

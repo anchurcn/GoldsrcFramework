@@ -6,6 +6,8 @@ using System.Text.Json;
 using GoldsrcFramework.Engine;
 using GoldsrcFramework.Engine.Native;
 using GoldsrcFramework.LinearMath;
+using GoldsrcFramework.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace GoldsrcFramework
 {
@@ -14,27 +16,17 @@ namespace GoldsrcFramework
         static IClientExportFuncs s_client = null!;
 
         /// <summary>
-        /// Initialize client with game assembly (called from FrameworkInterop)
+        /// Initialize client using DI container (called from FrameworkInterop)
         /// </summary>
-        public static void Initialize(Assembly? gameAssembly)
+        public static void Initialize()
         {
             try
             {
-                if (gameAssembly != null)
-                {
-                    // Find type implementing IClientExportFuncs
-                    var clientType = gameAssembly.GetTypes()
-                        .FirstOrDefault(x => x.GetInterface(nameof(IClientExportFuncs)) == typeof(IClientExportFuncs));
+                // Get client instance from DI container
+                s_client = ServiceContainer.GetService<IClientExportFuncs>();
 
-                    if (clientType != null)
-                    {
-                        s_client = (IClientExportFuncs)Activator.CreateInstance(clientType)!;
-                        return;
-                    }
-                }
-
-                // Fallback to framework default implementation
-                s_client = new FrameworkClientExports();
+                var logger = ServiceContainer.GetServiceOrNull<ILogger<object>>();
+                logger?.LogInformation("ClientMain initialized with {ClientType}", s_client.GetType().Name);
             }
             catch (Exception ex)
             {

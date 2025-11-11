@@ -9,6 +9,7 @@
 	<ItemGroup>
 		<ProjectReference Include="..\GoldsrcFramework.Engine\GoldsrcFramework.Engine.csproj" />
 		<ProjectReference Include="..\GoldsrcFramework\GoldsrcFramework.csproj">
+			<CopyLocalSatelliteAssemblies>true</CopyLocalSatelliteAssemblies>
 		</ProjectReference>
 	</ItemGroup>
 
@@ -26,10 +27,21 @@
 	<!-- Import ModPostBuild.targets for post-build processing -->
 	<Import Project="..\targets\ModPostBuild.targets" />
 
+	<!-- Copy Microsoft.Extensions.* DLLs and deps.json from GoldsrcFramework to output directory -->
+	<!--<Target Name="CopyDependencyDlls" AfterTargets="Build">
+		<ItemGroup>
+			<DependencyDlls Include="..\GoldsrcFramework\bin\$(Configuration)\$(TargetFramework)\Microsoft.Extensions.*.dll" />
+			<DependencyConfigs Include="..\GoldsrcFramework\bin\$(Configuration)\$(TargetFramework)\GoldsrcFramework.deps.json" />
+		</ItemGroup>
+		<Copy SourceFiles="@(DependencyDlls)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+		<Copy SourceFiles="@(DependencyConfigs)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="false" />
+		<Message Text="Copied Microsoft.Extensions.* DLLs and GoldsrcFramework.deps.json to $(OutDir)" Importance="high" />
+	</Target>-->
+
 	<!-- Post-build event to copy files to game directory -->
 	<Target Name="PostBuildCopyToGame" AfterTargets="ModPostBuild">
 		<Message Text="Executing post-build copy to game directory..." Importance="high" />
-		<Exec Command="&quot;$(ProjectDir)..\..\post_build_copy.bat&quot; &quot;$(OutDir)&quot;" ContinueOnError="true" IgnoreExitCode="false" />
+		<!--<Exec Command="&quot;$(ProjectDir)..\..\copy_demo.bat&quot; &quot;$(OutDir)&quot;" ContinueOnError="true" IgnoreExitCode="false" />-->
 	</Target>
 
 	<!--<Import Project="..\GoldsrcFramework\bin\$(Configuration)\$(TargetFramework)\GoldsrcFramework.targets" />-->

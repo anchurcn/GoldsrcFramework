@@ -1,4 +1,36 @@
 {
-  "GameClientAssembly": "GoldsrcFramework.Demo.dll",
-  "GameServerAssembly": "GoldsrcFramework.Demo.dll"
+  "Framework": {
+    "FrameworkName": "GoldsrcFramework Demo",
+    "Version": "1.0.0-demo",
+    "EnableDebug": true,
+    "EnableVerboseLogging": true,
+    "GameServerAssembly": "GoldsrcFramework.Demo.dll",
+    "GameClientAssembly": "GoldsrcFramework.Demo.dll"
+  },
+  "Logging": {
+    "MinimumLevel": "Debug",
+    "EnableConsole": true,
+    "EnableFile": false,
+    "LogFilePath": "logs/goldsrc-demo.log",
+    "LogLevel": {
+      "Default": "Debug",
+      "Microsoft": "Warning",
+      "System": "Warning",
+      "GoldsrcFramework": "Debug",
+      "GoldsrcFramework.Demo": "Trace"
+    }
+  },
+  "Game": {
+    "GameName": "Half-Life GSF Demo",
+    "MaxPlayers": 16,
+    "EnablePhysics": true,
+    "PhysicsUpdateRate": 60,
+    "CustomSettings": {
+      "DemoMode": "true",
+      "ShowDebugInfo": "true",
+      "CustomFeature1": "Enabled"
+    }
+  },
+  "GameServerAssembly": "GoldsrcFramework.Demo.dll",
+  "GameClientAssembly": "GoldsrcFramework.Demo.dll"
 }

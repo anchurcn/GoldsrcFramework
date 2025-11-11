@@ -10,6 +10,8 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using GoldsrcFramework.Engine.Native;
 using GoldsrcFramework.LinearMath;
+using GoldsrcFramework.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace GoldsrcFramework
 {
@@ -25,30 +27,20 @@ namespace GoldsrcFramework
         public static globalvars_t* s_globalVars = null;
 
         /// <summary>
-        /// Initialize server with game assembly (called from FrameworkInterop)
+        /// Initialize server using DI container (called from FrameworkInterop)
         /// </summary>
-        public static void Initialize(Assembly? gameAssembly)
+        public static void Initialize()
         {
             if (_inited) return;
             _inited = true;
 
             try
             {
-                if (gameAssembly != null)
-                {
-                    // Find type implementing IServerExportFuncs
-                    var serverType = gameAssembly.GetTypes()
-                        .FirstOrDefault(x => x.GetInterface(nameof(IServerExportFuncs)) == typeof(IServerExportFuncs));
+                // Get server instance from DI container
+                s_server = ServiceContainer.GetService<IServerExportFuncs>();
 
-                    if (serverType != null)
-                    {
-                        s_server = (IServerExportFuncs)Activator.CreateInstance(serverType)!;
-                        return;
-                    }
-                }
-
-                // Fallback to framework default implementation
-                s_server = new FrameworkServerExports();
+                var logger = ServiceContainer.GetServiceOrNull<ILogger<object>>();
+                logger?.LogInformation("ServerMain initialized with {ServerType}", s_server.GetType().Name);
             }
             catch (Exception ex)
             {
