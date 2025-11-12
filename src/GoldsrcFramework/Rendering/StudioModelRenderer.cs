@@ -1,5 +1,7 @@
 using GoldsrcFramework.Engine.Native;
+using GoldsrcFramework.Graphics;
 using GoldsrcFramework.LinearMath;
+using Microsoft.Extensions.Logging;
 using NativeInterop;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
@@ -1843,6 +1845,8 @@ public unsafe class StudioModelRenderer
         return _instance.StudioDrawPlayer(flags, pplayer) ? 1 : 0;
     }
     static r_studio_interface_s* nativeRenderer = null;
+    private static bool _openGLInfoPrinted = false;
+
     /// <summary>
     /// Get studio model interface - called by engine
     /// Original: int HUD_GetStudioModelInterface(int version, r_studio_interface_s** ppinterface, engine_studio_api_s* pstudio)
@@ -1857,6 +1861,44 @@ public unsafe class StudioModelRenderer
 
         if (version != STUDIO_INTERFACE_VERSION)
             return 0;
+
+        // Print OpenGL context information (only once)
+        if (!_openGLInfoPrinted)
+        {
+            _openGLInfoPrinted = true;
+
+            Console.WriteLine("\n");
+            Console.WriteLine("═══════════════════════════════════════════════════════════════════");
+            Console.WriteLine("  HUD_GetStudioModelInterface called - Querying OpenGL Context");
+            Console.WriteLine("═══════════════════════════════════════════════════════════════════");
+            Console.WriteLine();
+
+            try
+            {
+                // 获取 logger（如果可用）
+                ILogger? logger = null;
+                try
+                {
+                    logger = DependencyInjection.ServiceContainer.GetService<ILogger<StudioModelRenderer>>();
+                }
+                catch
+                {
+                    // ServiceContainer 可能还未初始化，忽略
+                }
+
+                // 打印 OpenGL 上下文信息
+                OpenGLInfo.PrintContextInfo(logger);
+
+                Console.WriteLine();
+                Console.WriteLine("═══════════════════════════════════════════════════════════════════");
+                Console.WriteLine();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error printing OpenGL info: {ex.Message}");
+                Console.WriteLine($"   Stack trace: {ex.StackTrace}");
+            }
+        }
 
         // Store engine studio API
         IEngineStudio = pstudio;
