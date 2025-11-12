@@ -3,7 +3,6 @@
 	<PropertyGroup>
 		<HalfLifeInstallDir>$(registry:HKEY_CURRENT_USER\Software\Valve\Steam@ModInstallPath)</HalfLifeInstallDir>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-		<GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
 		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 	</PropertyGroup>
 
