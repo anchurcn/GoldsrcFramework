@@ -192,7 +192,7 @@ namespace GoldsrcFramework.NetLoader
             {
                 // Get the current module file name
                 var sb = new char[1000];
-                uint ret = GetModuleFileName(IntPtr.Zero, sb, (uint)sb.Length);
+                uint ret = GetModuleFileName(_hModule, sb, (uint)sb.Length);
                 Span<char> sbSpan = sb;
                 moduleFileName = new string(sbSpan.TrimEnd());
 
