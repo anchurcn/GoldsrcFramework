@@ -1,9 +1,10 @@
-using GoldsrcFramework;
-using GoldsrcFramework.Configuration;
-using Microsoft.Extensions.Configuration;
+using GoldsrcFramework;  
+using GoldsrcFramework.Configuration;  
+using Microsoft.Extensions.Configuration;  
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;  
 using Microsoft.Extensions.Options;
+using System.Runtime.InteropServices;
 
 namespace GoldsrcFramework.Demo
 {
@@ -12,8 +13,15 @@ namespace GoldsrcFramework.Demo
     /// This is the entry point for mod-specific initialization and service registration
     /// Similar to ASP.NET Core's Startup class or WPF's App class
     /// </summary>
-    public class DemoModStartup : GoldsrcModStartup
+    public partial class DemoModStartup : GoldsrcModStartup
     {
+        [LibraryImport("SDL2", EntryPoint = "SDL_SetHint")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static partial bool SetHint(
+    [MarshalAs(UnmanagedType.LPStr)] string name,
+    [MarshalAs(UnmanagedType.LPStr)] string value); 
+
+        public const string SDL_HINT_WINDOWS_DISABLE_THREAD_NAMING = "SDL_WINDOWS_DISABLE_THREAD_NAMING";
         /// <summary>
         /// Configure services for dependency injection
         /// This is called during framework initialization, before the service provider is built
@@ -24,14 +32,17 @@ namespace GoldsrcFramework.Demo
             // Call base implementation
             base.ConfigureServices(services, configuration);
 
+            bool result = SetHint(SDL_HINT_WINDOWS_DISABLE_THREAD_NAMING, "1");
+
             // Example: Register custom services
             // services.AddSingleton<IMyCustomService, MyCustomService>();
             // services.AddTransient<IMyTransientService, MyTransientService>();
-            
+
             // Example: Configure custom options
             // services.Configure<MyModSettings>(configuration.GetSection("MyMod"));
 
             System.Diagnostics.Debug.WriteLine("[DemoModStartup] ConfigureServices called");
+            System.Diagnostics.Debug.WriteLine("[DemoModStartup] SDL_HINT_WINDOWS_DISABLE_THREAD_NAMING setting is " + result);
         }
 
         /// <summary>

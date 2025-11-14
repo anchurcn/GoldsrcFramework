@@ -1,0 +1,17 @@
+{
+  "profiles": {
+    "GoldsrcFramework.Demo": {
+      "commandName": "Project"
+    },
+    "Launch Half-Life": {
+      "commandName": "Executable",
+      "executablePath": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life\\hl.exe",
+      "commandLineArgs": "-console -game gsfdemo -windowed -w 1600 -h 900 +sv_cheats 1 +map c1a2c",
+      "workingDirectory": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life\\",
+      "environmentVariables": {
+        "SDL_WINDOWS_DISABLE_THREAD_NAMING": "1"
+      },
+      "nativeDebugging": true
+    }
+  }
+}

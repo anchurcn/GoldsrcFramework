@@ -4,12 +4,13 @@
 		<HalfLifeInstallDir>$(registry:HKEY_CURRENT_USER\Software\Valve\Steam@ModInstallPath)</HalfLifeInstallDir>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+		<StrideGraphicsApi>OpenGL</StrideGraphicsApi>
 	</PropertyGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\GoldsrcFramework.Engine\GoldsrcFramework.Engine.csproj" />
 		<ProjectReference Include="..\GoldsrcFramework\GoldsrcFramework.csproj">
-			<CopyLocalSatelliteAssemblies>true</CopyLocalSatelliteAssemblies>
+			<!--<CopyLocalSatelliteAssemblies>true</CopyLocalSatelliteAssemblies>-->
 		</ProjectReference>
 	</ItemGroup>
 
@@ -39,9 +40,10 @@
 	</Target>-->
 
 	<!-- Post-build event to copy files to game directory -->
-	<Target Name="PostBuildCopyToGame" AfterTargets="ModPostBuild">
+	<Target Name="PostBuildCopyToGame" AfterTargets="BuildNetLoader">
 		<Message Text="Executing post-build copy to game directory..." Importance="high" />
-		<!--<Exec Command="&quot;$(ProjectDir)..\..\copy_demo.bat&quot; &quot;$(OutDir)&quot;" ContinueOnError="true" IgnoreExitCode="false" />-->
+		<Exec Command="&quot;$(SolutionDir)..\copy_demo.bat&quot; &quot;$(OutDir)&quot; " />
+		
 	</Target>
 
 	<!--<Import Project="..\GoldsrcFramework\bin\$(Configuration)\$(TargetFramework)\GoldsrcFramework.targets" />-->
