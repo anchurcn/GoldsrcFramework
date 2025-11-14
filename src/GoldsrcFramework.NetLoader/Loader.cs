@@ -155,6 +155,27 @@ namespace GoldsrcFramework.NetLoader
         private static HostFrameworkResolver s_hostFxr = null!;
         private static HostContext s_hostContext = null!;
         private static string s_frameworkPath = string.Empty;
+        private static IntPtr _hModule = IntPtr.Zero;
+
+
+        [UnmanagedCallersOnly(EntryPoint = "DllMain", CallConvs = [typeof(CallConvStdcall)])]
+        public static bool DllMain(IntPtr hModule, uint ul_reason_for_call, IntPtr lpReserved)
+        {
+            _hModule = hModule;
+            switch (ul_reason_for_call)
+            {
+                case 1:
+                    // Your attach code...
+                    break;
+                default:
+                    break;
+            }
+            return true;
+        }
+
+        // LibraryImport GetModuleFileNameto get the current module path
+        [LibraryImport("kernel32.dll", SetLastError = true, EntryPoint = "GetModuleFileNameW")]
+        private static partial uint GetModuleFileName(IntPtr hModule, char[] lpFileName, uint nSize);
 
         /// <summary>
         /// Initialize the .NET host using Mxrx.NetHost.Fxr
@@ -166,11 +187,19 @@ namespace GoldsrcFramework.NetLoader
                 return;
             }
 
+            var moduleFileName = string.Empty;
             try
             {
+                // Get the current module file name
+                var sb = new char[1000];
+                uint ret = GetModuleFileName(IntPtr.Zero, sb, (uint)sb.Length);
+                Span<char> sbSpan = sb;
+                moduleFileName = new string(sbSpan.TrimEnd());
+
+                Debug.WriteLine("loader path : " + moduleFileName);
+
                 // Get the current module directory
-                string moduleDir = AppContext.BaseDirectory;
-                moduleDir = Path.Combine(moduleDir, "gsfdemo","cl_dlls");
+                string moduleDir = Path.GetDirectoryName(moduleFileName)!;
                 string gsfPath = Path.Combine(moduleDir, "GoldsrcFramework.dll");
                 string runtimeConfigPath = Path.Combine(moduleDir, "GoldsrcFramework.runtimeconfig.json");
                 s_frameworkPath = gsfPath;
