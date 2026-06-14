@@ -5,9 +5,9 @@
     },
     "Launch Half-Life": {
       "commandName": "Executable",
-      "executablePath": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life\\hl.exe",
+      "executablePath": "$(HLExe)",
       "commandLineArgs": "-console -game gsfdemo -windowed -w 1600 -h 900 +sv_cheats 1 +map c1a2c",
-      "workingDirectory": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life\\",
+      "workingDirectory": "$(HLExeFolder)",
       "environmentVariables": {
         "SDL_WINDOWS_DISABLE_THREAD_NAMING": "1"
       },

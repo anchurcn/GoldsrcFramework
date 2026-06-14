@@ -1,0 +1,9 @@
+<Project>
+	<PropertyGroup>
+		<!--client dll directory-->
+		<HlModDir>C:\Program Files (x86)\Steam\steamapps\common\Half-Life\gsfdemo\cl_dlls</HlModDir>
+		<!--Path to the game executable (hl.exe)-->
+		<HLExe>C:\Program Files (x86)\Steam\steamapps\common\Half-Life\hl.exe</HLExe>
+		<HLExeFolder>C:\Program Files (x86)\Steam\steamapps\common\Half-Life\</HLExeFolder>
+	</PropertyGroup>
+</Project>
