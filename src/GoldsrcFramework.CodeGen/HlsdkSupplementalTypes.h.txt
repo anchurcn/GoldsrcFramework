@@ -1,0 +1,22 @@
+// Supplemental HLSDK native type definitions for CppAst parsing.
+//
+// Keep this file C/C++ header-compatible. It is parsed together with HLSDK
+// headers by GoldsrcFramework.CodeGen.HlsdkNativeGenerator.
+//
+// Rules:
+// - Copy public HLSDK definitions here only when a type is referenced by the
+//   exported ABI but is not reachable from the filtered header set.
+// - For engine-private types that are only exposed as pointers in public HLSDK
+//   headers and have no public layout, define an intentionally opaque struct.
+//
+// Source: external/hlsdk/engine/eiface.h only forward-declares/uses
+// struct delta_s* in engine callbacks. Public HLSDK does not expose layout.
+struct delta_s
+{
+};
+
+// Source: external/hlsdk/common/com_model.h only uses struct surfcache_s*.
+// Public HLSDK does not expose layout.
+struct surfcache_s
+{
+};

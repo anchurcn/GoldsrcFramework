@@ -46,7 +46,7 @@ namespace GoldsrcFramework.CodeGen
         {
             // Process with previous converter first.
             // IF Starts with __Anonymous then we find name from typedef <anoymousType> <actualName>.
-            var name = DefaultGetCSharpNamePlugin.DefaultGetCSharpName(converter, element, context);
+            var name = element switch { CppTypedef t => t.Name, CppClass c => c.Name, CppEnum e => e.Name, _ => element.ToString() };
             if (name.StartsWith("__Anonymous"))
             {
                 var typedef = converter.CurrentCppCompilation.Typedefs
