@@ -205,6 +205,12 @@ internal static class HlsdkNativeGenerator
         readonly Dictionary<string, CppTypedef> _typedefs = compilation.Typedefs.ToDictionary(t => t.Name, t => t);
         readonly Dictionary<string, CppClass> _classes = compilation.Classes.Where(c => !string.IsNullOrWhiteSpace(c.Name)).GroupBy(c => c.Name).ToDictionary(g => g.Key, g => g.FirstOrDefault(c => c.IsDefinition) ?? g.First());
         readonly Dictionary<string, CppEnum> _enums = compilation.Enums.Where(e => !string.IsNullOrWhiteSpace(e.Name)).GroupBy(e => e.Name).ToDictionary(g => g.Key, g => g.First());
+        readonly Dictionary<string, string> _typeAliases = compilation.Typedefs
+            .Select(t => (Target: TypedefTargetName(t), Alias: t.Name))
+            .Where(x => !string.IsNullOrWhiteSpace(x.Target))
+            .GroupBy(x => x.Target!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().Alias, StringComparer.OrdinalIgnoreCase);
+
 
 
         readonly HashSet<string> _seen = [];
@@ -414,7 +420,12 @@ internal static class HlsdkNativeGenerator
             if (type is CppPointerType p) return IsFunctionPointer(p.ElementType) ? CsTypeName(p.ElementType, field) : CsTypeName(p.ElementType, field) + "*";
             if (type is CppArrayType a) return CsTypeName(a.ElementType, field) + "*";
             if (type is CppFunctionType fn) return "delegate* unmanaged[Cdecl]<" + string.Join(", ", fn.Parameters.Select(p => CsTypeName(p.Type, field)).Append(CsTypeName(fn.ReturnType, field))) + ">";
-            if (type is CppEnum e) return string.IsNullOrWhiteSpace(e.Name) ? "int" : mappings.TryGetValue(e.Name, out var em) ? em : e.Name;
+            if (type is CppEnum e)
+            {
+                if (string.IsNullOrWhiteSpace(e.Name)) return "int";
+                if (mappings.TryGetValue(e.Name, out var em)) return em;
+                return _typeAliases.TryGetValue(e.Name, out var alias) ? alias : e.Name;
+            }
             if (type is CppUnexposedType u && _typedefs.TryGetValue(u.Name, out var resolved)) return CsTypeName(resolved, field);
             if (type is CppUnexposedType u3 && _classes.TryGetValue(u3.Name, out var resolvedClass)) return CsTypeName(resolvedClass, field);
             if (type is CppUnexposedType u4 && _enums.TryGetValue(u4.Name, out var resolvedEnum)) return CsTypeName(resolvedEnum, field);
@@ -422,7 +433,7 @@ internal static class HlsdkNativeGenerator
             if (type is CppUnexposedType u5) { _opaqueTypes.Add(u5.Name); return u5.Name; }
             if (type is CppClass c)
             {
-                var className = string.IsNullOrWhiteSpace(c.Name) ? "__Anonymous" + Math.Abs(c.GetHashCode()) : mappings.TryGetValue(c.Name, out var cm) ? cm : c.Name;
+                var className = string.IsNullOrWhiteSpace(c.Name) ? "__Anonymous" + Math.Abs(c.GetHashCode()) : mappings.TryGetValue(c.Name, out var cm) ? cm : _typeAliases.TryGetValue(c.Name, out var alias) ? alias : c.Name;
                 if (!c.IsDefinition) _opaqueTypes.Add(className);
                 return className;
             }
@@ -435,6 +446,19 @@ internal static class HlsdkNativeGenerator
             type = Strip(type);
             return type switch { CppFunctionType f => f, CppPointerType p => UnwrapFunctionPointer(p.ElementType), CppQualifiedType q => UnwrapFunctionPointer(q.ElementType), _ => null };
         }
+
+        static string? TypedefTargetName(CppTypedef typedef)
+        {
+            var target = Strip(typedef.ElementType);
+            return target switch
+            {
+                CppClass c when !string.IsNullOrWhiteSpace(c.Name) => c.Name,
+                CppEnum e when !string.IsNullOrWhiteSpace(e.Name) => e.Name,
+                CppUnexposedType u when !string.IsNullOrWhiteSpace(u.Name) => u.Name,
+                _ => null
+            };
+        }
+
 
         static string? NativeName(CppType? type) => Strip(type) switch
         {
