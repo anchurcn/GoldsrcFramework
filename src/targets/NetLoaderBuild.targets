@@ -5,7 +5,8 @@
 
 	<PropertyGroup>
 		<!-- NetLoader project path -->
-		<NetLoaderProjectPath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.NetLoader\GoldsrcFramework.NetLoader.csproj</NetLoaderProjectPath>
+		<NetLoaderSourceLoaderCsPath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.NetLoader\Loader.cs</NetLoaderSourceLoaderCsPath>
+		<NetLoaderSourceCsprojPath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.NetLoader\GoldsrcFramework.NetLoader.csproj</NetLoaderSourceCsprojPath>
 
 		<!-- Output paths -->
 		<NetLoaderOutputPath>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\client.dll</NetLoaderOutputPath>
@@ -72,13 +73,13 @@
 	<Target Name="CopyNetLoaderSource"
 			AfterTargets="GenerateEntityExports"
 			DependsOnTargets="GenerateEntityExports"
-			Inputs="$(TargetPath);$(EntityExportsCsPath)"
+			Inputs="$(TargetPath);$(EntityExportsCsPath);$(NetLoaderSourceLoaderCsPath);$(NetLoaderSourceCsprojPath)"
 			Outputs="$(LoaderCsPath);$(NetLoaderCsprojPath)">
 
 		<Message Text="Copying NetLoader source files..." Importance="high" />
 
 		<!-- Copy Loader.cs -->
-		<Copy SourceFiles="$(MSBuildThisFileDirectory)..\GoldsrcFramework.NetLoader\Loader.cs"
+		<Copy SourceFiles="$(NetLoaderSourceLoaderCsPath)"
 			  DestinationFiles="$(LoaderCsPath)" />
 
 		<!-- Modify Loader.cs to use EntityExports instead of EntityExportsDemo -->
@@ -94,7 +95,6 @@
 				<![CDATA[<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net9.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<OutputType>Library</OutputType>
@@ -168,9 +168,9 @@
 				 Targets="Publish" />
 
 		<!-- Copy client.dll to final output location -->
-		<Copy SourceFiles="$(LoaderSourceDir)bin\$(Configuration)\net9.0\win-x86\native\client.dll"
+		<Copy SourceFiles="$(LoaderSourceDir)bin\$(Configuration)\$(TargetFramework)\win-x86\native\client.dll"
 			  DestinationFiles="$(NetLoaderOutputPath)" />
-		<Copy SourceFiles="$(LoaderSourceDir)bin\$(Configuration)\net9.0\win-x86\native\client.pdb"
+		<Copy SourceFiles="$(LoaderSourceDir)bin\$(Configuration)\$(TargetFramework)\win-x86\native\client.pdb"
 			  DestinationFiles="$(NetLoaderPdbOutputPath)" />
 
 		<Message Text="NetLoader built successfully: $(NetLoaderOutputPath)" Importance="high" />

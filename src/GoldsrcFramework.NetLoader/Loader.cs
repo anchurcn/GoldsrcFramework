@@ -157,44 +157,66 @@ namespace GoldsrcFramework.NetLoader
         private static string s_frameworkPath = string.Empty;
         private static IntPtr _hModule = IntPtr.Zero;
 
+        // Native AOT shared libraries already provide their own DllMain.
+        // Exporting another DllMain from C# causes LNK2005: _DllMain@12 already defined.
+        // Resolve the current native module by using the address of a function compiled into this DLL,
+        // so the loader DLL name does not need to be hard-coded.
+        private const uint GetModuleHandleExFlagUnchangedRefcount = 0x00000002;
+        private const uint GetModuleHandleExFlagFromAddress = 0x00000004;
 
-        [UnmanagedCallersOnly(EntryPoint = "DllMain", CallConvs = [typeof(CallConvStdcall)])]
-        public static bool DllMain(IntPtr hModule, uint ul_reason_for_call, IntPtr lpReserved)
-        {
-            _hModule = hModule;
-            switch (ul_reason_for_call)
-            {
-                case 1:
-                    // Your attach code...
-                    break;
-                default:
-                    break;
-            }
-            return true;
-        }
+        [LibraryImport("kernel32.dll", SetLastError = true, EntryPoint = "GetModuleHandleExW")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static partial bool GetModuleHandleEx(uint dwFlags, IntPtr lpModuleName, out IntPtr phModule);
 
-        // LibraryImport GetModuleFileNameto get the current module path
+        // LibraryImport GetModuleFileName to get the current module path
         [LibraryImport("kernel32.dll", SetLastError = true, EntryPoint = "GetModuleFileNameW")]
         private static partial uint GetModuleFileName(IntPtr hModule, char[] lpFileName, uint nSize);
+
+        private static string GetNativeLoaderModulePath(IntPtr addressInThisModule)
+        {
+            if (_hModule == IntPtr.Zero)
+            {
+                if (addressInThisModule == IntPtr.Zero)
+                {
+                    throw new InvalidOperationException("Unable to resolve current native module without a function address.");
+                }
+
+                uint flags = GetModuleHandleExFlagFromAddress | GetModuleHandleExFlagUnchangedRefcount;
+                if (!GetModuleHandleEx(flags, addressInThisModule, out _hModule) || _hModule == IntPtr.Zero)
+                {
+                    throw new InvalidOperationException("GetModuleHandleEx failed for current native module.");
+                }
+            }
+
+            char[] buffer = new char[1024];
+            uint length = GetModuleFileName(_hModule, buffer, (uint)buffer.Length);
+            if (length == 0)
+            {
+                throw new InvalidOperationException("GetModuleFileName failed for current native module.");
+            }
+
+            return new string(buffer, 0, (int)length);
+        }
+
+        [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+        private static void ModuleAddressAnchor()
+        {
+        }
 
         /// <summary>
         /// Initialize the .NET host using Mxrx.NetHost.Fxr
         /// </summary>
-        private static void InitializeNetHost()
+        private unsafe static void InitializeNetHost()
         {
             if (s_hostContext is not null)
             {
                 return;
             }
 
-            var moduleFileName = string.Empty;
             try
             {
-                // Get the current module file name
-                var sb = new char[1000];
-                uint ret = GetModuleFileName(_hModule, sb, (uint)sb.Length);
-                Span<char> sbSpan = sb;
-                moduleFileName = new string(sbSpan.TrimEnd());
+                IntPtr moduleAddress = (IntPtr)(delegate* unmanaged[Cdecl]<void>)&ModuleAddressAnchor;
+                string moduleFileName = GetNativeLoaderModulePath(moduleAddress);
 
                 Debug.WriteLine("loader path : " + moduleFileName);
 
