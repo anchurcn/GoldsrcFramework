@@ -21,6 +21,7 @@
 	</ItemGroup>
 	<PropertyGroup>
 		<IsBuildInDemo>true</IsBuildInDemo>
+		<DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
 		<!-- Define LoaderSourceDir for ModPostBuild.targets -->
 		<!-- NOTE: Removed explicit LoaderSourceDir setting - let ModPostBuild.targets handle it -->
 	</PropertyGroup>
