@@ -1,10 +1,7 @@
 ﻿using GoldsrcFramework.Engine.Native;
 using NativeInterop;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace GoldsrcFramework
 {
@@ -12,11 +9,12 @@ namespace GoldsrcFramework
     {
         public static cl_enginefunc_t* PClient { get; private set; }
         public static enginefuncs_s* PServer { get; private set; }
+        public static engine_studio_api_s* PStudio { get; private set; }
 
         public static void DrawStringCenter(string text)
         {
             Span<byte> msg = stackalloc byte[256];
-            int byteCount = Encoding.UTF8.GetBytes(text, msg);
+            int _ = Encoding.UTF8.GetBytes(text, msg);
             fixed (byte* ptr = msg)
             {
                 PClient->CenterPrint((NChar*)ptr);
@@ -41,6 +39,15 @@ namespace GoldsrcFramework
             if (PServer != null)
                 return; // Already initialized
             PServer = pEnginefuncs;
+        }
+
+        internal static void StudioApiInit(engine_studio_api_s* pstudio)
+        {
+            if (pstudio == null)
+                throw new ArgumentNullException(nameof(pstudio));
+            if (PStudio != null)
+                return; // Already initialized
+            PStudio = pstudio;
         }
     }
 }

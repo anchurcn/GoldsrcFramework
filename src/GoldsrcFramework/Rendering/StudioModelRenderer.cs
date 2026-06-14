@@ -1902,6 +1902,7 @@ public unsafe class StudioModelRenderer
 
         // Store engine studio API
         IEngineStudio = pstudio;
+        EngineApi.StudioApiInit(pstudio);
 
         // Create our studio interface
         var studioInterface = (r_studio_interface_s*)Marshal.AllocHGlobal(sizeof(r_studio_interface_s));
