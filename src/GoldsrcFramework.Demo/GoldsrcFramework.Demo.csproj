@@ -40,11 +40,35 @@
 		<Message Text="Copied Microsoft.Extensions.* DLLs and GoldsrcFramework.deps.json to $(OutDir)" Importance="high" />
 	</Target>-->
 
-	<!-- Post-build event to copy files to game directory -->
-	<Target Name="PostBuildCopyToGame" AfterTargets="BuildNetLoader">
-		<Message Text="Executing post-build copy to game directory..." Importance="high" />
-		<Exec Command="&quot;$(SolutionDir)..\copy_demo.bat&quot; &quot;$(OutDir)&quot; " />
-		
+	<!-- Post-build event to copy files to game directory.
+	     The copy target HlModDir is provided by Directory.Build.props.user at the root (not committed to git).
+	     Use robocopy to implement copy-if-newer/changed semantics and list the actually copied files directly in the log.
+	     Note: MSBuild Copy's CopiedFiles will contain files skipped by SkipUnchangedFiles and cannot be used to count actual updates. -->
+	<Target Name="CopyDemoToHlMod" AfterTargets="BuildNetLoader"
+	        Condition="'$(HlModDir)' != ''">
+		<MakeDir Directories="$(HlModDir)" />
+		<Message Text="copy_demo: robocopy $(OutDir) -&gt; $(HlModDir)" Importance="high" />
+		<Exec Command="robocopy &quot;$(OutDir).&quot; &quot;$(HlModDir)&quot; *.* /E /XO /XX /R:1 /W:1 /NDL /NP /NJH /NJS"
+		      IgnoreExitCode="true"
+		      ConsoleToMSBuild="true"
+		      StandardOutputImportance="Low">
+			<Output TaskParameter="ExitCode" PropertyName="_CopyDemoRoboCopyExitCode" />
+			<Output TaskParameter="ConsoleOutput" ItemName="_CopyDemoRoboCopyOutput" />
+		</Exec>
+		<Message Text="copy_demo: %(_CopyDemoRoboCopyOutput.Identity)" Importance="high"
+		         Condition="'@(_CopyDemoRoboCopyOutput)' != ''" />
+		<Message Text="copy_demo: robocopy exit code $(_CopyDemoRoboCopyExitCode) (0=no change, 1+=copied/extra info, &gt;=8=error)" Importance="high" />
+		<Error Text="copy_demo: robocopy failed with exit code $(_CopyDemoRoboCopyExitCode)"
+		       Condition="$(_CopyDemoRoboCopyExitCode) &gt;= 8" />
+	</Target>
+
+
+
+
+	<!-- Show a hint when HlModDir is not configured (usually because Directory.Build.props.user is not created). -->
+	<Target Name="WarnMissingHlModDir" AfterTargets="BuildNetLoader"
+	        Condition="'$(HlModDir)' == ''">
+		<Message Text="copy_demo: HlModDir missing, skip copy to game." Importance="high" />
 	</Target>
 
 	<!--<Import Project="..\GoldsrcFramework\bin\$(Configuration)\$(TargetFramework)\GoldsrcFramework.targets" />-->
