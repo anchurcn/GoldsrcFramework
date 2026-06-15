@@ -1,4 +1,4 @@
-# rawType humanoidType
+# rawType humanizedType
 # Function tables
 cl_enginefuncs_s ClientEngineFuncs
 cl_enginefunc_t ClientEngineFuncs

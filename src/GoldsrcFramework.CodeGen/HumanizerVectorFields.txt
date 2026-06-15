@@ -1,5 +1,5 @@
 # rawType.rawField
-# Convert ABI-compatible float[3] fields to Vector3 in Humanoid structs.
+# Convert ABI-compatible float[3] fields to Vector3 in humanized structs.
 ref_params_t.vieworg
 ref_params_t.viewangles
 ref_params_t.forward
