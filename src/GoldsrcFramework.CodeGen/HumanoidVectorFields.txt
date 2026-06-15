@@ -1,0 +1,36 @@
+# rawType.rawField
+# Convert ABI-compatible float[3] fields to Vector3 in Humanoid structs.
+ref_params_t.vieworg
+ref_params_t.viewangles
+ref_params_t.forward
+ref_params_t.right
+ref_params_t.up
+clientdata_t.origin
+clientdata_t.velocity
+clientdata_t.viewangles
+entity_state_t.origin
+entity_state_t.angles
+entity_state_t.velocity
+entity_state_t.mins
+entity_state_t.maxs
+entity_state_t.startpos
+entity_state_t.endpos
+entvars_t.origin
+entvars_t.oldorigin
+entvars_t.velocity
+entvars_t.basevelocity
+entvars_t.clbasevelocity
+entvars_t.movedir
+entvars_t.angles
+entvars_t.avelocity
+entvars_t.punchangle
+entvars_t.v_angle
+entvars_t.endpos
+entvars_t.startpos
+entvars_t.absmin
+entvars_t.absmax
+entvars_t.mins
+entvars_t.maxs
+entvars_t.size
+usercmd_t.viewangles
+usercmd_t.impact_position

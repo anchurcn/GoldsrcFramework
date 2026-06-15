@@ -1,0 +1,9 @@
+# rawType humanoidType
+# Function tables
+cl_enginefuncs_s ClientEngineFuncs
+cl_enginefunc_t ClientEngineFuncs
+cldll_func_t ClientExportFuncs
+enginefuncs_s ServerEngineFuncs
+enginefuncs_t ServerEngineFuncs
+DLL_FUNCTIONS ServerExportFuncs
+NEW_DLL_FUNCTIONS ServerNewExportFuncs
