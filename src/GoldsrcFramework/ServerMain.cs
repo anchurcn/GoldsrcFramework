@@ -25,7 +25,7 @@ namespace GoldsrcFramework
         // 静态变量存储服务端实例和引擎函数
         private static IServerExportFuncs s_server = null!;
         public static ServerEngineFuncs* s_engineFuncs = null;
-        public static Engine.Native.Deprecation.globalvars_t* s_globalVars = null;
+        public static globalvars_t* s_globalVars = null;
 
         /// <summary>
         /// Initialize server using DI container (called from FrameworkInterop)
@@ -56,7 +56,7 @@ namespace GoldsrcFramework
         /// </summary>
         /// <param name="pengfuncsFromEngine">引擎函数指针</param>
         /// <param name="pGlobals">全局变量指针</param>
-        public static void GiveFnptrsToDll(ServerEngineFuncs* pengfuncsFromEngine, Engine.Native.Deprecation.globalvars_t* pGlobals)
+        public static void GiveFnptrsToDll(ServerEngineFuncs* pengfuncsFromEngine, globalvars_t* pGlobals)
         {
             // 保存引擎函数指针和全局变量
             s_engineFuncs = pengfuncsFromEngine;

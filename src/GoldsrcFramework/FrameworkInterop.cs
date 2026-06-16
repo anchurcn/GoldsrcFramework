@@ -43,7 +43,7 @@ namespace GoldsrcFramework
         /// Server entry point: GiveFnptrsToDll
         /// </summary>
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        public static void GiveFnptrsToDll(ServerEngineFuncs* pengfuncsFromEngine, GoldsrcFramework.Engine.Native.Deprecation.globalvars_t* pGlobals)
+        public static void GiveFnptrsToDll(ServerEngineFuncs* pengfuncsFromEngine, globalvars_t* pGlobals)
         {
             EnsureFrameworkInitialized();
             EnsureServerInitialized();

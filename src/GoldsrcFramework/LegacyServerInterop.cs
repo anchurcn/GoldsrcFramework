@@ -25,7 +25,7 @@ namespace GoldsrcFramework
         /// <param name="pengfuncsFromEngine">引擎函数指针</param>
         /// <param name="pGlobals">全局变量指针</param>
         [DllImport(LegacyServerDll, CallingConvention = CallingConvention.Cdecl)]
-        private static extern void GiveFnptrsToDll(ServerEngineFuncs* pengfuncsFromEngine, Engine.Native.Deprecation.globalvars_t* pGlobals);
+        private static extern void GiveFnptrsToDll(ServerEngineFuncs* pengfuncsFromEngine, globalvars_t* pGlobals);
 
         /// <summary>
         /// 获取实体API函数表 (版本2)
@@ -45,7 +45,7 @@ namespace GoldsrcFramework
         [DllImport(LegacyServerDll, CallingConvention = CallingConvention.Cdecl)]
         private static extern int GetNewDLLFunctions(ServerNewExportFuncs* pFunctionTable, int* interfaceVersion);
 
-        public static void Initialize(ServerEngineFuncs* pengfuncsFromEngine, Engine.Native.Deprecation.globalvars_t* pGlobals)
+        public static void Initialize(ServerEngineFuncs* pengfuncsFromEngine, globalvars_t* pGlobals)
         {
             if (LegacyServerApiPtr is not null)
                 return;
