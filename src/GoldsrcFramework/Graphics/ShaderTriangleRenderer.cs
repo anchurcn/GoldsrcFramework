@@ -21,38 +21,98 @@ public static unsafe class ShaderTriangleRenderer
     private static GL? _gl;
     private static IntPtr _context;
     private static uint _program;
-    private static uint _vao;
     private static uint _vbo;
+    private static bool _errorLogged;
+    private static bool _drawLogged;
+    private static bool _noContextLogged;
+    private static bool _initializedLogged;
 
     private const string VertexShaderSource = "#version 120\nattribute vec2 aPosition;\nattribute vec3 aColor;\nvarying vec3 vColor;\nvoid main(){vColor=aColor;gl_Position=vec4(aPosition,0.0,1.0);}";
     private const string FragmentShaderSource = "#version 120\nvarying vec3 vColor;\nvoid main(){gl_FragColor=vec4(vColor,1.0);}";
 
     public static void DrawNormalTriangle()
     {
-        if (!EnsureInitialized())
-            return;
+        try
+        {
+            if (!EnsureInitialized())
+                return;
 
-        _gl!.UseProgram(_program);
-        _gl.BindVertexArray(_vao);
-        _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
-        _gl.BindVertexArray(0);
-        _gl.UseProgram(0);
+            bool depthTestWasEnabled = _gl!.IsEnabled(EnableCap.DepthTest);
+            bool cullFaceWasEnabled = _gl.IsEnabled(EnableCap.CullFace);
+
+            if (!_drawLogged)
+            {
+                _drawLogged = true;
+                Console.WriteLine("ShaderTriangleRenderer.DrawNormalTriangle is being called.");
+            }
+
+            _gl.Disable(EnableCap.DepthTest);
+            _gl.Disable(EnableCap.CullFace);
+            _gl.UseProgram(_program);
+            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
+
+            const uint stride = 5 * sizeof(float);
+            _gl.EnableVertexAttribArray(0);
+            _gl.VertexAttribPointer(0, 2, VertexAttribPointerType.Float, false, stride, (void*)0);
+            _gl.EnableVertexAttribArray(1);
+            _gl.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, stride, (void*)(2 * sizeof(float)));
+
+            _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
+
+            _gl.DisableVertexAttribArray(1);
+            _gl.DisableVertexAttribArray(0);
+            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
+            _gl.UseProgram(0);
+
+            if (depthTestWasEnabled)
+                _gl.Enable(EnableCap.DepthTest);
+            if (cullFaceWasEnabled)
+                _gl.Enable(EnableCap.CullFace);
+        }
+        catch (Exception ex)
+        {
+            LogOnce($"ShaderTriangleRenderer failed: {ex.Message}");
+            DisposeResources();
+        }
+    }
+
+    public static void Dispose()
+    {
+        DisposeResources();
+        _context = IntPtr.Zero;
+        _errorLogged = false;
+        _drawLogged = false;
+        _noContextLogged = false;
+        _initializedLogged = false;
     }
 
     private static bool EnsureInitialized()
     {
         var currentContext = OpenGLInfo.GetCurrentContext();
         if (currentContext == IntPtr.Zero)
+        {
+            if (!_noContextLogged)
+            {
+                _noContextLogged = true;
+                Console.WriteLine("ShaderTriangleRenderer skipped: no current OpenGL context.");
+            }
             return false;
+        }
 
-        if (_gl != null && _context == currentContext)
+        if (_gl != null && _context == currentContext && _program != 0 && _vbo != 0)
             return true;
 
         DisposeResources();
         _context = currentContext;
         _gl = GL.GetApi(GetProcAddress);
         InitializeResources();
-        return _program != 0;
+        if (_program != 0 && _vbo != 0 && !_initializedLogged)
+        {
+            _initializedLogged = true;
+            Console.WriteLine($"ShaderTriangleRenderer initialized on OpenGL context 0x{_context.ToInt64():X}.");
+        }
+
+        return _program != 0 && _vbo != 0;
     }
 
     private static void InitializeResources()
@@ -63,27 +123,17 @@ public static unsafe class ShaderTriangleRenderer
 
         float[] vertices =
         {
-            -0.65f, -0.55f, 1.0f, 0.2f, 0.2f,
-             0.65f, -0.55f, 0.2f, 1.0f, 0.2f,
-             0.0f,   0.65f, 0.2f, 0.2f, 1.0f,
+            -0.95f, -0.90f, 1.0f, 0.0f, 0.0f,
+             0.95f, -0.90f, 0.0f, 1.0f, 0.0f,
+             0.0f,   0.95f, 0.0f, 0.2f, 1.0f,
         };
 
-        _vao = _gl!.GenVertexArray();
-        _vbo = _gl.GenBuffer();
-
-        _gl.BindVertexArray(_vao);
+        _vbo = _gl!.GenBuffer();
         _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
         fixed (float* p = vertices)
         {
             _gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(vertices.Length * sizeof(float)), p, BufferUsageARB.StaticDraw);
         }
-
-        const uint stride = 5 * sizeof(float);
-        _gl.EnableVertexAttribArray(0);
-        _gl.VertexAttribPointer(0, 2, VertexAttribPointerType.Float, false, stride, (void*)0);
-        _gl.EnableVertexAttribArray(1);
-        _gl.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, stride, (void*)(2 * sizeof(float)));
-        _gl.BindVertexArray(0);
         _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
     }
 
@@ -133,12 +183,19 @@ public static unsafe class ShaderTriangleRenderer
             return;
 
         if (_vbo != 0) _gl.DeleteBuffer(_vbo);
-        if (_vao != 0) _gl.DeleteVertexArray(_vao);
         if (_program != 0) _gl.DeleteProgram(_program);
 
         _vbo = 0;
-        _vao = 0;
         _program = 0;
         _gl = null;
+    }
+
+    private static void LogOnce(string message)
+    {
+        if (_errorLogged)
+            return;
+
+        _errorLogged = true;
+        Console.WriteLine(message);
     }
 }
