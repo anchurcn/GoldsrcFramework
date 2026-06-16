@@ -1,5 +1,6 @@
 using GoldsrcFramework.Engine.Native;
 using GoldsrcFramework.LinearMath;
+using NativeInterop;
 using System;
 using System.Runtime.InteropServices;
 
@@ -32,13 +33,13 @@ namespace GoldsrcFramework
         public static extern void HUD_Reset();
 
         [DllImport(LegacyClientDll, CallingConvention = CallingConvention.Cdecl)]
-        public static extern void HUD_PlayerMove(playermove_s* ppmove, int server);
+        public static extern void HUD_PlayerMove(playermove_s* ppmove, qboolean server);
 
         [DllImport(LegacyClientDll, CallingConvention = CallingConvention.Cdecl)]
         public static extern void HUD_PlayerMoveInit(playermove_s* ppmove);
 
         [DllImport(LegacyClientDll, CallingConvention = CallingConvention.Cdecl)]
-        public static extern sbyte HUD_PlayerMoveTexture(sbyte* name);
+        public static extern NChar HUD_PlayerMoveTexture(NChar* name);
 
         [DllImport(LegacyClientDll, CallingConvention = CallingConvention.Cdecl)]
         public static extern void IN_ActivateMouse();
@@ -65,7 +66,7 @@ namespace GoldsrcFramework
         public static extern void CL_GetCameraOffsets(Vector3* ofs);
 
         [DllImport(LegacyClientDll, CallingConvention = CallingConvention.Cdecl)]
-        public static extern kbutton_s* KB_Find(sbyte* name);
+        public static extern kbutton_s* KB_Find(NChar* name);
 
         [DllImport(LegacyClientDll, CallingConvention = CallingConvention.Cdecl)]
         public static extern void CAM_Think();
@@ -74,7 +75,7 @@ namespace GoldsrcFramework
         public static extern void V_CalcRefdef(ref_params_s* pparams);
 
         [DllImport(LegacyClientDll, CallingConvention = CallingConvention.Cdecl)]
-        public static extern int HUD_AddEntity(int type, cl_entity_s* ent, sbyte* modelname);
+        public static extern int HUD_AddEntity(int type, cl_entity_s* ent, NChar* modelname);
 
         [DllImport(LegacyClientDll, CallingConvention = CallingConvention.Cdecl)]
         public static extern void HUD_CreateEntities();
@@ -107,7 +108,7 @@ namespace GoldsrcFramework
         public static extern void Demo_ReadBuffer(int size, byte* buffer);
 
         [DllImport(LegacyClientDll, CallingConvention = CallingConvention.Cdecl)]
-        public static extern int HUD_ConnectionlessPacket(netadr_s* net_from, sbyte* args, sbyte* response_buffer, int* response_buffer_size);
+        public static extern int HUD_ConnectionlessPacket(netadr_s* net_from, NChar* args, NChar* response_buffer, int* response_buffer_size);
 
         [DllImport(LegacyClientDll, CallingConvention = CallingConvention.Cdecl)]
         public static extern int HUD_GetHullBounds(int hullnumber, float* mins, float* maxs);
@@ -116,7 +117,7 @@ namespace GoldsrcFramework
         public static extern void HUD_Frame(double time);
 
         [DllImport(LegacyClientDll, CallingConvention = CallingConvention.Cdecl)]
-        public static extern int HUD_Key_Event(int eventcode, int keynum, sbyte* pszCurrentBinding);
+        public static extern int HUD_Key_Event(int eventcode, int keynum, NChar* pszCurrentBinding);
 
         [DllImport(LegacyClientDll, CallingConvention = CallingConvention.Cdecl)]
         public static extern void HUD_TempEntUpdate(double frametime, double client_time, double cl_gravity, tempent_s** ppTempEntFree, tempent_s** ppTempEntActive, delegate* unmanaged[Cdecl]<cl_entity_s*, int> Callback_AddVisibleEntity, delegate* unmanaged[Cdecl]<tempent_s*, float, void> Callback_TempEntPlaySound);

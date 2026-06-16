@@ -1,6 +1,7 @@
 using System;
 using System.Text;
 using GoldsrcFramework.LinearMath;
+using NativeInterop;
 
 namespace GoldsrcFramework.Engine.Native;
 
@@ -81,13 +82,13 @@ public unsafe class FrameworkServerExports : IServerExportFuncs
         LegacyServerInterop.SetAbsBox(pent);
     }
 
-    public virtual void SaveWriteFields(SAVERESTOREDATA* pSaveData, sbyte* pname, void* pBaseData, TYPEDESCRIPTION* pFields, int fieldCount)
+    public virtual void SaveWriteFields(SAVERESTOREDATA* pSaveData, NChar* pname, void* pBaseData, TYPEDESCRIPTION* pFields, int fieldCount)
     {
         Log(nameof(SaveWriteFields));
         LegacyServerInterop.SaveWriteFields(pSaveData, pname, pBaseData, pFields, fieldCount);
     }
 
-    public virtual void SaveReadFields(SAVERESTOREDATA* pSaveData, sbyte* pname, void* pBaseData, TYPEDESCRIPTION* pFields, int fieldCount)
+    public virtual void SaveReadFields(SAVERESTOREDATA* pSaveData, NChar* pname, void* pBaseData, TYPEDESCRIPTION* pFields, int fieldCount)
     {
         Log(nameof(SaveReadFields));
         LegacyServerInterop.SaveReadFields(pSaveData, pname, pBaseData, pFields, fieldCount);
@@ -111,7 +112,7 @@ public unsafe class FrameworkServerExports : IServerExportFuncs
         LegacyServerInterop.ResetGlobalState();
     }
 
-    public virtual qboolean ClientConnect(edict_t* pEntity, sbyte* pszName, sbyte* pszAddress, sbyte* szRejectReason)
+    public virtual qboolean ClientConnect(edict_t* pEntity, NChar* pszName, NChar* pszAddress, NChar* szRejectReason)
     {
         Log(nameof(ClientConnect));
         return LegacyServerInterop.ClientConnect(pEntity, pszName, pszAddress, szRejectReason);
@@ -141,7 +142,7 @@ public unsafe class FrameworkServerExports : IServerExportFuncs
         LegacyServerInterop.ClientCommand(pEntity);
     }
 
-    public virtual void ClientUserInfoChanged(edict_t* pEntity, sbyte* infobuffer)
+    public virtual void ClientUserInfoChanged(edict_t* pEntity, NChar* infobuffer)
     {
         Log(nameof(ClientUserInfoChanged));
         LegacyServerInterop.ClientUserInfoChanged(pEntity, infobuffer);
@@ -189,7 +190,7 @@ public unsafe class FrameworkServerExports : IServerExportFuncs
         LegacyServerInterop.ParmsChangeLevel();
     }
 
-    public virtual sbyte* GetGameDescription()
+    public virtual NChar* GetGameDescription()
     {
         Log(nameof(GetGameDescription));
         return LegacyServerInterop.GetGameDescription();
@@ -219,7 +220,7 @@ public unsafe class FrameworkServerExports : IServerExportFuncs
         LegacyServerInterop.SpectatorThink(pEntity);
     }
 
-    public virtual void Sys_Error(sbyte* error_string)
+    public virtual void Sys_Error(NChar* error_string)
     {
         Log(nameof(Sys_Error));
         LegacyServerInterop.Sys_Error(error_string);
@@ -237,7 +238,7 @@ public unsafe class FrameworkServerExports : IServerExportFuncs
         LegacyServerInterop.PM_Init(ppmove);
     }
 
-    public virtual sbyte PM_FindTextureType(sbyte* name)
+    public virtual NChar PM_FindTextureType(NChar* name)
     {
         Log(nameof(PM_FindTextureType));
         return LegacyServerInterop.PM_FindTextureType(name);
@@ -291,7 +292,7 @@ public unsafe class FrameworkServerExports : IServerExportFuncs
         LegacyServerInterop.CmdEnd(player);
     }
 
-    public virtual int ConnectionlessPacket(netadr_s* net_from, sbyte* args, sbyte* response_buffer, int* response_buffer_size)
+    public virtual int ConnectionlessPacket(netadr_s* net_from, NChar* args, NChar* response_buffer, int* response_buffer_size)
     {
         Log(nameof(ConnectionlessPacket));
         return LegacyServerInterop.ConnectionlessPacket(net_from, args, response_buffer, response_buffer_size);
@@ -309,7 +310,7 @@ public unsafe class FrameworkServerExports : IServerExportFuncs
         LegacyServerInterop.CreateInstancedBaselines();
     }
 
-    public virtual int InconsistentFile(edict_t* player, sbyte* filename, sbyte* disconnect_message)
+    public virtual int InconsistentFile(edict_t* player, NChar* filename, NChar* disconnect_message)
     {
         Log(nameof(InconsistentFile));
         return LegacyServerInterop.InconsistentFile(player, filename, disconnect_message);
@@ -340,13 +341,13 @@ public unsafe class FrameworkServerExports : IServerExportFuncs
         return LegacyServerInterop.ShouldCollide(pentTouched, pentOther);
     }
 
-    public virtual void CvarValue(edict_t* pEnt, sbyte* value)
+    public virtual void CvarValue(edict_t* pEnt, NChar* value)
     {
         Log(nameof(CvarValue));
         LegacyServerInterop.CvarValue(pEnt, value);
     }
 
-    public virtual void CvarValue2(edict_t* pEnt, int requestID, sbyte* cvarName, sbyte* value)
+    public virtual void CvarValue2(edict_t* pEnt, int requestID, NChar* cvarName, NChar* value)
     {
         Log(nameof(CvarValue2));
         LegacyServerInterop.CvarValue2(pEnt, requestID, cvarName, value);

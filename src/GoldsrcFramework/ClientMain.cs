@@ -1,13 +1,10 @@
-﻿using System.Reflection;
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Runtime.Loader;
-using System.Text.Json;
-using GoldsrcFramework.Engine;
 using GoldsrcFramework.Engine.Native;
 using GoldsrcFramework.LinearMath;
 using GoldsrcFramework.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using NativeInterop;
 
 namespace GoldsrcFramework
 {
@@ -62,7 +59,7 @@ namespace GoldsrcFramework
             v.IN_Accumulate = &IN_Accumulate;
             v.CL_CreateMove = &CL_CreateMove;
             v.CL_IsThirdPerson = &CL_IsThirdPerson;
-            v.CL_GetCameraOffsets = &CL_GetCameraOffset;
+            v.CL_CameraOffset = &CL_GetCameraOffset;
             v.KB_Find = &KB_Find;
             v.CAM_Think = &CAM_Think;
             v.V_CalcRefdef = &V_CalcRefdef;
@@ -131,7 +128,7 @@ namespace GoldsrcFramework
         }
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static void HUD_PlayerMove(playermove_s* ppmove, int server)
+        static void HUD_PlayerMove(playermove_s* ppmove, qboolean server)
         {
             s_client.HUD_PlayerMove(ppmove, server);
         }
@@ -143,7 +140,7 @@ namespace GoldsrcFramework
         }
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static sbyte HUD_PlayerMoveTexture(sbyte* name)
+        static NChar HUD_PlayerMoveTexture(NChar* name)
         {
             return s_client.HUD_PlayerMoveTexture(name);
         }
@@ -191,13 +188,13 @@ namespace GoldsrcFramework
         }
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static void CL_GetCameraOffset(Vector3* ofs)
+        static void CL_GetCameraOffset(float* ofs)
         {
-            s_client.CL_GetCameraOffsets(ofs);
+            s_client.CL_GetCameraOffsets((Vector3*)ofs);
         }
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static kbutton_s* KB_Find(sbyte* name)
+        static kbutton_s* KB_Find(NChar* name)
         {
             return s_client.KB_Find(name);
         }
@@ -215,7 +212,7 @@ namespace GoldsrcFramework
         }
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static int HUD_AddEntity(int type, cl_entity_s* ent, sbyte* modelname)
+        static int HUD_AddEntity(int type, cl_entity_s* ent, NChar* modelname)
         {
             return s_client.HUD_AddEntity(type, ent, modelname);
         }
@@ -281,7 +278,7 @@ namespace GoldsrcFramework
         }
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static int HUD_ConnectionlessPacket(netadr_s* net_from, sbyte* args, sbyte* response_buffer, int* response_buffer_size)
+        static int HUD_ConnectionlessPacket(netadr_s* net_from, NChar* args, NChar* response_buffer, int* response_buffer_size)
         {
             return s_client.HUD_ConnectionlessPacket(net_from, args, response_buffer, response_buffer_size);
         }
@@ -299,7 +296,7 @@ namespace GoldsrcFramework
         }
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static int HUD_Key_Event(int down, int keynum, sbyte* pszCurrentBinding)
+        static int HUD_Key_Event(int down, int keynum, NChar* pszCurrentBinding)
         {
             return s_client.HUD_Key_Event(down, keynum, pszCurrentBinding);
         }

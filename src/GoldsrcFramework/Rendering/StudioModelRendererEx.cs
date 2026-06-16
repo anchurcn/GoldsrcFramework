@@ -1,4 +1,5 @@
 ﻿using GoldsrcFramework.Engine.Native;
+using NativeInterop;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -32,10 +33,11 @@ namespace GoldsrcFramework.Rendering
                 m_pSubModel->submodels = (dmodel_t*)paSequences;
             }
 
-            if (IEngineStudio.Cache_Check((cache_user_s*)&(paSequences[pseqdesc->seqgroup])) == 0)
+            if (IEngineStudio.Cache_Check((cache_user_s*)&(paSequences[pseqdesc->seqgroup])) == null)
             {
                 // Con_Printf("loading %s\n", pseqgroup->name);
-                IEngineStudio.LoadCacheFile(pseqgroup->name.AsPointer(), (cache_user_s*)&paSequences[pseqdesc->seqgroup]);
+                NChar* namePtr = (NChar*)System.Runtime.CompilerServices.Unsafe.AsPointer(ref pseqgroup->name[0]);
+                IEngineStudio.LoadCacheFile(namePtr, (cache_user_s*)&paSequences[pseqdesc->seqgroup]);
             }
             return (mstudioanim_t*)((byte*)paSequences[pseqdesc->seqgroup].data + pseqdesc->animindex);
         }

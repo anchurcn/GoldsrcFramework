@@ -12,6 +12,7 @@ using GoldsrcFramework.Engine.Native;
 using GoldsrcFramework.LinearMath;
 using GoldsrcFramework.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using NativeInterop;
 
 namespace GoldsrcFramework
 {
@@ -131,16 +132,16 @@ namespace GoldsrcFramework
         /// <param name="pFunctionTable">函数表指针</param>
         private static void FillServerExportFuncs(ServerExportFuncs* pFunctionTable)
         {
-            pFunctionTable->GameInit = &GameInit;
-            pFunctionTable->Spawn = &Spawn;
-            pFunctionTable->Think = &Think;
-            pFunctionTable->Use = &Use;
-            pFunctionTable->Touch = &Touch;
-            pFunctionTable->Blocked = &Blocked;
-            pFunctionTable->KeyValue = &KeyValue;
-            pFunctionTable->Save = &Save;
-            pFunctionTable->Restore = &Restore;
-            pFunctionTable->SetAbsBox = &SetAbsBox;
+            pFunctionTable->GameDLLInit = &GameInit;
+            pFunctionTable->DispatchSpawn = &Spawn;
+            pFunctionTable->DispatchThink = &Think;
+            pFunctionTable->DispatchUse = &Use;
+            pFunctionTable->DispatchTouch = &Touch;
+            pFunctionTable->DispatchBlocked = &Blocked;
+            pFunctionTable->DispatchKeyValue = &KeyValue;
+            pFunctionTable->DispatchSave = &Save;
+            pFunctionTable->DispatchRestore = &Restore;
+            pFunctionTable->DispatchObjectCollsionBox = &SetAbsBox;
             pFunctionTable->SaveWriteFields = &SaveWriteFields;
             pFunctionTable->SaveReadFields = &SaveReadFields;
             pFunctionTable->SaveGlobalState = &SaveGlobalState;
@@ -190,7 +191,7 @@ namespace GoldsrcFramework
         private static void FillServerNewExportFuncs(ServerNewExportFuncs* pFunctionTable)
         {
             pFunctionTable->OnFreeEntPrivateData = &OnFreeEntPrivateData;
-            pFunctionTable->GameShutdown = &GameShutdown;
+            pFunctionTable->GameDLLShutdown = &GameShutdown;
             pFunctionTable->ShouldCollide = &ShouldCollide;
             pFunctionTable->CvarValue = &CvarValue;
             pFunctionTable->CvarValue2 = &CvarValue2;
@@ -229,11 +230,11 @@ namespace GoldsrcFramework
         static void SetAbsBox(edict_t* pent) => s_server.SetAbsBox(pent);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static void SaveWriteFields(SAVERESTOREDATA* pSaveData, sbyte* pname, void* pBaseData, TYPEDESCRIPTION* pFields, int fieldCount)
+        static void SaveWriteFields(SAVERESTOREDATA* pSaveData, NChar* pname, void* pBaseData, TYPEDESCRIPTION* pFields, int fieldCount)
             => s_server.SaveWriteFields(pSaveData, pname, pBaseData, pFields, fieldCount);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static void SaveReadFields(SAVERESTOREDATA* pSaveData, sbyte* pname, void* pBaseData, TYPEDESCRIPTION* pFields, int fieldCount)
+        static void SaveReadFields(SAVERESTOREDATA* pSaveData, NChar* pname, void* pBaseData, TYPEDESCRIPTION* pFields, int fieldCount)
             => s_server.SaveReadFields(pSaveData, pname, pBaseData, pFields, fieldCount);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
@@ -246,7 +247,7 @@ namespace GoldsrcFramework
         static void ResetGlobalState() => s_server.ResetGlobalState();
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static qboolean ClientConnect(edict_t* pEntity, sbyte* pszName, sbyte* pszAddress, sbyte* szRejectReason)
+        static qboolean ClientConnect(edict_t* pEntity, NChar* pszName, NChar* pszAddress, NChar* szRejectReason)
             => s_server.ClientConnect(pEntity, pszName, pszAddress, szRejectReason);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
@@ -262,7 +263,7 @@ namespace GoldsrcFramework
         static void ClientCommand(edict_t* pEntity) => s_server.ClientCommand(pEntity);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static void ClientUserInfoChanged(edict_t* pEntity, sbyte* infobuffer) => s_server.ClientUserInfoChanged(pEntity, infobuffer);
+        static void ClientUserInfoChanged(edict_t* pEntity, NChar* infobuffer) => s_server.ClientUserInfoChanged(pEntity, infobuffer);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
         static void ServerActivate(edict_t* pEdictList, int edictCount, int clientMax) => s_server.ServerActivate(pEdictList, edictCount, clientMax);
@@ -286,7 +287,7 @@ namespace GoldsrcFramework
         static void ParmsChangeLevel() => s_server.ParmsChangeLevel();
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static sbyte* GetGameDescription() => s_server.GetGameDescription();
+        static NChar* GetGameDescription() => (NChar*)s_server.GetGameDescription();
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
         static void PlayerCustomization(edict_t* pEntity, customization_t* pCust) => s_server.PlayerCustomization(pEntity, pCust);
@@ -301,7 +302,7 @@ namespace GoldsrcFramework
         static void SpectatorThink(edict_t* pEntity) => s_server.SpectatorThink(pEntity);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static void Sys_Error(sbyte* error_string) => s_server.Sys_Error(error_string);
+        static void Sys_Error(NChar* error_string) => s_server.Sys_Error(error_string);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
         static void PM_Move(playermove_s* ppmove, qboolean server) => s_server.PM_Move(ppmove, server);
@@ -310,7 +311,7 @@ namespace GoldsrcFramework
         static void PM_Init(playermove_s* ppmove) => s_server.PM_Init(ppmove);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static sbyte PM_FindTextureType(sbyte* name) => s_server.PM_FindTextureType(name);
+        static NChar PM_FindTextureType(NChar* name) => s_server.PM_FindTextureType(name);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
         static void SetupVisibility(edict_t* pViewEntity, edict_t* pClient, byte** pvs, byte** pas) => s_server.SetupVisibility(pViewEntity, pClient, pvs, pas);
@@ -339,7 +340,7 @@ namespace GoldsrcFramework
         static void CmdEnd(edict_t* player) => s_server.CmdEnd(player);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static int ConnectionlessPacket(netadr_s* net_from, sbyte* args, sbyte* response_buffer, int* response_buffer_size)
+        static int ConnectionlessPacket(netadr_s* net_from, NChar* args, NChar* response_buffer, int* response_buffer_size)
             => s_server.ConnectionlessPacket(net_from, args, response_buffer, response_buffer_size);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
@@ -349,7 +350,7 @@ namespace GoldsrcFramework
         static void CreateInstancedBaselines() => s_server.CreateInstancedBaselines();
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static int InconsistentFile(edict_t* player, sbyte* filename, sbyte* disconnect_message)
+        static int InconsistentFile(edict_t* player, NChar* filename, NChar* disconnect_message)
             => s_server.InconsistentFile(player, filename, disconnect_message);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
@@ -367,9 +368,9 @@ namespace GoldsrcFramework
         static int ShouldCollide(edict_t* pentTouched, edict_t* pentOther) => s_server.ShouldCollide(pentTouched, pentOther);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static void CvarValue(edict_t* pEnt, sbyte* value) => s_server.CvarValue(pEnt, value);
+        static void CvarValue(edict_t* pEnt, NChar* value) => s_server.CvarValue(pEnt, value);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static void CvarValue2(edict_t* pEnt, int requestID, sbyte* cvarName, sbyte* value) => s_server.CvarValue2(pEnt, requestID, cvarName, value);
+        static void CvarValue2(edict_t* pEnt, int requestID, NChar* cvarName, NChar* value) => s_server.CvarValue2(pEnt, requestID, cvarName, value);
     }
 }

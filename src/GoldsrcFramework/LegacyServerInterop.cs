@@ -1,5 +1,6 @@
 ﻿using GoldsrcFramework.Engine.Native;
 using GoldsrcFramework.LinearMath;
+using NativeInterop;
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -70,7 +71,7 @@ namespace GoldsrcFramework
             {
                 // Log if null entrys found in the new API.
                 if(LegacyServerNewApiPtr->OnFreeEntPrivateData == null) Debug.WriteLine("Warning: New API OnFreeEntPrivateData is null!");
-                if(LegacyServerNewApiPtr->GameShutdown == null) Debug.WriteLine("Warning: New API GameShutdown is null!");
+                if(LegacyServerNewApiPtr->GameDLLShutdown == null) Debug.WriteLine("Warning: New API GameDLLShutdown is null!");
                 if(LegacyServerNewApiPtr->ShouldCollide == null) Debug.WriteLine("Warning: New API ShouldCollide is null!");
                 if(LegacyServerNewApiPtr->CvarValue == null) Debug.WriteLine("Warning: New API CvarValue is null!");
                 if(LegacyServerNewApiPtr->CvarValue2 == null) Debug.WriteLine("Warning: New API CvarValue2 is null!");
@@ -78,30 +79,30 @@ namespace GoldsrcFramework
         }
 
         // DLL_FUNCTIONS 静态转发方法
-        public static void GameInit() => LegacyServerApiPtr->GameInit();
+        public static void GameInit() => LegacyServerApiPtr->GameDLLInit();
 
-        public static int Spawn(edict_t* pent) => LegacyServerApiPtr->Spawn(pent);
+        public static int Spawn(edict_t* pent) => LegacyServerApiPtr->DispatchSpawn(pent);
 
-        public static void Think(edict_t* pent) => LegacyServerApiPtr->Think(pent);
+        public static void Think(edict_t* pent) => LegacyServerApiPtr->DispatchThink(pent);
 
-        public static void Use(edict_t* pentUsed, edict_t* pentOther) => LegacyServerApiPtr->Use(pentUsed, pentOther);
+        public static void Use(edict_t* pentUsed, edict_t* pentOther) => LegacyServerApiPtr->DispatchUse(pentUsed, pentOther);
 
-        public static void Touch(edict_t* pentTouched, edict_t* pentOther) => LegacyServerApiPtr->Touch(pentTouched, pentOther);
+        public static void Touch(edict_t* pentTouched, edict_t* pentOther) => LegacyServerApiPtr->DispatchTouch(pentTouched, pentOther);
 
-        public static void Blocked(edict_t* pentBlocked, edict_t* pentOther) => LegacyServerApiPtr->Blocked(pentBlocked, pentOther);
+        public static void Blocked(edict_t* pentBlocked, edict_t* pentOther) => LegacyServerApiPtr->DispatchBlocked(pentBlocked, pentOther);
 
-        public static void KeyValue(edict_t* pentKeyvalue, KeyValueData* pkvd) => LegacyServerApiPtr->KeyValue(pentKeyvalue, pkvd);
+        public static void KeyValue(edict_t* pentKeyvalue, KeyValueData* pkvd) => LegacyServerApiPtr->DispatchKeyValue(pentKeyvalue, pkvd);
 
-        public static void Save(edict_t* pent, SAVERESTOREDATA* pSaveData) => LegacyServerApiPtr->Save(pent, pSaveData);
+        public static void Save(edict_t* pent, SAVERESTOREDATA* pSaveData) => LegacyServerApiPtr->DispatchSave(pent, pSaveData);
 
-        public static int Restore(edict_t* pent, SAVERESTOREDATA* pSaveData, int globalEntity) => LegacyServerApiPtr->Restore(pent, pSaveData, globalEntity);
+        public static int Restore(edict_t* pent, SAVERESTOREDATA* pSaveData, int globalEntity) => LegacyServerApiPtr->DispatchRestore(pent, pSaveData, globalEntity);
 
-        public static void SetAbsBox(edict_t* pent) => LegacyServerApiPtr->SetAbsBox(pent);
+        public static void SetAbsBox(edict_t* pent) => LegacyServerApiPtr->DispatchObjectCollsionBox(pent);
 
-        public static void SaveWriteFields(SAVERESTOREDATA* pSaveData, sbyte* pname, void* pBaseData, TYPEDESCRIPTION* pFields, int fieldCount)
+        public static void SaveWriteFields(SAVERESTOREDATA* pSaveData, NChar* pname, void* pBaseData, TYPEDESCRIPTION* pFields, int fieldCount)
             => LegacyServerApiPtr->SaveWriteFields(pSaveData, pname, pBaseData, pFields, fieldCount);
 
-        public static void SaveReadFields(SAVERESTOREDATA* pSaveData, sbyte* pname, void* pBaseData, TYPEDESCRIPTION* pFields, int fieldCount)
+        public static void SaveReadFields(SAVERESTOREDATA* pSaveData, NChar* pname, void* pBaseData, TYPEDESCRIPTION* pFields, int fieldCount)
             => LegacyServerApiPtr->SaveReadFields(pSaveData, pname, pBaseData, pFields, fieldCount);
 
         public static void SaveGlobalState(SAVERESTOREDATA* pSaveData) => LegacyServerApiPtr->SaveGlobalState(pSaveData);
@@ -110,7 +111,7 @@ namespace GoldsrcFramework
 
         public static void ResetGlobalState() => LegacyServerApiPtr->ResetGlobalState();
 
-        public static qboolean ClientConnect(edict_t* pEntity, sbyte* pszName, sbyte* pszAddress, sbyte* szRejectReason)
+        public static qboolean ClientConnect(edict_t* pEntity, NChar* pszName, NChar* pszAddress, NChar* szRejectReason)
             => LegacyServerApiPtr->ClientConnect(pEntity, pszName, pszAddress, szRejectReason);
 
         public static void ClientDisconnect(edict_t* pEntity) => LegacyServerApiPtr->ClientDisconnect(pEntity);
@@ -121,7 +122,7 @@ namespace GoldsrcFramework
 
         public static void ClientCommand(edict_t* pEntity) => LegacyServerApiPtr->ClientCommand(pEntity);
 
-        public static void ClientUserInfoChanged(edict_t* pEntity, sbyte* infobuffer) => LegacyServerApiPtr->ClientUserInfoChanged(pEntity, infobuffer);
+        public static void ClientUserInfoChanged(edict_t* pEntity, NChar* infobuffer) => LegacyServerApiPtr->ClientUserInfoChanged(pEntity, infobuffer);
 
         public static void ServerActivate(edict_t* pEdictList, int edictCount, int clientMax) => LegacyServerApiPtr->ServerActivate(pEdictList, edictCount, clientMax);
 
@@ -137,7 +138,7 @@ namespace GoldsrcFramework
 
         public static void ParmsChangeLevel() => LegacyServerApiPtr->ParmsChangeLevel();
 
-        public static sbyte* GetGameDescription() => LegacyServerApiPtr->GetGameDescription();
+        public static NChar* GetGameDescription() => LegacyServerApiPtr->GetGameDescription();
 
         public static void PlayerCustomization(edict_t* pEntity, customization_t* pCust) => LegacyServerApiPtr->PlayerCustomization(pEntity, pCust);
 
@@ -147,13 +148,13 @@ namespace GoldsrcFramework
 
         public static void SpectatorThink(edict_t* pEntity) => LegacyServerApiPtr->SpectatorThink(pEntity);
 
-        public static void Sys_Error(sbyte* error_string) => LegacyServerApiPtr->Sys_Error(error_string);
+        public static void Sys_Error(NChar* error_string) => LegacyServerApiPtr->Sys_Error(error_string);
 
         public static void PM_Move(playermove_s* ppmove, qboolean server) => LegacyServerApiPtr->PM_Move(ppmove, server);
 
         public static void PM_Init(playermove_s* ppmove) => LegacyServerApiPtr->PM_Init(ppmove);
 
-        public static sbyte PM_FindTextureType(sbyte* name) => LegacyServerApiPtr->PM_FindTextureType(name);
+        public static NChar PM_FindTextureType(NChar* name) => LegacyServerApiPtr->PM_FindTextureType(name);
 
         public static void SetupVisibility(edict_t* pViewEntity, edict_t* pClient, byte** pvs, byte** pas)
             => LegacyServerApiPtr->SetupVisibility(pViewEntity, pClient, pvs, pas);
@@ -175,14 +176,14 @@ namespace GoldsrcFramework
 
         public static void CmdEnd(edict_t* player) => LegacyServerApiPtr->CmdEnd(player);
 
-        public static int ConnectionlessPacket(netadr_s* net_from, sbyte* args, sbyte* response_buffer, int* response_buffer_size)
+        public static int ConnectionlessPacket(netadr_s* net_from, NChar* args, NChar* response_buffer, int* response_buffer_size)
             => LegacyServerApiPtr->ConnectionlessPacket(net_from, args, response_buffer, response_buffer_size);
 
         public static int GetHullBounds(int hullnumber, float* mins, float* maxs) => LegacyServerApiPtr->GetHullBounds(hullnumber, mins, maxs);
 
         public static void CreateInstancedBaselines() => LegacyServerApiPtr->CreateInstancedBaselines();
 
-        public static int InconsistentFile(edict_t* player, sbyte* filename, sbyte* disconnect_message)
+        public static int InconsistentFile(edict_t* player, NChar* filename, NChar* disconnect_message)
             => LegacyServerApiPtr->InconsistentFile(player, filename, disconnect_message);
 
         public static int AllowLagCompensation() => LegacyServerApiPtr->AllowLagCompensation();
@@ -194,9 +195,9 @@ namespace GoldsrcFramework
 
         public static int ShouldCollide(edict_t* pentTouched, edict_t* pentOther) { return default; }
 
-        public static void CvarValue(edict_t* pEnt, sbyte* value) {}
+        public static void CvarValue(edict_t* pEnt, NChar* value) {}
 
-        public static void CvarValue2(edict_t* pEnt, int requestID, sbyte* cvarName, sbyte* value)
+        public static void CvarValue2(edict_t* pEnt, int requestID, NChar* cvarName, NChar* value)
         {
 
         }

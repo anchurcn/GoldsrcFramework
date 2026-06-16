@@ -48,7 +48,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         LegacyClientInterop.HUD_Reset();
     }
 
-    public virtual void HUD_PlayerMove(playermove_s* ppmove, int server)
+    public virtual void HUD_PlayerMove(playermove_s* ppmove, qboolean server)
     {
         LegacyClientInterop.HUD_PlayerMove(ppmove, server);
     }
@@ -58,7 +58,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         LegacyClientInterop.HUD_PlayerMoveInit(ppmove);
     }
 
-    public virtual sbyte HUD_PlayerMoveTexture(sbyte* name)
+    public virtual NChar HUD_PlayerMoveTexture(NChar* name)
     {
         return LegacyClientInterop.HUD_PlayerMoveTexture(name);
     }
@@ -103,7 +103,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         LegacyClientInterop.CL_GetCameraOffsets(ofs);
     }
 
-    public virtual kbutton_s* KB_Find(sbyte* name)
+    public virtual kbutton_s* KB_Find(NChar* name)
     {
         return LegacyClientInterop.KB_Find(name);
     }
@@ -118,7 +118,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         LegacyClientInterop.V_CalcRefdef(pparams);
     }
 
-    public virtual int HUD_AddEntity(int type, cl_entity_s* ent, sbyte* modelname)
+    public virtual int HUD_AddEntity(int type, cl_entity_s* ent, NChar* modelname)
     {
         return LegacyClientInterop.HUD_AddEntity(type, ent, modelname);
     }
@@ -173,7 +173,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         LegacyClientInterop.Demo_ReadBuffer(size, buffer);
     }
 
-    public virtual int HUD_ConnectionlessPacket(netadr_s* net_from, sbyte* args, sbyte* response_buffer, int* response_buffer_size)
+    public virtual int HUD_ConnectionlessPacket(netadr_s* net_from, NChar* args, NChar* response_buffer, int* response_buffer_size)
     {
         return LegacyClientInterop.HUD_ConnectionlessPacket(net_from, args, response_buffer, response_buffer_size);
     }
@@ -188,7 +188,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         LegacyClientInterop.HUD_Frame(time);
     }
 
-    public virtual int HUD_Key_Event(int eventcode, int keynum, sbyte* pszCurrentBinding)
+    public virtual int HUD_Key_Event(int eventcode, int keynum, NChar* pszCurrentBinding)
     {
         return LegacyClientInterop.HUD_Key_Event(eventcode, keynum, pszCurrentBinding);
     }

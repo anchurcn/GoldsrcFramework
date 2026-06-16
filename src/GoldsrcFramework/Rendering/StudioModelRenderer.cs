@@ -823,7 +823,7 @@ public unsafe class StudioModelRenderer
 
         fixed (float* pAdj = adj)
         {
-            StudioCalcBoneAdj(dadt, pAdj, m_pCurrentEntity->curstate.controller, m_pCurrentEntity->latched.prevcontroller, m_pCurrentEntity->mouth.mouthopen);
+            StudioCalcBoneAdj(dadt, pAdj, &m_pCurrentEntity->curstate.controller.Element0, &m_pCurrentEntity->latched.prevcontroller.Element0, m_pCurrentEntity->mouth.mouthopen);
 
             for (i = 0; i < m_pStudioHeader->numbones; i++, pbone++, panim++)
             {
@@ -964,14 +964,15 @@ public unsafe class StudioModelRenderer
 
         if (paSequences == null)
         {
-            paSequences = (cache_user_s*)IEngineStudio->Mem_Calloc(16, (nuint)sizeof(cache_user_s)); // UNDONE: leak!
+            paSequences = (cache_user_s*)IEngineStudio->Mem_Calloc(16, (uint)sizeof(cache_user_s)); // UNDONE: leak!
             pSubModel->submodels = (dmodel_t*)paSequences;
         }
 
-        if (IEngineStudio->Cache_Check(&paSequences[pseqdesc->seqgroup]) == 0)
+        if (IEngineStudio->Cache_Check(&paSequences[pseqdesc->seqgroup]) == null)
         {
-            EngineApi.PClient->Con_DPrintf(pseqgroup->name.AsPointer());
-            IEngineStudio->LoadCacheFile(pseqgroup->name.AsPointer(), (cache_user_s*)&paSequences[pseqdesc->seqgroup]);
+            NChar* namePtr = (NChar*)System.Runtime.CompilerServices.Unsafe.AsPointer(ref pseqgroup->name[0]);
+            EngineApi.PClient->Con_DPrintf(namePtr);
+            IEngineStudio->LoadCacheFile(namePtr, (cache_user_s*)&paSequences[pseqdesc->seqgroup]);
         }
 
         return (mstudioanim_t*)((byte*)paSequences[pseqdesc->seqgroup].data + pseqdesc->animindex);
@@ -1628,7 +1629,7 @@ public unsafe class StudioModelRenderer
                     var triApi = engineFuncs->pTriAPI;
                     if (triApi->SpriteTexture != null)
                     {
-                        triApi->SpriteTexture((int)(nint)m_pChromeSprite, 0);
+                        triApi->SpriteTexture(m_pChromeSprite, 0);
                     }
                 }
             }
@@ -1711,7 +1712,7 @@ public unsafe class StudioModelRenderer
             {
                 nint pBodyPart = (nint)m_pBodyPart;
                 nint pSubModel = (nint)m_pSubModel;
-                IEngineStudio->StudioSetupModel(i, &pBodyPart, &pSubModel);
+                IEngineStudio->StudioSetupModel(i, (void**)&pBodyPart, (void**)&pSubModel);
                 m_pBodyPart = (mstudiobodyparts_t*)pBodyPart;
                 m_pSubModel = (mstudiomodel_t*)pSubModel;
 
@@ -1784,7 +1785,7 @@ public unsafe class StudioModelRenderer
             {
                 nint pBodyPart = (nint)m_pBodyPart;
                 nint pSubModel = (nint)m_pSubModel;
-                IEngineStudio->StudioSetupModel(i, &pBodyPart, &pSubModel);
+                IEngineStudio->StudioSetupModel(i, (void**)&pBodyPart, (void**)&pSubModel);
                 m_pBodyPart = (mstudiobodyparts_t*)pBodyPart;
                 m_pSubModel = (mstudiomodel_t*)pSubModel;
 
