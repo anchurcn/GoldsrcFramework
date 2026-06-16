@@ -6,6 +6,13 @@ namespace GoldsrcFramework.CodeGen;
 internal static class HlsdkNativeGenerator
 {
     static readonly string[] RootStructs = ["cldll_func_t", "cl_enginefuncs_s", "cl_enginefunc_t", "enginefuncs_s", "DLL_FUNCTIONS", "NEW_DLL_FUNCTIONS"];
+    static readonly string[] ManagedNativeApiRootTypes = [
+        "studiohdr_t", "mstudiobonecontroller_t", "mstudiobone_t", "mstudioseqdesc_t", "mstudioseqgroup_t",
+        "mstudiobodyparts_t", "mstudioattachment_t", "mstudiobbox_t", "mstudiotexture_t", "mstudiomodel_t",
+        "mstudiomesh_t", "mstudiopivot_t", "mstudioanim_t", "mstudioanimvalue_t",
+        "server_studio_api_t", "sv_blending_interface_t"
+    ];
+
 
     static int Main(string[] args)
     {
@@ -254,6 +261,7 @@ internal static class HlsdkNativeGenerator
         public string Generate()
         {
             foreach (var c in compilation.Classes.Where(c => RootStructs.Contains(c.Name))) Enqueue(c);
+            foreach (var c in compilation.Classes.Where(c => ManagedNativeApiRootTypes.Contains(CsTypeName(c, false)) || ManagedNativeApiRootTypes.Contains(c.Name))) Enqueue(c);
 
             foreach (var f in compilation.Functions.Where(f => Path.GetFileName(f.SourceFile).Equals("Exports.h", StringComparison.OrdinalIgnoreCase))) { Enqueue(f.ReturnType); foreach (var p in f.Parameters) Enqueue(p.Type); }
             while (_queue.TryDequeue(out var type)) Visit(type);
@@ -268,7 +276,9 @@ internal static class HlsdkNativeGenerator
         public void GenerateHumanizerFiles(string nativeDir)
         {
             Directory.CreateDirectory(nativeDir);
+            DeletePreviousHumanizerFiles(nativeDir);
             var fileMap = new List<(string RawType, string HumanizedType, string RelativePath, string Reason, string SourceHeader)>();
+            var writtenFiles = new List<string>();
             var files = new Dictionary<string, (StringBuilder Builder, HashSet<string> Emitted)>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var type in HumanizerTypes())
@@ -297,11 +307,52 @@ internal static class HlsdkNativeGenerator
             {
                 var filePath = Path.Combine(nativeDir, NormalizeRelativePath(file.Key));
                 WriteGeneratedFile(filePath, file.Value.Builder.ToString());
+                writtenFiles.Add(file.Key.Replace('\\', '/'));
                 Console.WriteLine($"Generated {filePath}");
             }
 
             WriteGeneratedFile(Path.Combine(nativeDir, "Generated", "HlsdkNative.filemap.generated.md"), CreateFileMapReport(fileMap));
+            WriteGeneratedFile(HumanizerFilesManifestPath(nativeDir), string.Join(Environment.NewLine, writtenFiles.Order(StringComparer.OrdinalIgnoreCase)) + Environment.NewLine);
         }
+
+
+        static string HumanizerFilesManifestPath(string nativeDir) => Path.Combine(nativeDir, "Generated", "HlsdkNative.humanizer.files.txt");
+
+        static void DeletePreviousHumanizerFiles(string nativeDir)
+        {
+            var manifest = HumanizerFilesManifestPath(nativeDir);
+            if (!File.Exists(manifest))
+            {
+                DeleteBootstrapHumanizerFiles(nativeDir);
+                return;
+            }
+
+            foreach (var line in File.ReadAllLines(manifest))
+            {
+                var relative = line.Trim();
+                if (string.IsNullOrWhiteSpace(relative)) continue;
+                var fullPath = Path.GetFullPath(Path.Combine(nativeDir, NormalizeRelativePath(relative)));
+                if (!fullPath.StartsWith(Path.GetFullPath(nativeDir), StringComparison.OrdinalIgnoreCase)) continue;
+                if (File.Exists(fullPath)) File.Delete(fullPath);
+            }
+        }
+
+        static void DeleteBootstrapHumanizerFiles(string nativeDir)
+        {
+            // One-time cleanup for files generated before the manifest existed.
+            foreach (var directory in new[] { "Client", "Core", "Entity", "Input", "Misc", "Model", "PlayerMove", "Resource", "SaveRestore", "Studio", "Text" })
+            {
+                var fullPath = Path.Combine(nativeDir, directory);
+                if (Directory.Exists(fullPath)) Directory.Delete(fullPath, recursive: true);
+            }
+
+            foreach (var fileName in new[] { "ClientEngineFuncs.cs", "ClientExportFuncs.cs", "ServerEngineFuncs.cs", "ServerExportFuncs.cs", "ServerNewExportFuncs.cs" })
+            {
+                var fullPath = Path.Combine(nativeDir, fileName);
+                if (File.Exists(fullPath)) File.Delete(fullPath);
+            }
+        }
+
 
         (StringBuilder Builder, HashSet<string> Emitted) GetOrCreateHumanizerFile(Dictionary<string, (StringBuilder Builder, HashSet<string> Emitted)> files, string relativePath)
         {
@@ -358,25 +409,11 @@ internal static class HlsdkNativeGenerator
 
         IEnumerable<CppType> HumanizerTypes()
         {
+            // Humanizer should expose the ABI dependency graph rooted at the engine/client
+            // function tables and exported API entry points. It must not scan every parsed
+            // declaration just because it exists in the translation unit.
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var type in _ordered)
-            {
-                var key = HumanizerTypeKey(type);
-                if (key is not null && seen.Add(key)) yield return type;
-            }
-
-            foreach (var typedef in compilation.Typedefs.Where(t => Strip(t.ElementType) is CppPrimitiveType))
-            {
-                if (seen.Add(typedef.Name)) yield return typedef;
-            }
-
-            foreach (var type in compilation.Classes.Where(c => c.IsDefinition && IsAdditionalHumanizerHeader(c.SourceFile)))
-            {
-                var key = HumanizerTypeKey(type);
-                if (key is not null && seen.Add(key)) yield return type;
-            }
-
-            foreach (var type in compilation.Enums.Where(e => IsAdditionalHumanizerHeader(e.SourceFile)))
             {
                 var key = HumanizerTypeKey(type);
                 if (key is not null && seen.Add(key)) yield return type;

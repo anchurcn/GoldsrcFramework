@@ -8,4 +8,5 @@ uint32 uint
 CRC32_t uint
 
 uint64 ulong
+size_t nuint
 
