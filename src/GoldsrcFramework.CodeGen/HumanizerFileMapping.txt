@@ -1,0 +1,45 @@
+# rawType relativePath
+# Root-level ABI function tables
+cl_enginefuncs_s ClientEngineFuncs.cs
+cl_enginefunc_t ClientEngineFuncs.cs
+cldll_func_t ClientExportFuncs.cs
+enginefuncs_s ServerEngineFuncs.cs
+enginefuncs_t ServerEngineFuncs.cs
+DLL_FUNCTIONS ServerExportFuncs.cs
+NEW_DLL_FUNCTIONS ServerNewExportFuncs.cs
+
+# EngineTypes.cs replacement wave. The old hand-written definitions live under
+# GoldsrcFramework.Engine.Native.Deprecation, so generated Humanizer types are now formal.
+ref_params_t Client/RefParams.cs
+usercmd_t Input/UserCmd.cs
+clientdata_t Client/ClientData.cs
+entity_state_t Entity/EntityState.cs
+entvars_t Entity/EntVars.cs
+edict_t Entity/Edict.cs
+cl_entity_t Client/ClientEntity.cs
+pmtrace_t PlayerMove/PlayerMoveTrace.cs
+physent_t PlayerMove/PhysEnt.cs
+movevars_t PlayerMove/MoveVars.cs
+model_t Model/Model.cs
+msurface_t Model/Surface.cs
+texture_t Model/Texture.cs
+screenfade_t Client/ScreenFade.cs
+client_textmessage_t Text/ClientTextMessage.cs
+sequenceEntry_s Text/SequenceEntry.cs
+sentenceEntry_s Text/SentenceEntry.cs
+KeyValueData Entity/KeyValueData.cs
+SAVERESTOREDATA SaveRestore/SaveRestoreData.cs
+TYPEDESCRIPTION SaveRestore/TypeDescription.cs
+resource_t Resource/Resource.cs
+
+# Primitive typedef wrappers / handles
+qboolean Core/EngineHandles.cs
+HSPRITE Core/EngineHandles.cs
+string_t Core/EngineHandles.cs
+
+
+# StudioTypes.cs is still hand-written in GoldsrcFramework.Engine.Native. Enable
+# these after moving it to Deprecation or replacing it fully.
+# mstudioevent_t Studio/StudioEvent.cs
+# r_studio_interface_t Studio/StudioApi.cs
+# engine_studio_api_t Studio/StudioApi.cs
