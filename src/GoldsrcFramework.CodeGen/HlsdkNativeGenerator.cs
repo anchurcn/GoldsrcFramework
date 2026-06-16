@@ -656,8 +656,94 @@ internal static class HlsdkNativeGenerator
 
         string HumanizedCsTypeName(CppType type, bool field)
         {
-            var rawName = CsTypeName(type, field);
-            return humanizerTypeMappings.TryGetValue(rawName, out var mapped) ? mapped : rawName;
+            type = Strip(type)!;
+
+            // Handle typedef with humanizer mapping
+            if (type is CppTypedef td2)
+            {
+                var tdName = td2.Name;
+                if (humanizerTypeMappings.TryGetValue(tdName, out var tdMapped))
+                    return tdMapped;
+                if (mappings.TryGetValue(tdName, out var m))
+                    return m;
+                if (IsFunctionPointer(td2.ElementType))
+                    return HumanizedCsTypeName(UnwrapFunctionPointer(td2.ElementType)!, field);
+                if (td2.ElementType is CppClass or CppEnum or CppUnexposedType)
+                    return HumanizedCsTypeName(td2.ElementType, field);
+                return tdName;
+            }
+
+            // Handle pointer type - recursively humanize element type
+            if (type is CppPointerType p)
+            {
+                if (IsFunctionPointer(p.ElementType))
+                    return HumanizedCsTypeName(p.ElementType, field);
+                return HumanizedCsTypeName(p.ElementType, field) + "*";
+            }
+
+            // Handle array type
+            if (type is CppArrayType a)
+                return HumanizedCsTypeName(a.ElementType, field) + "*";
+
+            // Handle function type - recursively humanize parameters and return type
+            if (type is CppFunctionType fn)
+                return "delegate* unmanaged[Cdecl]<" + string.Join(", ", fn.Parameters.Select(p => HumanizedCsTypeName(p.Type, field)).Append(HumanizedCsTypeName(fn.ReturnType, field))) + ">";
+
+            // Handle enum
+            if (type is CppEnum e)
+            {
+                if (string.IsNullOrWhiteSpace(e.Name)) return "int";
+                if (humanizerTypeMappings.TryGetValue(e.Name, out var eMapped)) return eMapped;
+                if (mappings.TryGetValue(e.Name, out var em)) return em;
+                return _typeAliases.TryGetValue(e.Name, out var alias) ? alias : e.Name;
+            }
+
+            // Handle CppUnexposedType
+            if (type is CppUnexposedType u && _typedefs.TryGetValue(u.Name, out var resolved))
+                return HumanizedCsTypeName(resolved, field);
+            if (type is CppUnexposedType u3 && _classes.TryGetValue(u3.Name, out var resolvedClass))
+                return HumanizedCsTypeName(resolvedClass, field);
+            if (type is CppUnexposedType u4 && _enums.TryGetValue(u4.Name, out var resolvedEnum))
+                return HumanizedCsTypeName(resolvedEnum, field);
+            if (type is CppUnexposedType u2)
+            {
+                if (humanizerTypeMappings.TryGetValue(u2.Name, out var uMapped)) return uMapped;
+                if (mappings.TryGetValue(u2.Name, out var um)) return um;
+                _opaqueTypes.Add(u2.Name);
+                return u2.Name;
+            }
+
+            // Handle CppClass
+            if (type is CppClass c)
+            {
+                var className = string.IsNullOrWhiteSpace(c.Name) ? "__Anonymous" + Math.Abs(c.GetHashCode()) : c.Name;
+
+                // First check if the class name itself has a humanizer mapping
+                if (humanizerTypeMappings.TryGetValue(className, out var cMapped)) return cMapped;
+
+                // Then check if there's a typedef alias for this class
+                var aliasName = _typeAliases.TryGetValue(className, out var alias) ? alias : className;
+
+                // Check if the alias has a humanizer mapping
+                if (aliasName != className && humanizerTypeMappings.TryGetValue(aliasName, out var aliasMapped)) return aliasMapped;
+
+                // Check CustomTypeMapping
+                if (mappings.TryGetValue(className, out var cm)) return cm;
+                if (aliasName != className && mappings.TryGetValue(aliasName, out var am)) return am;
+
+                if (!c.IsDefinition) _opaqueTypes.Add(aliasName);
+                return aliasName;
+            }
+
+            // Handle primitive types
+            var displayName = type.GetDisplayName();
+            if (type is CppPrimitiveType ptype)
+            {
+                var primitiveName = Primitive(ptype.Kind);
+                return mappings.TryGetValue(displayName, out var dm) ? dm : mappings.TryGetValue(primitiveName, out var pm) ? pm : primitiveName;
+            }
+
+            return mappings.TryGetValue(displayName, out var mappedDisplayName) ? mappedDisplayName : displayName;
         }
 
 

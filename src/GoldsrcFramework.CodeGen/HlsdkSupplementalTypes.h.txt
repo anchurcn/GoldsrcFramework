@@ -8,7 +8,12 @@
 //   exported ABI but is not reachable from the filtered header set.
 // - For engine-private types that are only exposed as pointers in public HLSDK
 //   headers and have no public layout, define an intentionally opaque struct.
-//
+
+// size_t typedef for proper mapping to nuint
+// System headers are not parsed (ParseSystemIncludes = false), so we need to
+// explicitly define size_t to ensure it's recognized as a typedef.
+typedef unsigned int size_t;
+
 // Source: external/hlsdk/engine/eiface.h only forward-declares/uses
 // struct delta_s* in engine callbacks. Public HLSDK does not expose layout.
 struct delta_s
