@@ -12,7 +12,7 @@ public unsafe class GameClientExports : FrameworkClientExports
     /// <summary>
     /// Example override: Initialize the client DLL with custom game logic
     /// </summary>
-    public override int Initialize(cl_enginefunc_t* pEnginefuncs, int iVersion)
+    public override int Initialize(ClientEngineFuncs* pEnginefuncs, int iVersion)
     {
         // Call base framework initialization first
         var result = base.Initialize(pEnginefuncs, iVersion);
@@ -52,7 +52,7 @@ public unsafe class GameClientExports : FrameworkClientExports
     /// <summary>
     /// Example override: Custom player movement handling
     /// </summary>
-    public override void HUD_PlayerMove(playermove_s* ppmove, qboolean server)
+    public override void HUD_PlayerMove(playermove_t* ppmove, qboolean server)
     {
         // Call base framework player movement
         base.HUD_PlayerMove(ppmove, server);
@@ -76,7 +76,7 @@ public unsafe class GameClientExports : FrameworkClientExports
     /// <summary>
     /// Example override: Custom entity addition with game-specific logic
     /// </summary>
-    public override int HUD_AddEntity(int type, cl_entity_s* ent, NChar* modelname)
+    public override int HUD_AddEntity(int type, cl_entity_t* ent, NChar* modelname)
     {
         // Add custom entity processing here
         // For example: Custom entity effects, filtering, etc.
@@ -143,7 +143,7 @@ public unsafe class DemoClientExports : FrameworkClientExports
     /// <summary>
     /// Demo-specific initialization
     /// </summary>
-    public override int Initialize(cl_enginefunc_t* pEnginefuncs, int iVersion)
+    public override int Initialize(ClientEngineFuncs* pEnginefuncs, int iVersion)
     {
         // Demo-specific initialization
         var result = base.Initialize(pEnginefuncs, iVersion);
@@ -187,3 +187,4 @@ public unsafe class DemoClientExports : FrameworkClientExports
         return base.HUD_Key_Event(eventcode, keynum, pszCurrentBinding);
     }
 }
+

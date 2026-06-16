@@ -24,8 +24,8 @@ namespace GoldsrcFramework
 
         // 静态变量存储服务端实例和引擎函数
         private static IServerExportFuncs s_server = null!;
-        public static enginefuncs_s* s_engineFuncs = null;
-        public static globalvars_t* s_globalVars = null;
+        public static ServerEngineFuncs* s_engineFuncs = null;
+        public static Engine.Native.Deprecation.globalvars_t* s_globalVars = null;
 
         /// <summary>
         /// Initialize server using DI container (called from FrameworkInterop)
@@ -56,7 +56,7 @@ namespace GoldsrcFramework
         /// </summary>
         /// <param name="pengfuncsFromEngine">引擎函数指针</param>
         /// <param name="pGlobals">全局变量指针</param>
-        public static void GiveFnptrsToDll(enginefuncs_s* pengfuncsFromEngine, globalvars_t* pGlobals)
+        public static void GiveFnptrsToDll(ServerEngineFuncs* pengfuncsFromEngine, Engine.Native.Deprecation.globalvars_t* pGlobals)
         {
             // 保存引擎函数指针和全局变量
             s_engineFuncs = pengfuncsFromEngine;
@@ -305,10 +305,10 @@ namespace GoldsrcFramework
         static void Sys_Error(NChar* error_string) => s_server.Sys_Error(error_string);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static void PM_Move(playermove_s* ppmove, qboolean server) => s_server.PM_Move(ppmove, server);
+        static void PM_Move(playermove_t* ppmove, qboolean server) => s_server.PM_Move(ppmove, server);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static void PM_Init(playermove_s* ppmove) => s_server.PM_Init(ppmove);
+        static void PM_Init(playermove_t* ppmove) => s_server.PM_Init(ppmove);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
         static NChar PM_FindTextureType(NChar* name) => s_server.PM_FindTextureType(name);
@@ -317,30 +317,30 @@ namespace GoldsrcFramework
         static void SetupVisibility(edict_t* pViewEntity, edict_t* pClient, byte** pvs, byte** pas) => s_server.SetupVisibility(pViewEntity, pClient, pvs, pas);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static void UpdateClientData(edict_t* ent, int sendweapons, clientdata_s* cd) => s_server.UpdateClientData(ent, sendweapons, cd);
+        static void UpdateClientData(edict_t* ent, int sendweapons, clientdata_t* cd) => s_server.UpdateClientData(ent, sendweapons, cd);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static int AddToFullPack(entity_state_s* state, int e, edict_t* ent, edict_t* host, int hostflags, int player, byte* pSet)
+        static int AddToFullPack(entity_state_t* state, int e, edict_t* ent, edict_t* host, int hostflags, int player, byte* pSet)
             => s_server.AddToFullPack(state, e, ent, host, hostflags, player, pSet);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static void CreateBaseline(int player, int eindex, entity_state_s* baseline, edict_t* entity, int playermodelindex, Vector3* player_mins, Vector3* player_maxs)
+        static void CreateBaseline(int player, int eindex, entity_state_t* baseline, edict_t* entity, int playermodelindex, Vector3* player_mins, Vector3* player_maxs)
             => s_server.CreateBaseline(player, eindex, baseline, entity, playermodelindex, player_mins, player_maxs);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
         static void RegisterEncoders() => s_server.RegisterEncoders();
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static int GetWeaponData(edict_t* player, weapon_data_s* info) => s_server.GetWeaponData(player, info);
+        static int GetWeaponData(edict_t* player, weapon_data_t* info) => s_server.GetWeaponData(player, info);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static void CmdStart(edict_t* player, usercmd_s* cmd, uint random_seed) => s_server.CmdStart(player, cmd, random_seed);
+        static void CmdStart(edict_t* player, usercmd_t* cmd, uint random_seed) => s_server.CmdStart(player, cmd, random_seed);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
         static void CmdEnd(edict_t* player) => s_server.CmdEnd(player);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static int ConnectionlessPacket(netadr_s* net_from, NChar* args, NChar* response_buffer, int* response_buffer_size)
+        static int ConnectionlessPacket(netadr_t* net_from, NChar* args, NChar* response_buffer, int* response_buffer_size)
             => s_server.ConnectionlessPacket(net_from, args, response_buffer, response_buffer_size);
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]

@@ -1,4 +1,4 @@
-﻿using GoldsrcFramework.Engine.Native;
+using GoldsrcFramework.Engine.Native;
 using NativeInterop;
 using System;
 using System.Collections.Generic;
@@ -13,10 +13,10 @@ namespace GoldsrcFramework.Rendering
     /// </summary>
     public unsafe class StudioModelRendererEx
     {
-        private static engine_studio_api_s* pIEngineStudio;
-        private static engine_studio_api_s IEngineStudio;
+        private static engine_studio_api_t* pIEngineStudio;
+        private static engine_studio_api_t IEngineStudio;
 
-        public static mstudioanim_t* GetAnim(studiohdr_t* pHeader, model_s* m_pSubModel, mstudioseqdesc_t* pseqdesc)
+        public static mstudioanim_t* GetAnim(studiohdr_t* pHeader, model_t* m_pSubModel, mstudioseqdesc_t* pseqdesc)
         {
             mstudioseqgroup_t* pseqgroup = (mstudioseqgroup_t*)((byte*)pHeader + pHeader->seqgroupindex) + pseqdesc->seqgroup;
 
@@ -25,19 +25,19 @@ namespace GoldsrcFramework.Rendering
                 return (mstudioanim_t*)((byte*)pHeader + pseqdesc->animindex);
             }
 
-            cache_user_s* paSequences = (cache_user_s*)m_pSubModel->submodels;
+            cache_user_t* paSequences = (cache_user_t*)m_pSubModel->submodels;
 
             if (paSequences == null)
             {
-                paSequences = (cache_user_s*)IEngineStudio.Mem_Calloc(16, (uint)sizeof(cache_user_s)); // UNDONE: leak!
+                paSequences = (cache_user_t*)IEngineStudio.Mem_Calloc(16, (uint)sizeof(cache_user_t)); // UNDONE: leak!
                 m_pSubModel->submodels = (dmodel_t*)paSequences;
             }
 
-            if (IEngineStudio.Cache_Check((cache_user_s*)&(paSequences[pseqdesc->seqgroup])) == null)
+            if (IEngineStudio.Cache_Check((cache_user_t*)&(paSequences[pseqdesc->seqgroup])) == null)
             {
                 // Con_Printf("loading %s\n", pseqgroup->name);
                 NChar* namePtr = (NChar*)System.Runtime.CompilerServices.Unsafe.AsPointer(ref pseqgroup->name[0]);
-                IEngineStudio.LoadCacheFile(namePtr, (cache_user_s*)&paSequences[pseqdesc->seqgroup]);
+                IEngineStudio.LoadCacheFile(namePtr, (cache_user_t*)&paSequences[pseqdesc->seqgroup]);
             }
             return (mstudioanim_t*)((byte*)paSequences[pseqdesc->seqgroup].data + pseqdesc->animindex);
         }

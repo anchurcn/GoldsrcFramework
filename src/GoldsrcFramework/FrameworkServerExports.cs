@@ -226,13 +226,13 @@ public unsafe class FrameworkServerExports : IServerExportFuncs
         LegacyServerInterop.Sys_Error(error_string);
     }
 
-    public virtual void PM_Move(playermove_s* ppmove, qboolean server)
+    public virtual void PM_Move(playermove_t* ppmove, qboolean server)
     {
         Log(nameof(PM_Move));
         LegacyServerInterop.PM_Move(ppmove, server);
     }
 
-    public virtual void PM_Init(playermove_s* ppmove)
+    public virtual void PM_Init(playermove_t* ppmove)
     {
         Log(nameof(PM_Init));
         LegacyServerInterop.PM_Init(ppmove);
@@ -250,19 +250,19 @@ public unsafe class FrameworkServerExports : IServerExportFuncs
         LegacyServerInterop.SetupVisibility(pViewEntity, pClient, pvs, pas);
     }
 
-    public virtual void UpdateClientData(edict_t* ent, int sendweapons, clientdata_s* cd)
+    public virtual void UpdateClientData(edict_t* ent, int sendweapons, clientdata_t* cd)
     {
         Log(nameof(UpdateClientData));
         LegacyServerInterop.UpdateClientData(ent, sendweapons, cd);
     }
 
-    public virtual int AddToFullPack(entity_state_s* state, int e, edict_t* ent, edict_t* host, int hostflags, int player, byte* pSet)
+    public virtual int AddToFullPack(entity_state_t* state, int e, edict_t* ent, edict_t* host, int hostflags, int player, byte* pSet)
     {
         Log(nameof(AddToFullPack));
         return LegacyServerInterop.AddToFullPack(state, e, ent, host, hostflags, player, pSet);
     }
 
-    public virtual void CreateBaseline(int player, int eindex, entity_state_s* baseline, edict_t* entity, int playermodelindex, Vector3* player_mins, Vector3* player_maxs)
+    public virtual void CreateBaseline(int player, int eindex, entity_state_t* baseline, edict_t* entity, int playermodelindex, Vector3* player_mins, Vector3* player_maxs)
     {
         Log(nameof(CreateBaseline));
         LegacyServerInterop.CreateBaseline(player, eindex, baseline, entity, playermodelindex, player_mins, player_maxs);
@@ -274,13 +274,13 @@ public unsafe class FrameworkServerExports : IServerExportFuncs
         LegacyServerInterop.RegisterEncoders();
     }
 
-    public virtual int GetWeaponData(edict_t* player, weapon_data_s* info)
+    public virtual int GetWeaponData(edict_t* player, weapon_data_t* info)
     {
         Log(nameof(GetWeaponData));
         return LegacyServerInterop.GetWeaponData(player, info);
     }
 
-    public virtual void CmdStart(edict_t* player, usercmd_s* cmd, uint random_seed)
+    public virtual void CmdStart(edict_t* player, usercmd_t* cmd, uint random_seed)
     {
         Log(nameof(CmdStart));
         LegacyServerInterop.CmdStart(player, cmd, random_seed);
@@ -292,7 +292,7 @@ public unsafe class FrameworkServerExports : IServerExportFuncs
         LegacyServerInterop.CmdEnd(player);
     }
 
-    public virtual int ConnectionlessPacket(netadr_s* net_from, NChar* args, NChar* response_buffer, int* response_buffer_size)
+    public virtual int ConnectionlessPacket(netadr_t* net_from, NChar* args, NChar* response_buffer, int* response_buffer_size)
     {
         Log(nameof(ConnectionlessPacket));
         return LegacyServerInterop.ConnectionlessPacket(net_from, args, response_buffer, response_buffer_size);

@@ -1,4 +1,4 @@
-﻿
+
 //using GoldsrcFramework.Engine.Native;
 //using GoldsrcFramework.LinearMath;
 //using System.Runtime.InteropServices;
@@ -43,7 +43,7 @@
 //    /// </summary>
 //    public void EntityStateExample()
 //    {
-//        var entityState = new entity_state_s
+//        var entityState = new entity_state_t
 //        {
 //            entityType = 1,
 //            number = 100,
@@ -67,7 +67,7 @@
 //    /// </summary>
 //    public void ClientDataExample()
 //    {
-//        var clientData = new clientdata_s
+//        var clientData = new clientdata_t
 //        {
 //            origin = new Vector3(100, 200, 50),
 //            velocity = new Vector3(0, 0, -9.8f),
@@ -130,7 +130,7 @@
 //    /// <summary>
 //    /// Example: Override HUD_PlayerMove with proper types
 //    /// </summary>
-//    public override void HUD_PlayerMove(playermove_s* ppmove, int server)
+//    public override void HUD_PlayerMove(playermove_t* ppmove, int server)
 //    {
 //        if (ppmove != null)
 //        {
@@ -160,7 +160,7 @@
 //    /// <summary>
 //    /// Example: Override HUD_AddEntity with proper types
 //    /// </summary>
-//    public override int HUD_AddEntity(int type, cl_entity_s* ent, sbyte* modelname)
+//    public override int HUD_AddEntity(int type, cl_entity_t* ent, sbyte* modelname)
 //    {
 //        if (ent != null)
 //        {
@@ -192,7 +192,7 @@
 //    /// </summary>
 //    public void NetworkAddressExample()
 //    {
-//        var netAddr = new netadr_s
+//        var netAddr = new netadr_t
 //        {
 //            type = netadrtype_t.NA_IP,
 //            port = 27015
@@ -270,7 +270,7 @@
 //    /// <summary>
 //    /// Example: Override HUD_GetStudioModelInterface with proper types
 //    /// </summary>
-//    public override int HUD_GetStudioModelInterface(int version, r_studio_interface_s** ppinterface, engine_studio_api_s* pstudio)
+//    public override int HUD_GetStudioModelInterface(int version, r_studio_interface_t** ppinterface, engine_studio_api_t* pstudio)
 //    {
 //        // Check version compatibility
 //        const int STUDIO_INTERFACE_VERSION = 1;
@@ -278,7 +278,7 @@
 //            return 0;
 
 //        // Create our studio interface
-//        var studioInterface = new r_studio_interface_s
+//        var studioInterface = new r_studio_interface_t
 //        {
 //            version = STUDIO_INTERFACE_VERSION,
 //            StudioDrawModel = &MyStudioDrawModel,
@@ -335,7 +335,7 @@
 //    /// Example studio player drawing function
 //    /// </summary>
 //    [UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
-//    public static int MyStudioDrawPlayer(int flags, entity_state_s* pplayer)
+//    public static int MyStudioDrawPlayer(int flags, entity_state_t* pplayer)
 //    {
 //        // Custom player model rendering logic
 //        if (pplayer != null)
@@ -372,7 +372,7 @@
 //    /// <summary>
 //    /// Example: Working with engine studio API functions
 //    /// </summary>
-//    public void EngineStudioAPIExample(engine_studio_api_s* pstudio)
+//    public void EngineStudioAPIExample(engine_studio_api_t* pstudio)
 //    {
 //        if (pstudio != null)
 //        {
@@ -446,11 +446,11 @@
 //            var buffer = pstudio->Mem_Calloc(512, 1);
 
 //            // Load model data
-//            var model = new model_s(); // Assume we have a model
+//            var model = new model_t(); // Assume we have a model
 //            var extraData = pstudio->Mod_Extradata(&model);
 
 //            // Cache operations
-//            var cacheUser = new cache_user_s();
+//            var cacheUser = new cache_user_t();
 //            var cachedData = pstudio->Cache_Check(&cacheUser);
 
 //            if (cachedData == IntPtr.Zero)
@@ -470,7 +470,7 @@
 //        if (pblending != null && pblending->version == 1)
 //        {
 //            // Setup bones for server-side calculations
-//            var model = new model_s();
+//            var model = new model_t();
 //            float frame = 0.0f;
 //            int sequence = 0;
 //            Vector3 angles = new(0, 90, 0);

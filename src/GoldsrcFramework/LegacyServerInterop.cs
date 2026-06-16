@@ -25,7 +25,7 @@ namespace GoldsrcFramework
         /// <param name="pengfuncsFromEngine">引擎函数指针</param>
         /// <param name="pGlobals">全局变量指针</param>
         [DllImport(LegacyServerDll, CallingConvention = CallingConvention.Cdecl)]
-        private static extern void GiveFnptrsToDll(enginefuncs_s* pengfuncsFromEngine, globalvars_t* pGlobals);
+        private static extern void GiveFnptrsToDll(ServerEngineFuncs* pengfuncsFromEngine, Engine.Native.Deprecation.globalvars_t* pGlobals);
 
         /// <summary>
         /// 获取实体API函数表 (版本2)
@@ -45,7 +45,7 @@ namespace GoldsrcFramework
         [DllImport(LegacyServerDll, CallingConvention = CallingConvention.Cdecl)]
         private static extern int GetNewDLLFunctions(ServerNewExportFuncs* pFunctionTable, int* interfaceVersion);
 
-        public static void Initialize(enginefuncs_s* pengfuncsFromEngine, globalvars_t* pGlobals)
+        public static void Initialize(ServerEngineFuncs* pengfuncsFromEngine, Engine.Native.Deprecation.globalvars_t* pGlobals)
         {
             if (LegacyServerApiPtr is not null)
                 return;
@@ -150,33 +150,33 @@ namespace GoldsrcFramework
 
         public static void Sys_Error(NChar* error_string) => LegacyServerApiPtr->Sys_Error(error_string);
 
-        public static void PM_Move(playermove_s* ppmove, qboolean server) => LegacyServerApiPtr->PM_Move(ppmove, server);
+        public static void PM_Move(playermove_t* ppmove, qboolean server) => LegacyServerApiPtr->PM_Move(ppmove, server);
 
-        public static void PM_Init(playermove_s* ppmove) => LegacyServerApiPtr->PM_Init(ppmove);
+        public static void PM_Init(playermove_t* ppmove) => LegacyServerApiPtr->PM_Init(ppmove);
 
         public static NChar PM_FindTextureType(NChar* name) => LegacyServerApiPtr->PM_FindTextureType(name);
 
         public static void SetupVisibility(edict_t* pViewEntity, edict_t* pClient, byte** pvs, byte** pas)
             => LegacyServerApiPtr->SetupVisibility(pViewEntity, pClient, pvs, pas);
 
-        public static void UpdateClientData(edict_t* ent, int sendweapons, clientdata_s* cd)
+        public static void UpdateClientData(edict_t* ent, int sendweapons, clientdata_t* cd)
             => LegacyServerApiPtr->UpdateClientData(ent, sendweapons, cd);
 
-        public static int AddToFullPack(entity_state_s* state, int e, edict_t* ent, edict_t* host, int hostflags, int player, byte* pSet)
+        public static int AddToFullPack(entity_state_t* state, int e, edict_t* ent, edict_t* host, int hostflags, int player, byte* pSet)
             => LegacyServerApiPtr->AddToFullPack(state, e, ent, host, hostflags, player, pSet);
 
-        public static void CreateBaseline(int player, int eindex, entity_state_s* baseline, edict_t* entity, int playermodelindex, Vector3* player_mins, Vector3* player_maxs)
+        public static void CreateBaseline(int player, int eindex, entity_state_t* baseline, edict_t* entity, int playermodelindex, Vector3* player_mins, Vector3* player_maxs)
             => LegacyServerApiPtr->CreateBaseline(player, eindex, baseline, entity, playermodelindex, player_mins, player_maxs);
 
         public static void RegisterEncoders() => LegacyServerApiPtr->RegisterEncoders();
 
-        public static int GetWeaponData(edict_t* player, weapon_data_s* info) => LegacyServerApiPtr->GetWeaponData(player, info);
+        public static int GetWeaponData(edict_t* player, weapon_data_t* info) => LegacyServerApiPtr->GetWeaponData(player, info);
 
-        public static void CmdStart(edict_t* player, usercmd_s* cmd, uint random_seed) => LegacyServerApiPtr->CmdStart(player, cmd, random_seed);
+        public static void CmdStart(edict_t* player, usercmd_t* cmd, uint random_seed) => LegacyServerApiPtr->CmdStart(player, cmd, random_seed);
 
         public static void CmdEnd(edict_t* player) => LegacyServerApiPtr->CmdEnd(player);
 
-        public static int ConnectionlessPacket(netadr_s* net_from, NChar* args, NChar* response_buffer, int* response_buffer_size)
+        public static int ConnectionlessPacket(netadr_t* net_from, NChar* args, NChar* response_buffer, int* response_buffer_size)
             => LegacyServerApiPtr->ConnectionlessPacket(net_from, args, response_buffer, response_buffer_size);
 
         public static int GetHullBounds(int hullnumber, float* mins, float* maxs) => LegacyServerApiPtr->GetHullBounds(hullnumber, mins, maxs);

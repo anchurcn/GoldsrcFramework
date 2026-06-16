@@ -52,24 +52,24 @@ public unsafe class StudioModelRenderer
 
     // Cvars that studio model code needs to reference
     // Use high quality models?
-    private cvar_s* m_pCvarHiModels;
+    private cvar_t* m_pCvarHiModels;
     // Developer debug output desired?
-    private cvar_s* m_pCvarDeveloper;
+    private cvar_t* m_pCvarDeveloper;
     // Draw entities bone hit boxes, etc?
-    private cvar_s* m_pCvarDrawEntities;
+    private cvar_t* m_pCvarDrawEntities;
 
     #endregion
 
     #region Member Variables - Current Entity and Model
 
     // The entity which we are currently rendering.
-    private cl_entity_s* m_pCurrentEntity;
+    private cl_entity_t* m_pCurrentEntity;
 
     // The model for the entity being rendered
-    private model_s* m_pRenderModel;
+    private model_t* m_pRenderModel;
 
     // Player info for current player, if drawing a player
-    private player_info_s* m_pPlayerInfo;
+    private player_info_t* m_pPlayerInfo;
 
     // The index of the player being drawn
     private int m_nPlayerIndex;
@@ -89,7 +89,7 @@ public unsafe class StudioModelRenderer
     private int m_nBottomColor;
 
     // Sprite model used for drawing studio model chrome
-    private model_s* m_pChromeSprite;
+    private model_t* m_pChromeSprite;
 
     #endregion
 
@@ -159,7 +159,7 @@ public unsafe class StudioModelRenderer
     #region Static Members
 
     // Engine Studio API
-    private static engine_studio_api_s* IEngineStudio;
+    private static engine_studio_api_t* IEngineStudio;
 
     // Global instance
     private static StudioModelRenderer? _instance;
@@ -241,7 +241,7 @@ public unsafe class StudioModelRenderer
     /// <returns>True if model was drawn successfully</returns>
     public virtual bool StudioDrawModel(int flags)
     {
-        alight_s lighting;
+        alight_t lighting;
         Vector3 dir;
 
         m_pCurrentEntity = IEngineStudio->GetCurrentEntity();
@@ -252,7 +252,7 @@ public unsafe class StudioModelRenderer
         // Special handling for dead player rendering
         if (m_pCurrentEntity->curstate.renderfx == (int)RenderFx.kRenderFxDeadPlayer)
         {
-            entity_state_s deadplayer;
+            entity_state_t deadplayer;
             bool result;
             bool save_interp;
 
@@ -320,7 +320,7 @@ public unsafe class StudioModelRenderer
             // copy attachments into global entity array
             if (m_pCurrentEntity->index > 0)
             {
-                cl_entity_s* ent = EngineApi.PClient->GetEntityByIndex(m_pCurrentEntity->index);
+                cl_entity_t* ent = EngineApi.PClient->GetEntityByIndex(m_pCurrentEntity->index);
 
                 ent->attachment = m_pCurrentEntity->attachment;
             }
@@ -355,9 +355,9 @@ public unsafe class StudioModelRenderer
     /// <param name="flags">Rendering flags</param>
     /// <param name="pplayer">Player entity state</param>
     /// <returns>True if player was drawn successfully</returns>
-    public virtual bool StudioDrawPlayer(int flags, entity_state_s* pplayer)
+    public virtual bool StudioDrawPlayer(int flags, entity_state_t* pplayer)
     {
-        alight_s lighting;
+        alight_t lighting;
         Vector3 dir;
 
         m_pCurrentEntity = IEngineStudio->GetCurrentEntity();
@@ -440,7 +440,7 @@ public unsafe class StudioModelRenderer
             // copy attachments into global entity array
             if (m_pCurrentEntity->index > 0)
             {
-                cl_entity_s* ent = EngineApi.PClient->GetEntityByIndex(m_pCurrentEntity->index);
+                cl_entity_t* ent = EngineApi.PClient->GetEntityByIndex(m_pCurrentEntity->index);
 
                 // Copy 4 attachment points
                 for (int i = 0; i < 4; i++)
@@ -495,9 +495,9 @@ public unsafe class StudioModelRenderer
 
             if (pplayer->weaponmodel != 0)
             {
-                cl_entity_s saveent = *m_pCurrentEntity;
+                cl_entity_t saveent = *m_pCurrentEntity;
 
-                model_s* pweaponmodel = IEngineStudio->GetModelByIndex(pplayer->weaponmodel);
+                model_t* pweaponmodel = IEngineStudio->GetModelByIndex(pplayer->weaponmodel);
 
                 m_pStudioHeader = (studiohdr_t*)IEngineStudio->Mod_Extradata(pweaponmodel);
                 IEngineStudio->StudioSetHeader(m_pStudioHeader);
@@ -948,10 +948,10 @@ public unsafe class StudioModelRenderer
     /// Look up animation data for sequence
     /// Original: mstudioanim_t* CStudioModelRenderer::StudioGetAnim(model_t* m_pSubModel, mstudioseqdesc_t* pseqdesc)
     /// </summary>
-    private mstudioanim_t* StudioGetAnim(model_s* pSubModel, mstudioseqdesc_t* pseqdesc)
+    private mstudioanim_t* StudioGetAnim(model_t* pSubModel, mstudioseqdesc_t* pseqdesc)
     {
         mstudioseqgroup_t* pseqgroup;
-        cache_user_s* paSequences;
+        cache_user_t* paSequences;
 
         pseqgroup = (mstudioseqgroup_t*)((byte*)m_pStudioHeader + m_pStudioHeader->seqgroupindex) + pseqdesc->seqgroup;
 
@@ -960,11 +960,11 @@ public unsafe class StudioModelRenderer
             return (mstudioanim_t*)((byte*)m_pStudioHeader + pseqdesc->animindex);
         }
 
-        paSequences = (cache_user_s*)pSubModel->submodels;
+        paSequences = (cache_user_t*)pSubModel->submodels;
 
         if (paSequences == null)
         {
-            paSequences = (cache_user_s*)IEngineStudio->Mem_Calloc(16, (uint)sizeof(cache_user_s)); // UNDONE: leak!
+            paSequences = (cache_user_t*)IEngineStudio->Mem_Calloc(16, (uint)sizeof(cache_user_t)); // UNDONE: leak!
             pSubModel->submodels = (dmodel_t*)paSequences;
         }
 
@@ -972,7 +972,7 @@ public unsafe class StudioModelRenderer
         {
             NChar* namePtr = (NChar*)System.Runtime.CompilerServices.Unsafe.AsPointer(ref pseqgroup->name[0]);
             EngineApi.PClient->Con_DPrintf(namePtr);
-            IEngineStudio->LoadCacheFile(namePtr, (cache_user_s*)&paSequences[pseqdesc->seqgroup]);
+            IEngineStudio->LoadCacheFile(namePtr, (cache_user_t*)&paSequences[pseqdesc->seqgroup]);
         }
 
         return (mstudioanim_t*)((byte*)paSequences[pseqdesc->seqgroup].data + pseqdesc->animindex);
@@ -1122,7 +1122,7 @@ public unsafe class StudioModelRenderer
     /// Apply special effects to transformation matrix
     /// Original: void CStudioModelRenderer::StudioFxTransform(cl_entity_t* ent, float transform[3][4])
     /// </summary>
-    private void StudioFxTransform(cl_entity_s* ent, Matrix3x4* transform)
+    private void StudioFxTransform(cl_entity_t* ent, Matrix3x4* transform)
     {
         switch ((RenderFx)ent->curstate.renderfx)
         {
@@ -1474,7 +1474,7 @@ public unsafe class StudioModelRenderer
     /// Merge cached bones with current bones for model
     /// Original: void CStudioModelRenderer::StudioMergeBones(model_t* m_pSubModel)
     /// </summary>
-    private void StudioMergeBones(model_s* pSubModel)
+    private void StudioMergeBones(model_t* pSubModel)
     {
         int i, j;
         double f;
@@ -1835,26 +1835,26 @@ public unsafe class StudioModelRenderer
 
     /// <summary>
     /// Static wrapper for StudioDrawPlayer - called by engine
-    /// Original: int R_StudioDrawPlayer(int flags, entity_state_s* pplayer)
+    /// Original: int R_StudioDrawPlayer(int flags, entity_state_t* pplayer)
     /// </summary>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-    private static int R_StudioDrawPlayer(int flags, entity_state_s* pplayer)
+    private static int R_StudioDrawPlayer(int flags, entity_state_t* pplayer)
     {
         if (_instance == null)
             return 0;
 
         return _instance.StudioDrawPlayer(flags, pplayer) ? 1 : 0;
     }
-    static r_studio_interface_s* nativeRenderer = null;
+    static r_studio_interface_t* nativeRenderer = null;
     private static bool _openGLInfoPrinted = false;
 
     /// <summary>
     /// Get studio model interface - called by engine
-    /// Original: int HUD_GetStudioModelInterface(int version, r_studio_interface_s** ppinterface, engine_studio_api_s* pstudio)
+    /// Original: int HUD_GetStudioModelInterface(int version, r_studio_interface_t** ppinterface, engine_studio_api_t* pstudio)
     /// </summary>
-    public static int GetStudioModelInterface(int version, r_studio_interface_s** ppinterface, engine_studio_api_s* pstudio)
+    public static int GetStudioModelInterface(int version, r_studio_interface_t** ppinterface, engine_studio_api_t* pstudio)
     {
-        fixed(r_studio_interface_s** p =  &nativeRenderer)
+        fixed(r_studio_interface_t** p =  &nativeRenderer)
         {
             var res = LegacyClientInterop.HUD_GetStudioModelInterface(version, p, pstudio);
         }
@@ -1906,7 +1906,7 @@ public unsafe class StudioModelRenderer
         EngineApi.StudioApiInit(pstudio);
 
         // Create our studio interface
-        var studioInterface = (r_studio_interface_s*)Marshal.AllocHGlobal(sizeof(r_studio_interface_s));
+        var studioInterface = (r_studio_interface_t*)Marshal.AllocHGlobal(sizeof(r_studio_interface_t));
         studioInterface->version = STUDIO_INTERFACE_VERSION;
         studioInterface->StudioDrawModel = &R_StudioDrawModel;
         studioInterface->StudioDrawPlayer = &R_StudioDrawPlayer;
@@ -1958,7 +1958,7 @@ public unsafe class StudioModelRenderer
     /// Estimate gait frame for player
     /// Original: void CStudioModelRenderer::StudioEstimateGait(entity_state_t* pplayer)
     /// </summary>
-    private void StudioEstimateGait(entity_state_s* pplayer)
+    private void StudioEstimateGait(entity_state_t* pplayer)
     {
         float dt;
         Vector3 est_velocity;
@@ -2027,7 +2027,7 @@ public unsafe class StudioModelRenderer
     /// Process movement of player
     /// Original: void CStudioModelRenderer::StudioProcessGait(entity_state_t* pplayer)
     /// </summary>
-    private void StudioProcessGait(entity_state_s* pplayer)
+    private void StudioProcessGait(entity_state_t* pplayer)
     {
         mstudioseqdesc_t* pseqdesc;
         float dt;

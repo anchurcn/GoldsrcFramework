@@ -16,7 +16,7 @@ namespace GoldsrcFramework.Engine.Native;
 public unsafe class FrameworkClientExports : IClientExportFuncs
 {
     // IClientExportFuncs implementation - all based on LegacyClientInterop
-    public virtual int Initialize(cl_enginefunc_t* pEnginefuncs, int iVersion)
+    public virtual int Initialize(ClientEngineFuncs* pEnginefuncs, int iVersion)
     {
         EngineApi.ClientApiInit(pEnginefuncs);
         return LegacyClientInterop.Initialize(pEnginefuncs, iVersion);
@@ -48,19 +48,20 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         LegacyClientInterop.HUD_Reset();
     }
 
-    public virtual void HUD_PlayerMove(playermove_s* ppmove, qboolean server)
+    public virtual void HUD_PlayerMove(playermove_t* ppmove, qboolean server)
     {
-        LegacyClientInterop.HUD_PlayerMove(ppmove, server);
+        LegacyClientInterop.HUD_PlayerMove(ppmove, server.Value);
     }
 
-    public virtual void HUD_PlayerMoveInit(playermove_s* ppmove)
+    public virtual void HUD_PlayerMoveInit(playermove_t* ppmove)
     {
         LegacyClientInterop.HUD_PlayerMoveInit(ppmove);
     }
 
     public virtual NChar HUD_PlayerMoveTexture(NChar* name)
     {
-        return LegacyClientInterop.HUD_PlayerMoveTexture(name);
+        sbyte result = LegacyClientInterop.HUD_PlayerMoveTexture((sbyte*)name);
+        return new NChar((byte)result);
     }
 
     public virtual void IN_ActivateMouse()
@@ -88,7 +89,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         LegacyClientInterop.IN_Accumulate();
     }
 
-    public virtual void CL_CreateMove(float frametime, usercmd_s* cmd, int active)
+    public virtual void CL_CreateMove(float frametime, usercmd_t* cmd, int active)
     {
         LegacyClientInterop.CL_CreateMove(frametime, cmd, active);
     }
@@ -103,9 +104,9 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         LegacyClientInterop.CL_GetCameraOffsets(ofs);
     }
 
-    public virtual kbutton_s* KB_Find(NChar* name)
+    public virtual kbutton_t* KB_Find(NChar* name)
     {
-        return LegacyClientInterop.KB_Find(name);
+        return LegacyClientInterop.KB_Find((sbyte*)name);
     }
 
     public virtual void CAM_Think()
@@ -113,14 +114,14 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         LegacyClientInterop.CAM_Think();
     }
 
-    public virtual void V_CalcRefdef(ref_params_s* pparams)
+    public virtual void V_CalcRefdef(ref_params_t* pparams)
     {
         LegacyClientInterop.V_CalcRefdef(pparams);
     }
 
-    public virtual int HUD_AddEntity(int type, cl_entity_s* ent, NChar* modelname)
+    public virtual int HUD_AddEntity(int type, cl_entity_t* ent, NChar* modelname)
     {
-        return LegacyClientInterop.HUD_AddEntity(type, ent, modelname);
+        return LegacyClientInterop.HUD_AddEntity(type, ent, (sbyte*)modelname);
     }
 
     public virtual void HUD_CreateEntities()
@@ -138,12 +139,12 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         LegacyClientInterop.HUD_DrawTransparentTriangles();
     }
 
-    public virtual void HUD_StudioEvent(mstudioevent_s* @event, cl_entity_s* entity)
+    public virtual void HUD_StudioEvent(mstudioevent_t* @event, cl_entity_t* entity)
     {
         LegacyClientInterop.HUD_StudioEvent(@event, entity);
     }
 
-    public virtual void HUD_PostRunCmd(local_state_s* from, local_state_s* to, usercmd_s* cmd, int runfuncs, double time, uint random_seed)
+    public virtual void HUD_PostRunCmd(local_state_t* from, local_state_t* to, usercmd_t* cmd, int runfuncs, double time, uint random_seed)
     {
         LegacyClientInterop.HUD_PostRunCmd(from, to, cmd, runfuncs, time, random_seed);
     }
@@ -153,17 +154,17 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         LegacyClientInterop.HUD_Shutdown();
     }
 
-    public virtual void HUD_TxferLocalOverrides(entity_state_s* state, clientdata_s* client)
+    public virtual void HUD_TxferLocalOverrides(entity_state_t* state, clientdata_t* client)
     {
         LegacyClientInterop.HUD_TxferLocalOverrides(state, client);
     }
 
-    public virtual void HUD_ProcessPlayerState(entity_state_s* dst, entity_state_s* src)
+    public virtual void HUD_ProcessPlayerState(entity_state_t* dst, entity_state_t* src)
     {
         LegacyClientInterop.HUD_ProcessPlayerState(dst, src);
     }
 
-    public virtual void HUD_TxferPredictionData(entity_state_s* ps, entity_state_s* pps, clientdata_s* pcd, clientdata_s* ppcd, weapon_data_s* wd, weapon_data_s* pwd)
+    public virtual void HUD_TxferPredictionData(entity_state_t* ps, entity_state_t* pps, clientdata_t* pcd, clientdata_t* ppcd, weapon_data_t* wd, weapon_data_t* pwd)
     {
         LegacyClientInterop.HUD_TxferPredictionData(ps, pps, pcd, ppcd, wd, pwd);
     }
@@ -173,9 +174,9 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         LegacyClientInterop.Demo_ReadBuffer(size, buffer);
     }
 
-    public virtual int HUD_ConnectionlessPacket(netadr_s* net_from, NChar* args, NChar* response_buffer, int* response_buffer_size)
+    public virtual int HUD_ConnectionlessPacket(netadr_t* net_from, NChar* args, NChar* response_buffer, int* response_buffer_size)
     {
-        return LegacyClientInterop.HUD_ConnectionlessPacket(net_from, args, response_buffer, response_buffer_size);
+        return LegacyClientInterop.HUD_ConnectionlessPacket(net_from, (sbyte*)args, (sbyte*)response_buffer, response_buffer_size);
     }
 
     public virtual int HUD_GetHullBounds(int hullnumber, float* mins, float* maxs)
@@ -193,12 +194,12 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         return LegacyClientInterop.HUD_Key_Event(eventcode, keynum, pszCurrentBinding);
     }
 
-    public virtual void HUD_TempEntUpdate(double frametime, double client_time, double cl_gravity, tempent_s** ppTempEntFree, tempent_s** ppTempEntActive, delegate* unmanaged[Cdecl]<cl_entity_s*, int> Callback_AddVisibleEntity, delegate* unmanaged[Cdecl]<tempent_s*, float, void> Callback_TempEntPlaySound)
+    public virtual void HUD_TempEntUpdate(double frametime, double client_time, double cl_gravity, TEMPENTITY** ppTempEntFree, TEMPENTITY** ppTempEntActive, delegate* unmanaged[Cdecl]<cl_entity_t*, int> Callback_AddVisibleEntity, delegate* unmanaged[Cdecl]<TEMPENTITY*, float, void> Callback_TempEntPlaySound)
     {
         LegacyClientInterop.HUD_TempEntUpdate(frametime, client_time, cl_gravity, ppTempEntFree, ppTempEntActive, Callback_AddVisibleEntity, Callback_TempEntPlaySound);
     }
 
-    public virtual cl_entity_s* HUD_GetUserEntity(int index)
+    public virtual cl_entity_t* HUD_GetUserEntity(int index)
     {
         return LegacyClientInterop.HUD_GetUserEntity(index);
     }
@@ -213,7 +214,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         LegacyClientInterop.HUD_DirectorMessage(iSize, pbuf);
     }
 
-    public virtual int HUD_GetStudioModelInterface(int version, r_studio_interface_s** ppinterface, engine_studio_api_s* pstudio)
+    public virtual int HUD_GetStudioModelInterface(int version, r_studio_interface_t** ppinterface, engine_studio_api_t* pstudio)
     {
         //return LegacyClientInterop.HUD_GetStudioModelInterface(version, ppinterface, pstudio);
         return StudioModelRenderer.GetStudioModelInterface(version, ppinterface, pstudio);
@@ -234,3 +235,4 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         return LegacyClientInterop.ClientFactory();
     }
 }
+
