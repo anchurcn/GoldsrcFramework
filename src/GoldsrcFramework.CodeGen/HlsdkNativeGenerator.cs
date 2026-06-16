@@ -5,7 +5,7 @@ namespace GoldsrcFramework.CodeGen;
 
 internal static class HlsdkNativeGenerator
 {
-    static readonly string[] RootStructs = ["cldll_func_t", "cl_enginefuncs_s", "cl_enginefunc_t", "enginefuncs_s", "DLL_FUNCTIONS", "NEW_DLL_FUNCTIONS"];
+    static readonly string[] RootStructs = ["cldll_func_t", "cl_enginefunc_t", "enginefuncs_t", "DLL_FUNCTIONS", "NEW_DLL_FUNCTIONS"];
     static readonly string[] ManagedNativeApiRootTypes = [
         "studiohdr_t", "mstudiobonecontroller_t", "mstudiobone_t", "mstudioseqdesc_t", "mstudioseqgroup_t",
         "mstudiobodyparts_t", "mstudioattachment_t", "mstudiobbox_t", "mstudiotexture_t", "mstudiomodel_t",
@@ -260,7 +260,7 @@ internal static class HlsdkNativeGenerator
 
         public string Generate()
         {
-            foreach (var c in compilation.Classes.Where(c => RootStructs.Contains(c.Name))) Enqueue(c);
+            foreach (var root in RootStructs) EnqueueRootType(root);
             foreach (var c in compilation.Classes.Where(c => ManagedNativeApiRootTypes.Contains(CsTypeName(c, false)) || ManagedNativeApiRootTypes.Contains(c.Name))) Enqueue(c);
 
             foreach (var f in compilation.Functions.Where(f => Path.GetFileName(f.SourceFile).Equals("Exports.h", StringComparison.OrdinalIgnoreCase))) { Enqueue(f.ReturnType); foreach (var p in f.Parameters) Enqueue(p.Type); }
@@ -484,8 +484,9 @@ internal static class HlsdkNativeGenerator
                 return explicitPath.Replace('\\', '/');
             }
 
-            reason = "fallback-humanizer-file";
-            return Path.Combine("Misc", SafeFileName(humanizedName) + ".cs").Replace('\\', '/');
+            reason = "fallback-header-folder";
+            var headerFolder = HeaderFolderName(sourceHeader);
+            return Path.Combine(headerFolder, SafeFileName(humanizedName) + ".cs").Replace('\\', '/');
         }
 
         static string SafeFileName(string value)
@@ -668,6 +669,25 @@ internal static class HlsdkNativeGenerator
             return sb.ToString();
         }
 
+
+        void EnqueueRootType(string name)
+        {
+            if (_typedefs.TryGetValue(name, out var typedef))
+            {
+                Enqueue(typedef);
+                return;
+            }
+
+            var cls = compilation.Classes.FirstOrDefault(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase))
+                ?? compilation.Classes.FirstOrDefault(c => string.Equals(CsTypeName(c, false), name, StringComparison.OrdinalIgnoreCase));
+            if (cls is not null)
+            {
+                Enqueue(cls);
+                return;
+            }
+
+            if (_enums.TryGetValue(name, out var en)) Enqueue(en);
+        }
 
         void Enqueue(CppType? type)
         {
