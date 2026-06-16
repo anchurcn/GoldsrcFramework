@@ -5,7 +5,7 @@ namespace GoldsrcFramework.CodeGen;
 
 internal static class HlsdkNativeGenerator
 {
-    static readonly string[] RootStructs = ["cldll_func_t", "cl_enginefunc_t", "enginefuncs_t", "DLL_FUNCTIONS", "NEW_DLL_FUNCTIONS"];
+    static readonly string[] RootStructs = ["cldll_func_t", "cl_enginefunc_t", "enginefuncs_t", "DLL_FUNCTIONS", "NEW_DLL_FUNCTIONS", "globalvars_t", "entvars_t"];
     static readonly string[] ManagedNativeApiRootTypes = [
         "studiohdr_t", "mstudiobonecontroller_t", "mstudiobone_t", "mstudioseqdesc_t", "mstudioseqgroup_t",
         "mstudiobodyparts_t", "mstudioattachment_t", "mstudiobbox_t", "mstudiotexture_t", "mstudiomodel_t",
