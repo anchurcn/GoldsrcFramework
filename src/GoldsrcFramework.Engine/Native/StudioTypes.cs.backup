@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using GoldsrcFramework.LinearMath;
 using NativeInterop;
 
-namespace GoldsrcFramework.Engine.Native;
+namespace GoldsrcFramework.Engine.Native.Deprecation;
 
 /// <summary>
 /// Studio model constants

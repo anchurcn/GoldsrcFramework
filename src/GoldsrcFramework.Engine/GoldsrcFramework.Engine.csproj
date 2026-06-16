@@ -5,6 +5,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Native\StudioTypes.cs.backup" />
+  </ItemGroup>
+
+
+  <ItemGroup>
     <ProjectReference Include="..\GoldsrcFramework.Math\GoldsrcFramework.Math.csproj" />
   </ItemGroup>
 

@@ -1,4 +1,5 @@
 using GoldsrcFramework.LinearMath;
+using NativeInterop;
 using System;
 
 namespace GoldsrcFramework.Engine.Native;
@@ -11,7 +12,7 @@ public unsafe interface IClientExportFuncs
     /// <summary>
     /// Initialize the client DLL
     /// </summary>
-    int Initialize(cl_enginefunc_t* pEnginefuncs, int iVersion);
+    int Initialize(ClientEngineFuncs* pEnginefuncs, int iVersion);
 
     /// <summary>
     /// Initialize HUD elements
@@ -41,17 +42,17 @@ public unsafe interface IClientExportFuncs
     /// <summary>
     /// Handle player movement
     /// </summary>
-    void HUD_PlayerMove(playermove_s* ppmove, int server);
+    void HUD_PlayerMove(playermove_t* ppmove, qboolean server);
 
     /// <summary>
     /// Initialize player movement
     /// </summary>
-    void HUD_PlayerMoveInit(playermove_s* ppmove);
+    void HUD_PlayerMoveInit(playermove_t* ppmove);
 
     /// <summary>
     /// Get texture type for player movement
     /// </summary>
-    sbyte HUD_PlayerMoveTexture(sbyte* name);
+    NChar HUD_PlayerMoveTexture(NChar* name);
 
     /// <summary>
     /// Activate mouse input
@@ -81,7 +82,7 @@ public unsafe interface IClientExportFuncs
     /// <summary>
     /// Create movement command
     /// </summary>
-    void CL_CreateMove(float frametime, usercmd_s* cmd, int active);
+    void CL_CreateMove(float frametime, usercmd_t* cmd, int active);
 
     /// <summary>
     /// Check if in third person view
@@ -96,7 +97,7 @@ public unsafe interface IClientExportFuncs
     /// <summary>
     /// Find key button
     /// </summary>
-    kbutton_s* KB_Find(sbyte* name);
+    kbutton_t* KB_Find(NChar* name);
 
     /// <summary>
     /// Camera think function
@@ -106,12 +107,12 @@ public unsafe interface IClientExportFuncs
     /// <summary>
     /// Calculate reference parameters
     /// </summary>
-    void V_CalcRefdef(ref_params_s* pparams);
+    void V_CalcRefdef(ref_params_t* pparams);
 
     /// <summary>
     /// Add entity to render list
     /// </summary>
-    int HUD_AddEntity(int type, cl_entity_s* ent, sbyte* modelname);
+    int HUD_AddEntity(int type, cl_entity_t* ent, NChar* modelname);
 
     /// <summary>
     /// Create entities
@@ -131,12 +132,12 @@ public unsafe interface IClientExportFuncs
     /// <summary>
     /// Handle studio events
     /// </summary>
-    void HUD_StudioEvent(mstudioevent_s* @event, cl_entity_s* entity);
+    void HUD_StudioEvent(mstudioevent_t* @event, cl_entity_t* entity);
 
     /// <summary>
     /// Post run command processing
     /// </summary>
-    void HUD_PostRunCmd(local_state_s* from, local_state_s* to, usercmd_s* cmd, int runfuncs, double time, uint random_seed);
+    void HUD_PostRunCmd(local_state_t* from, local_state_t* to, usercmd_t* cmd, int runfuncs, double time, uint random_seed);
 
     /// <summary>
     /// Shutdown client DLL
@@ -146,17 +147,17 @@ public unsafe interface IClientExportFuncs
     /// <summary>
     /// Transfer local overrides
     /// </summary>
-    void HUD_TxferLocalOverrides(entity_state_s* state, clientdata_s* client);
+    void HUD_TxferLocalOverrides(entity_state_t* state, clientdata_t* client);
 
     /// <summary>
     /// Process player state
     /// </summary>
-    void HUD_ProcessPlayerState(entity_state_s* dst, entity_state_s* src);
+    void HUD_ProcessPlayerState(entity_state_t* dst, entity_state_t* src);
 
     /// <summary>
     /// Transfer prediction data
     /// </summary>
-    void HUD_TxferPredictionData(entity_state_s* ps, entity_state_s* pps, clientdata_s* pcd, clientdata_s* ppcd, weapon_data_s* wd, weapon_data_s* pwd);
+    void HUD_TxferPredictionData(entity_state_t* ps, entity_state_t* pps, clientdata_t* pcd, clientdata_t* ppcd, weapon_data_t* wd, weapon_data_t* pwd);
 
     /// <summary>
     /// Read demo buffer
@@ -166,7 +167,7 @@ public unsafe interface IClientExportFuncs
     /// <summary>
     /// Handle connectionless packet
     /// </summary>
-    int HUD_ConnectionlessPacket(netadr_s* net_from, sbyte* args, sbyte* response_buffer, int* response_buffer_size);
+    int HUD_ConnectionlessPacket(netadr_t* net_from, NChar* args, NChar* response_buffer, int* response_buffer_size);
 
     /// <summary>
     /// Get hull bounds
@@ -181,17 +182,17 @@ public unsafe interface IClientExportFuncs
     /// <summary>
     /// Handle key events
     /// </summary>
-    int HUD_Key_Event(int eventcode, int keynum, sbyte* pszCurrentBinding);
+    int HUD_Key_Event(int eventcode, int keynum, NChar* pszCurrentBinding);
 
     /// <summary>
     /// Update temporary entities
     /// </summary>
-    void HUD_TempEntUpdate(double frametime, double client_time, double cl_gravity, tempent_s** ppTempEntFree, tempent_s** ppTempEntActive, delegate* unmanaged[Cdecl]<cl_entity_s*, int> Callback_AddVisibleEntity, delegate* unmanaged[Cdecl]<tempent_s*, float, void> Callback_TempEntPlaySound);
+    void HUD_TempEntUpdate(double frametime, double client_time, double cl_gravity, TEMPENTITY** ppTempEntFree, TEMPENTITY** ppTempEntActive, delegate* unmanaged[Cdecl]<cl_entity_t*, int> Callback_AddVisibleEntity, delegate* unmanaged[Cdecl]<TEMPENTITY*, float, void> Callback_TempEntPlaySound);
 
     /// <summary>
     /// Get user entity
     /// </summary>
-    cl_entity_s* HUD_GetUserEntity(int index);
+    cl_entity_t* HUD_GetUserEntity(int index);
 
     /// <summary>
     /// Handle voice status
@@ -206,7 +207,7 @@ public unsafe interface IClientExportFuncs
     /// <summary>
     /// Get studio model interface
     /// </summary>
-    int HUD_GetStudioModelInterface(int version, r_studio_interface_s** ppinterface, engine_studio_api_s* pstudio);
+    int HUD_GetStudioModelInterface(int version, r_studio_interface_t** ppinterface, engine_studio_api_t* pstudio);
 
     /// <summary>
     /// Get chat input position
