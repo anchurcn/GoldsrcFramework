@@ -495,6 +495,17 @@ internal static class HlsdkNativeGenerator
             return value;
         }
 
+        static string HeaderFolderName(string? sourceHeader)
+        {
+            if (string.IsNullOrWhiteSpace(sourceHeader)) return "Misc";
+
+            var normalized = sourceHeader.Replace('\\', '/');
+            var fileName = Path.GetFileNameWithoutExtension(normalized);
+            if (fileName.EndsWith(".h", StringComparison.OrdinalIgnoreCase)) fileName = Path.GetFileNameWithoutExtension(fileName);
+            return string.IsNullOrWhiteSpace(fileName) ? "Misc" : SafeFileName(fileName);
+        }
+
+
         void EmitHumanizedType(StringBuilder sb, CppType type, string humanizedName)
         {
             type = Strip(type)!;
