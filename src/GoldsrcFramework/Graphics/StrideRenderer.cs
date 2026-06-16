@@ -157,7 +157,6 @@ public unsafe class StrideRenderer : IDisposable
     /// </summary>
     public void Render()
     {
-        return;
         if (!_isInitialized || _graphicsDevice == null || _commandList == null || _vertexBuffer == null || _indexBuffer == null)
             return;
         try
