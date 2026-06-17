@@ -1,8 +1,5 @@
 {
   "profiles": {
-    "GoldsrcFramework.Demo": {
-      "commandName": "Project"
-    },
     "Launch Half-Life": {
       "commandName": "Executable",
       "executablePath": "$(HLExe)",
