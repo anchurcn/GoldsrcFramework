@@ -81,3 +81,10 @@ hd_background "1"
 1. Copy all files in Demo project OutDir(usually bin/Debug/net8.0/) to gsfdemo/cl_dlls
 1. The demo can be run now
 1. For vs debug run, config the demo launcher project to launch the game
+
+Half Life 1 SDK LICENSE
+======================
+
+Half Life 1 SDK Copyright© Valve Corp.  
+
+[LICENSE](LICENSE.txt)
