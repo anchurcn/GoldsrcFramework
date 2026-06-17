@@ -3,6 +3,8 @@ using GoldsrcFramework.Engine.Native;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.Reflection;
+
 using System.Runtime.Loader;
 
 namespace GoldsrcFramework.DependencyInjection
@@ -17,6 +19,7 @@ namespace GoldsrcFramework.DependencyInjection
         private static readonly object _lock = new object();
         private static bool _initialized = false;
         private static IGoldsrcModStartup? _modStartup;
+        private static bool _assemblyResolverRegistered = false;
 
         /// <summary>
         /// Get the service provider
@@ -68,6 +71,8 @@ namespace GoldsrcFramework.DependencyInjection
                 {
                     // Build configuration
                     var frameworkDir = Path.GetDirectoryName(typeof(ServiceContainer).Assembly.Location);
+                    RegisterAssemblyResolver(frameworkDir);
+
                     var configBuilder = new ConfigurationBuilder()
                         .SetBasePath(frameworkDir ?? Directory.GetCurrentDirectory());
 
@@ -150,6 +155,36 @@ namespace GoldsrcFramework.DependencyInjection
                     System.Diagnostics.Debug.WriteLine($"ServiceContainer initialization error: {ex.Message}");
                     throw;
                 }
+            }
+        }
+
+        private static void RegisterAssemblyResolver(string? frameworkDir)
+        {
+            if (_assemblyResolverRegistered || string.IsNullOrEmpty(frameworkDir))
+                return;
+
+            var loadContext = AssemblyLoadContext.GetLoadContext(typeof(ServiceContainer).Assembly);
+            if (loadContext == null)
+                return;
+
+            loadContext.Resolving += (_, assemblyName) => ResolveAssemblyFromDirectory(frameworkDir, assemblyName);
+            _assemblyResolverRegistered = true;
+        }
+
+        private static Assembly? ResolveAssemblyFromDirectory(string frameworkDir, AssemblyName assemblyName)
+        {
+            var assemblyPath = Path.Combine(frameworkDir, assemblyName.Name + ".dll");
+            if (!File.Exists(assemblyPath))
+                return null;
+
+            try
+            {
+                return AssemblyLoadContext.GetLoadContext(typeof(ServiceContainer).Assembly)!
+                    .LoadFromAssemblyPath(assemblyPath);
+            }
+            catch
+            {
+                return null;
             }
         }
 
