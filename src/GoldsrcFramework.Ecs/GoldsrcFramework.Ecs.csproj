@@ -5,7 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Stride.Engine" Version="4.2.1.2485" />
+    <PackageReference Include="Stride.Engine" Version="4.3.0.2507" />
   </ItemGroup>
 
   <ItemGroup>

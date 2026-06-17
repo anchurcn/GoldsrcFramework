@@ -5,10 +5,12 @@
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 		<StrideGraphicsApi>OpenGL</StrideGraphicsApi>
+		<RuntimeIdentifier>win-x86</RuntimeIdentifier>
 	</PropertyGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\GoldsrcFramework.Engine\GoldsrcFramework.Engine.csproj" />
+		<ProjectReference Include="..\GoldsrcFramework.Ecs\GoldsrcFramework.Ecs.csproj" />
 		<ProjectReference Include="..\GoldsrcFramework\GoldsrcFramework.csproj">
 			<!--<CopyLocalSatelliteAssemblies>true</CopyLocalSatelliteAssemblies>-->
 		</ProjectReference>
