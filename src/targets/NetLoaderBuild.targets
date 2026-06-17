@@ -4,14 +4,16 @@
 	<!-- This targets file handles building the NetLoader (client.dll) using Native AOT -->
 
 	<PropertyGroup>
-		<!-- NetLoader project path -->
+		<!-- Configuration -->
+
+		<RuntimeIdentifier>win-x86</RuntimeIdentifier>
+		<!-- Source paths (relative to targets directory) -->
 		<NetLoaderSourceLoaderCsPath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.NetLoader\Loader.cs</NetLoaderSourceLoaderCsPath>
 		<NetLoaderSourceCsprojPath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.NetLoader\GoldsrcFramework.NetLoader.csproj</NetLoaderSourceCsprojPath>
 
 		<!-- Output paths -->
 		<NetLoaderOutputPath>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\client.dll</NetLoaderOutputPath>
 		<NetLoaderPdbOutputPath>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\client.pdb</NetLoaderPdbOutputPath>
-		<NetLoaderPublishDir>$(MSBuildProjectDirectory)\..\GoldsrcFramework.NetLoader\bin\Release\$(TargetFramework)\win-x64\publish</NetLoaderPublishDir>
 	</PropertyGroup>
 
 	<!-- Set LoaderSourceDir in a target to ensure proper evaluation of IntermediateOutputPath -->
@@ -83,13 +85,14 @@
 			  DestinationFiles="$(LoaderCsPath)" />
 
 		<!-- Modify Loader.cs to use EntityExports instead of EntityExportsDemo -->
+		<!-- EntityExportsDemo is the demo class in GoldsrcFramework.NetLoader, EntityExports is generated per-project -->
 		<PropertyGroup>
 			<LoaderCsContent>$([System.IO.File]::ReadAllText('$(LoaderCsPath)'))</LoaderCsContent>
 			<ModifiedLoaderCsContent>$(LoaderCsContent.Replace('EntityExportsDemo', 'EntityExports'))</ModifiedLoaderCsContent>
 		</PropertyGroup>
 		<WriteLinesToFile File="$(LoaderCsPath)" Lines="$(ModifiedLoaderCsContent)" Overwrite="true" />
 
-		<!-- Create a modified csproj file for win-x86 -->
+		<!-- Create a modified csproj file for Native AOT compilation -->
 		<PropertyGroup>
 			<CsprojContent>
 				<![CDATA[<Project Sdk="Microsoft.NET.Sdk">
@@ -100,9 +103,8 @@
 		<OutputType>Library</OutputType>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
-		<!-- Native AOT Configuration for win-x86 -->
+		<!-- Native AOT Configuration -->
 		<PublishAot>true</PublishAot>
-		<RuntimeIdentifier>win-x86</RuntimeIdentifier>
 		<SelfContained>true</SelfContained>
 		<PublishTrimmed>true</PublishTrimmed>
 		<TrimMode>partial</TrimMode>
@@ -115,13 +117,9 @@
 		<IlcExportUnmanagedEntrypoints>true</IlcExportUnmanagedEntrypoints>
 	</PropertyGroup>
 
-	<ItemGroup>
-		<PackageReference Include="Mxrx.NetHost.Fxr" Version="0.1.1" />
-	</ItemGroup>
-
 	<Target Name="PrepareForNativePublish" AfterTargets="Build">
 		<ItemGroup>
-			<NativeLibrary Include="$(NetCoreTargetingPackRoot)/Microsoft.NETCore.App.Host.win-x86/$(BundledNETCoreAppPackageVersion)/runtimes/win-x86/native\libnethost.lib" />
+			<NativeLibrary Include="$(NetCoreTargetingPackRoot)/Microsoft.NETCore.App.Host.$(RuntimeIdentifier)/$(BundledNETCoreAppPackageVersion)/runtimes/$(RuntimeIdentifier)/native\libnethost.lib" />
 		</ItemGroup>
 	</Target>
 
@@ -144,6 +142,7 @@
 
 		<!-- Copy GoldsrcFramework.dll and runtimeconfig.json to LoaderSource -->
 		<PropertyGroup>
+			<!-- GoldsrcFramework is a sibling project, located at ../GoldsrcFramework relative to the consuming project -->
 			<GoldsrcFrameworkBinDir>$(MSBuildProjectDirectory)\..\GoldsrcFramework\bin\$(Configuration)\$(TargetFramework)\</GoldsrcFrameworkBinDir>
 		</PropertyGroup>
 
@@ -154,18 +153,18 @@
 
 		<!-- Restore packages for the copied project -->
 		<MSBuild Projects="$(NetLoaderCsprojPath)"
-				 Properties="Configuration=$(Configuration);RuntimeIdentifier=win-x86"
+				 Properties="Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier);TargetFramework=$(TargetFramework)"
 				 Targets="Restore" />
 
 		<!-- Publish NetLoader from LoaderSource directory -->
 		<MSBuild Projects="$(NetLoaderCsprojPath)"
-				 Properties="Configuration=$(Configuration);RuntimeIdentifier=win-x86;PublishDir=$(LoaderSourceDir)publish\"
+				 Properties="Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier);TargetFramework=$(TargetFramework);PublishDir=$(LoaderSourceDir)publish\"
 				 Targets="Publish" />
 
 		<!-- Copy client.dll to final output location -->
-		<Copy SourceFiles="$(LoaderSourceDir)bin\$(Configuration)\$(TargetFramework)\win-x86\native\client.dll"
+		<Copy SourceFiles="$(LoaderSourceDir)bin\$(Configuration)\$(TargetFramework)\$(RuntimeIdentifier)\native\client.dll"
 			  DestinationFiles="$(NetLoaderOutputPath)" />
-		<Copy SourceFiles="$(LoaderSourceDir)bin\$(Configuration)\$(TargetFramework)\win-x86\native\client.pdb"
+		<Copy SourceFiles="$(LoaderSourceDir)bin\$(Configuration)\$(TargetFramework)\$(RuntimeIdentifier)\native\client.pdb"
 			  DestinationFiles="$(NetLoaderPdbOutputPath)" />
 
 		<Message Text="NetLoader built successfully: $(NetLoaderOutputPath)" Importance="high" />
