@@ -11,7 +11,7 @@
 		<!-- Output paths -->
 		<NetLoaderOutputPath>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\client.dll</NetLoaderOutputPath>
 		<NetLoaderPdbOutputPath>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\client.pdb</NetLoaderPdbOutputPath>
-		<NetLoaderPublishDir>$(MSBuildProjectDirectory)\..\GoldsrcFramework.NetLoader\bin\Release\net8.0\win-x64\publish</NetLoaderPublishDir>
+		<NetLoaderPublishDir>$(MSBuildProjectDirectory)\..\GoldsrcFramework.NetLoader\bin\Release\$(TargetFramework)\win-x64\publish</NetLoaderPublishDir>
 	</PropertyGroup>
 
 	<!-- Set LoaderSourceDir in a target to ensure proper evaluation of IntermediateOutputPath -->
@@ -29,7 +29,7 @@
 	<PropertyGroup>
 		<!-- BuildTool paths -->
 		<BuildToolProjectPath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.BuildTool\GoldsrcFramework.BuildTool.csproj</BuildToolProjectPath>
-		<BuildToolOutputPath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.BuildTool\bin\$(Configuration)\net8.0\GoldsrcFramework.BuildTool.exe</BuildToolOutputPath>
+		<BuildToolOutputPath>$(MSBuildThisFileDirectory)..\GoldsrcFramework.BuildTool\bin\$(Configuration)\$(TargetFramework)\GoldsrcFramework.BuildTool.exe</BuildToolOutputPath>
 	</PropertyGroup>
 
 	<!-- 1. Ensure BuildTool is built -->
@@ -142,14 +142,9 @@
 
 		<Message Text="Building NetLoader with Native AOT from LoaderSource..." Importance="high" />
 
-		<!-- First ensure GoldsrcFramework is built and copy required files -->
-		<MSBuild Projects="$(MSBuildProjectFile)"
-				 Properties="Configuration=$(Configuration)"
-				 Targets="Build" />
-
 		<!-- Copy GoldsrcFramework.dll and runtimeconfig.json to LoaderSource -->
 		<PropertyGroup>
-			<GoldsrcFrameworkBinDir>$(MSBuildProjectDirectory)\..\GoldsrcFramework\bin\$(Configuration)\net8.0\</GoldsrcFrameworkBinDir>
+			<GoldsrcFrameworkBinDir>$(MSBuildProjectDirectory)\..\GoldsrcFramework\bin\$(Configuration)\$(TargetFramework)\</GoldsrcFrameworkBinDir>
 		</PropertyGroup>
 
 		<Copy SourceFiles="$(GoldsrcFrameworkBinDir)GoldsrcFramework.dll"
