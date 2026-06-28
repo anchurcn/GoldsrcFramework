@@ -24,7 +24,7 @@ namespace GoldsrcFramework
         /// </summary>
         /// <param name="pengfuncsFromEngine">引擎函数指针</param>
         /// <param name="pGlobals">全局变量指针</param>
-        [DllImport(LegacyServerDll, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LegacyServerDll, CallingConvention = CallingConvention.StdCall)]
         private static extern void GiveFnptrsToDll(ServerEngineFuncs* pengfuncsFromEngine, globalvars_t* pGlobals);
 
         /// <summary>
