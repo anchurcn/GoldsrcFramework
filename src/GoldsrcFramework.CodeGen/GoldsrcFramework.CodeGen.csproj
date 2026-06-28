@@ -11,10 +11,11 @@
 		<!-- Workaround for issue https://github.com/microsoft/ClangSharp/issues/129 -->
 		<RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' AND '$(PackAsTool)' != 'true'">$(NETCoreSdkRuntimeIdentifier)</RuntimeIdentifier>
 	</PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\external\CppAst.NET\src\CppAst\CppAst.csproj" />
-    <ProjectReference Include="..\..\external\CppAst.CodeGen\src\CppAst.CodeGen\CppAst.CodeGen.csproj" />
-  </ItemGroup>
+
+	<ItemGroup>
+	  <PackageReference Include="CppAst" Version="0.25.0" />
+	  <PackageReference Include="CppAst.CodeGen" Version="0.28.2" />
+	</ItemGroup>
 
 
 

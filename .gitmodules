@@ -1,3 +1,11 @@
 [submodule "external/hlsdk"]
 	path = external/hlsdk
 	url = https://github.com/anchurcn/halflife-updated.git
+[submodule "external/CppAst.CodeGen"]
+	path = external/CppAst.CodeGen
+	url = https://github.com/xoofx/CppAst.CodeGen.git
+	branch = main
+[submodule "external/CppAst.NET"]
+	path = external/CppAst.NET
+	url = https://github.com/xoofx/CppAst.NET.git
+	branch = main
