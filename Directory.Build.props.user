@@ -1,5 +1,6 @@
 <Project>
 	<PropertyGroup>
+		<HalfLifeInstallDir>$(registry:HKEY_CURRENT_USER\Software\Valve\Steam@ModInstallPath)</HalfLifeInstallDir>
 		<!--client dll directory-->
 		<HlModDir>C:\Program Files (x86)\Steam\steamapps\common\Half-Life\gsfdemo\cl_dlls</HlModDir>
 		<!--Path to the game executable (hl.exe)-->
