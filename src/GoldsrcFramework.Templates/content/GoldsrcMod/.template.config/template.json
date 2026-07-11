@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "anchur",
+  "classifications": [
+    "GoldSrc",
+    "Mod",
+    "C#"
+  ],
+  "identity": "GoldsrcFramework.Templates.GoldsrcMod",
+  "name": "GoldsrcFramework Mod",
+  "shortName": "goldsrcmod",
+  "sourceName": "GoldsrcMod",
+  "preferNameDirectory": true,
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "symbols": {
+    "modName": {
+      "type": "parameter",
+      "datatype": "text",
+      "description": "The GoldSrc game directory name used by -game.",
+      "defaultValue": "mymod",
+      "replaces": "mymod"
+    },
+    "displayName": {
+      "type": "parameter",
+      "datatype": "text",
+      "description": "The human-readable mod name.",
+      "defaultValue": "My GoldSrc Mod",
+      "replaces": "My GoldSrc Mod"
+    },
+    "frameworkVersion": {
+      "type": "parameter",
+      "datatype": "text",
+      "description": "The GoldsrcFramework package version to reference.",
+      "defaultValue": "0.1.0",
+      "replaces": "GOLDSRCFRAMEWORK_VERSION"
+    }
+  }
+}

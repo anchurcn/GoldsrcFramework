@@ -1,0 +1,32 @@
+{
+  "Framework": {
+    "FrameworkName": "My GoldSrc Mod",
+    "Version": "1.0.0",
+    "EnableDebug": true,
+    "EnableVerboseLogging": true,
+    "GameServerAssembly": "GoldsrcMod.dll",
+    "GameClientAssembly": "GoldsrcMod.dll"
+  },
+  "Logging": {
+    "MinimumLevel": "Debug",
+    "EnableConsole": true,
+    "EnableFile": false,
+    "LogFilePath": "logs/goldsrcmod.log",
+    "LogLevel": {
+      "Default": "Debug",
+      "Microsoft": "Warning",
+      "System": "Warning",
+      "GoldsrcFramework": "Debug",
+      "GoldsrcMod": "Trace"
+    }
+  },
+  "Game": {
+    "GameName": "My GoldSrc Mod",
+    "MaxPlayers": 16,
+    "EnablePhysics": true,
+    "PhysicsUpdateRate": 60,
+    "CustomSettings": {}
+  },
+  "GameServerAssembly": "GoldsrcMod.dll",
+  "GameClientAssembly": "GoldsrcMod.dll"
+}

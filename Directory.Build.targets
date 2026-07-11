@@ -1,0 +1,11 @@
+<Project>
+
+  <Target Name="ConfigureMinVer" BeforeTargets="MinVer">
+    <PropertyGroup>
+      <MinVerDefaultPreReleaseIdentifiers>preview.0</MinVerDefaultPreReleaseIdentifiers>
+      <MinVerTagPrefix>v</MinVerTagPrefix>
+      <MinVerVerbosity>normal</MinVerVerbosity>
+    </PropertyGroup>
+  </Target>
+
+</Project>

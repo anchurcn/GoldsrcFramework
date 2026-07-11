@@ -1,46 +1,51 @@
 <Project>
-  
-  <!-- 
-    ============================================================================
-    统一的 TargetFramework 版本管理
-    ============================================================================
-    这个文件会被所有子项目自动导入，用于集中管理 TargetFramework 版本。
-    
-    使用方法：
-    1. 在这里修改 DefaultTargetFramework 或 NetLoaderTargetFramework 即可影响所有项目
-    2. 各个项目的 .csproj 文件中使用 $(TargetFramework) 而不是硬编码版本号
-    3. 如果某个项目需要特殊版本，可以在项目文件中覆盖
-  -->
-  
-  <PropertyGroup>
-    <!-- 默认的 TargetFramework 版本 (用于大部分项目) -->
+
+  <PropertyGroup Label="Target frameworks">
     <DefaultTargetFramework>net10.0</DefaultTargetFramework>
-    
-    <!-- NetLoader 项目使用的特殊版本 (因为需要 Native AOT 支持) -->
     <NetLoaderTargetFramework>net10.0</NetLoaderTargetFramework>
   </PropertyGroup>
-  
-  <!-- 
-    为不同的项目设置 TargetFramework
-    如果项目没有显式设置 TargetFramework，则使用这里的默认值
-  -->
+
   <PropertyGroup Condition="'$(TargetFramework)' == ''">
-    <!-- NetLoader 项目使用特殊版本 -->
     <TargetFramework Condition="$(MSBuildProjectName.Contains('NetLoader'))">$(NetLoaderTargetFramework)</TargetFramework>
-    
-    <!-- 其他所有项目使用默认版本 -->
     <TargetFramework Condition="'$(TargetFramework)' == ''">$(DefaultTargetFramework)</TargetFramework>
   </PropertyGroup>
-  
-  <!-- 通用的项目属性 -->
-  <PropertyGroup>
+
+  <PropertyGroup Label="Build">
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
+
+  <PropertyGroup Label="Package">
+    <Authors>anchur</Authors>
+    <Company>anchur</Company>
+    <Copyright>Half Life 1 SDK Copyright(c) Valve Corp.</Copyright>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+    <PackageProjectUrl>https://github.com/anchurcn/GoldsrcFramework</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>https://github.com/anchurcn/GoldsrcFramework/releases</PackageReleaseNotes>
+    <PackageTags>goldsrc;half-life;modding;dotnet;csharp</PackageTags>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/anchurcn/GoldsrcFramework.git</RepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsPackable)' == 'true'">
+    <None Include="$(MSBuildThisFileDirectory)LICENSE.txt" Pack="true" PackagePath="" Visible="false" />
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="" Visible="false" />
+  </ItemGroup>
+
+  <ItemGroup Label="Build tools" Condition="'$(MSBuildProjectExtension)' == '.csproj'">
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="all" Version="8.0.0" />
+    <PackageReference Include="MinVer" PrivateAssets="all" Version="6.0.0" />
+  </ItemGroup>
 
   <Import Project="$(MSBuildThisFileDirectory)Directory.Build.props.user"
           Condition="Exists('$(MSBuildThisFileDirectory)Directory.Build.props.user')" />
 
 </Project>
-

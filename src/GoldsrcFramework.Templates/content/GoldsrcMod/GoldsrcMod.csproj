@@ -1,0 +1,12 @@
+<Project Sdk="GoldsrcFramework.Sdk/GOLDSRCFRAMEWORK_VERSION">
+
+  <PropertyGroup>
+    <GoldsrcModDirectoryName>mymod</GoldsrcModDirectoryName>
+    <GoldsrcModDisplayName>My GoldSrc Mod</GoldsrcModDisplayName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="GoldsrcFramework" Version="GOLDSRCFRAMEWORK_VERSION" />
+  </ItemGroup>
+
+</Project>

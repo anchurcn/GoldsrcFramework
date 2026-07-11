@@ -5,6 +5,7 @@
     <IsPackable>true</IsPackable>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <PackageId>GoldsrcFramework.Sdk</PackageId>
+    <Title>GoldsrcFramework SDK</Title>
     <Description>MSBuild SDK assets for GoldsrcFramework mod projects.</Description>
     <NoWarn>$(NoWarn);NU5128</NoWarn>
   </PropertyGroup>
@@ -12,16 +13,34 @@
   <ItemGroup>
     <None Include="build\**\*"
           Pack="true"
-          PackagePath="buildTransitive\" />
+          PackagePath="build\" />
     <None Include="Sdk\**\*"
           Pack="true"
           PackagePath="Sdk\" />
     <None Include="targets\**\*"
           Pack="true"
-          PackagePath="buildTransitive\targets\" />
+          PackagePath="targets\" />
     <None Include="..\GoldsrcFramework.NetLoader\Loader.cs"
           Pack="true"
-          PackagePath="buildTransitive\tools\GoldsrcFramework.NetLoader\Loader.cs" />
+          PackagePath="tools\GoldsrcFramework.NetLoader\Loader.cs" />
   </ItemGroup>
+
+  <PropertyGroup>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackGoldsrcFrameworkSdkBuildTool</TargetsForTfmSpecificContentInPackage>
+  </PropertyGroup>
+
+  <Target Name="BuildGoldsrcFrameworkSdkBuildTool" Condition="'$(NoBuild)' != 'true'">
+    <MSBuild Projects="..\GoldsrcFramework.BuildTool\GoldsrcFramework.BuildTool.csproj"
+             Properties="Configuration=$(Configuration);Platform=AnyCPU;TargetFramework=$(TargetFramework)"
+             Targets="Build" />
+  </Target>
+
+  <Target Name="PackGoldsrcFrameworkSdkBuildTool" DependsOnTargets="BuildGoldsrcFrameworkSdkBuildTool">
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="..\GoldsrcFramework.BuildTool\bin\$(Configuration)\$(TargetFramework)\GoldsrcFramework.BuildTool.*">
+        <PackagePath>tools\GoldsrcFramework.BuildTool\</PackagePath>
+      </TfmSpecificPackageFile>
+    </ItemGroup>
+  </Target>
 
 </Project>

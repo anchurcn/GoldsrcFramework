@@ -39,6 +39,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GoldsrcFramework.Ecs", "Gol
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GoldsrcFramework.Sdk", "GoldsrcFramework.Sdk\GoldsrcFramework.Sdk.csproj", "{08C56D78-008F-4C81-86A7-07B82030D0DC}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GoldsrcFramework.Templates", "GoldsrcFramework.Templates\GoldsrcFramework.Templates.csproj", "{4C0D4404-1BF3-44B2-A91E-AD0B3A4146E4}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -205,6 +207,18 @@ Global
 		{08C56D78-008F-4C81-86A7-07B82030D0DC}.Release|x64.Build.0 = Release|Any CPU
 		{08C56D78-008F-4C81-86A7-07B82030D0DC}.Release|x86.ActiveCfg = Release|Any CPU
 		{08C56D78-008F-4C81-86A7-07B82030D0DC}.Release|x86.Build.0 = Release|Any CPU
+		{4C0D4404-1BF3-44B2-A91E-AD0B3A4146E4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4C0D4404-1BF3-44B2-A91E-AD0B3A4146E4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4C0D4404-1BF3-44B2-A91E-AD0B3A4146E4}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{4C0D4404-1BF3-44B2-A91E-AD0B3A4146E4}.Debug|x64.Build.0 = Debug|Any CPU
+		{4C0D4404-1BF3-44B2-A91E-AD0B3A4146E4}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{4C0D4404-1BF3-44B2-A91E-AD0B3A4146E4}.Debug|x86.Build.0 = Debug|Any CPU
+		{4C0D4404-1BF3-44B2-A91E-AD0B3A4146E4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4C0D4404-1BF3-44B2-A91E-AD0B3A4146E4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4C0D4404-1BF3-44B2-A91E-AD0B3A4146E4}.Release|x64.ActiveCfg = Release|Any CPU
+		{4C0D4404-1BF3-44B2-A91E-AD0B3A4146E4}.Release|x64.Build.0 = Release|Any CPU
+		{4C0D4404-1BF3-44B2-A91E-AD0B3A4146E4}.Release|x86.ActiveCfg = Release|Any CPU
+		{4C0D4404-1BF3-44B2-A91E-AD0B3A4146E4}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

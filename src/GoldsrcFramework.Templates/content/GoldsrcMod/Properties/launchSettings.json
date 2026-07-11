@@ -1,0 +1,13 @@
+{
+  "profiles": {
+    "Launch Half-Life": {
+      "commandName": "Executable",
+      "executablePath": "$(HLExe)",
+      "commandLineArgs": "-console -game mymod -windowed -width 1600 -height 900",
+      "workingDirectory": "$(HLExeFolder)",
+      "environmentVariables": {
+        "SDL_WINDOWS_DISABLE_THREAD_NAMING": "1"
+      }
+    }
+  }
+}
