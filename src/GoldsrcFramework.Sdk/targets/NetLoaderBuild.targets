@@ -1,0 +1,120 @@
+<Project>
+
+  <PropertyGroup>
+    <GoldsrcFrameworkSourceRoot Condition="'$(GoldsrcFrameworkSourceRoot)' == '' and '$(UsingGoldsrcFrameworkSdk)' != 'true'">$(GoldsrcFrameworkSdkRoot)..\</GoldsrcFrameworkSourceRoot>
+
+    <GoldsrcFrameworkNetLoaderSourcePath Condition="'$(GoldsrcFrameworkNetLoaderSourcePath)' == '' and '$(UsingGoldsrcFrameworkSdk)' != 'true'">$(GoldsrcFrameworkSourceRoot)GoldsrcFramework.NetLoader\Loader.cs</GoldsrcFrameworkNetLoaderSourcePath>
+    <GoldsrcFrameworkNetLoaderSourcePath Condition="'$(GoldsrcFrameworkNetLoaderSourcePath)' == ''">$(GoldsrcFrameworkSdkRoot)tools\GoldsrcFramework.NetLoader\Loader.cs</GoldsrcFrameworkNetLoaderSourcePath>
+
+    <GoldsrcFrameworkBuildToolProjectPath Condition="'$(GoldsrcFrameworkBuildToolProjectPath)' == '' and '$(UsingGoldsrcFrameworkSdk)' != 'true'">$(GoldsrcFrameworkSourceRoot)GoldsrcFramework.BuildTool\GoldsrcFramework.BuildTool.csproj</GoldsrcFrameworkBuildToolProjectPath>
+    <GoldsrcFrameworkBuildToolExePath Condition="'$(GoldsrcFrameworkBuildToolExePath)' == '' and '$(UsingGoldsrcFrameworkSdk)' != 'true'">$(GoldsrcFrameworkSourceRoot)GoldsrcFramework.BuildTool\bin\$(Configuration)\$(TargetFramework)\GoldsrcFramework.BuildTool.exe</GoldsrcFrameworkBuildToolExePath>
+    <GoldsrcFrameworkBuildToolExePath Condition="'$(GoldsrcFrameworkBuildToolExePath)' == '' and Exists('$(GoldsrcFrameworkSdkRoot)tools\GoldsrcFramework.BuildTool\GoldsrcFramework.BuildTool.exe')">$(GoldsrcFrameworkSdkRoot)tools\GoldsrcFramework.BuildTool\GoldsrcFramework.BuildTool.exe</GoldsrcFrameworkBuildToolExePath>
+    <GoldsrcFrameworkBuildToolDllPath Condition="'$(GoldsrcFrameworkBuildToolDllPath)' == '' and Exists('$(GoldsrcFrameworkSdkRoot)tools\GoldsrcFramework.BuildTool\GoldsrcFramework.BuildTool.dll')">$(GoldsrcFrameworkSdkRoot)tools\GoldsrcFramework.BuildTool\GoldsrcFramework.BuildTool.dll</GoldsrcFrameworkBuildToolDllPath>
+
+    <GoldsrcFrameworkBuildToolCommand Condition="'$(GoldsrcFrameworkBuildToolCommand)' == '' and '$(GoldsrcFrameworkBuildToolExePath)' != ''">&quot;$(GoldsrcFrameworkBuildToolExePath)&quot;</GoldsrcFrameworkBuildToolCommand>
+    <GoldsrcFrameworkBuildToolCommand Condition="'$(GoldsrcFrameworkBuildToolCommand)' == '' and '$(GoldsrcFrameworkBuildToolDllPath)' != ''">dotnet &quot;$(GoldsrcFrameworkBuildToolDllPath)&quot;</GoldsrcFrameworkBuildToolCommand>
+
+  </PropertyGroup>
+
+  <Target Name="SetGoldsrcFrameworkLoaderSourceDir"
+          BeforeTargets="CreateGoldsrcFrameworkLoaderSourceDir">
+    <PropertyGroup>
+      <GoldsrcFrameworkLoaderSourceDir Condition="'$(GoldsrcFrameworkLoaderSourceDir)' == ''">$(IntermediateOutputPath)GoldsrcFrameworkLoaderSource\</GoldsrcFrameworkLoaderSourceDir>
+      <GoldsrcFrameworkEntityExportsCsPath>$(GoldsrcFrameworkLoaderSourceDir)EntityExports.cs</GoldsrcFrameworkEntityExportsCsPath>
+      <GoldsrcFrameworkGeneratedLoaderCsPath>$(GoldsrcFrameworkLoaderSourceDir)Loader.cs</GoldsrcFrameworkGeneratedLoaderCsPath>
+      <GoldsrcFrameworkGeneratedNetLoaderProjectPath>$(GoldsrcFrameworkLoaderSourceDir)GoldsrcFramework.NetLoader.csproj</GoldsrcFrameworkGeneratedNetLoaderProjectPath>
+      <GoldsrcFrameworkGeneratedNetLoaderDllPath>$(GoldsrcFrameworkLoaderSourceDir)bin\$(Configuration)\$(TargetFramework)\$(RuntimeIdentifier)\native\client.dll</GoldsrcFrameworkGeneratedNetLoaderDllPath>
+      <GoldsrcFrameworkGeneratedNetLoaderPdbPath>$(GoldsrcFrameworkLoaderSourceDir)bin\$(Configuration)\$(TargetFramework)\$(RuntimeIdentifier)\native\client.pdb</GoldsrcFrameworkGeneratedNetLoaderPdbPath>
+      <GoldsrcFrameworkAssemblyPath Condition="'$(GoldsrcFrameworkAssemblyPath)' == ''">$(TargetDir)GoldsrcFramework.dll</GoldsrcFrameworkAssemblyPath>
+      <GoldsrcFrameworkRuntimeConfigPath Condition="'$(GoldsrcFrameworkRuntimeConfigPath)' == ''">$(TargetDir)GoldsrcFramework.runtimeconfig.json</GoldsrcFrameworkRuntimeConfigPath>
+      <GoldsrcFrameworkNetLoaderOutputPath Condition="'$(GoldsrcFrameworkNetLoaderOutputPath)' == ''">$(TargetDir)client.dll</GoldsrcFrameworkNetLoaderOutputPath>
+      <GoldsrcFrameworkNetLoaderPdbOutputPath Condition="'$(GoldsrcFrameworkNetLoaderPdbOutputPath)' == ''">$(TargetDir)client.pdb</GoldsrcFrameworkNetLoaderPdbOutputPath>
+    </PropertyGroup>
+  </Target>
+
+  <Target Name="BuildGoldsrcFrameworkBuildTool"
+          BeforeTargets="GenerateEntityExports"
+          Condition="'$(UsingGoldsrcFrameworkSdk)' != 'true'">
+    <Error Text="GoldsrcFramework.BuildTool project was not found at $(GoldsrcFrameworkBuildToolProjectPath)."
+           Condition="!Exists('$(GoldsrcFrameworkBuildToolProjectPath)')" />
+    <Message Text="Building GoldsrcFramework.BuildTool..." Importance="high" />
+    <MSBuild Projects="$(GoldsrcFrameworkBuildToolProjectPath)"
+             Properties="Configuration=$(Configuration);Platform=AnyCPU;TargetFramework=$(TargetFramework)"
+             Targets="Build" />
+  </Target>
+
+  <Target Name="ValidateGoldsrcFrameworkBuildTool"
+          BeforeTargets="GenerateEntityExports"
+          DependsOnTargets="BuildGoldsrcFrameworkBuildTool">
+    <Error Text="GoldsrcFramework.BuildTool could not be resolved. In source mode set GoldsrcFrameworkBuildToolProjectPath; in package mode the package must include tools\GoldsrcFramework.BuildTool."
+           Condition="'$(GoldsrcFrameworkBuildToolCommand)' == ''" />
+    <Error Text="GoldsrcFramework.BuildTool executable was not found at $(GoldsrcFrameworkBuildToolExePath)."
+           Condition="'$(GoldsrcFrameworkBuildToolExePath)' != '' and !Exists('$(GoldsrcFrameworkBuildToolExePath)')" />
+    <Error Text="GoldsrcFramework.BuildTool DLL was not found at $(GoldsrcFrameworkBuildToolDllPath)."
+           Condition="'$(GoldsrcFrameworkBuildToolDllPath)' != '' and !Exists('$(GoldsrcFrameworkBuildToolDllPath)')" />
+  </Target>
+
+  <Target Name="CreateGoldsrcFrameworkLoaderSourceDir"
+          BeforeTargets="GenerateEntityExports"
+          DependsOnTargets="SetGoldsrcFrameworkLoaderSourceDir">
+    <MakeDir Directories="$(GoldsrcFrameworkLoaderSourceDir)" />
+  </Target>
+
+  <Target Name="GenerateEntityExports"
+          AfterTargets="Build"
+          DependsOnTargets="ValidateGoldsrcFrameworkBuildTool;CreateGoldsrcFrameworkLoaderSourceDir;SetGoldsrcFrameworkLoaderSourceDir"
+          Inputs="$(TargetPath)"
+          Outputs="$(GoldsrcFrameworkEntityExportsCsPath)">
+    <Error Text="GoldsrcFramework.dll not found at $(GoldsrcFrameworkAssemblyPath). Make sure the mod references GoldsrcFramework and CopyLocalLockFileAssemblies is enabled."
+           Condition="!Exists('$(GoldsrcFrameworkAssemblyPath)')" />
+    <Message Text="Generating GoldsrcFramework entity exports: $(GoldsrcFrameworkEntityExportsCsPath)" Importance="high" />
+    <Exec Command="$(GoldsrcFrameworkBuildToolCommand) cs &quot;$(GoldsrcFrameworkAssemblyPath)&quot; &quot;$(GoldsrcFrameworkEntityExportsCsPath)&quot;"
+          WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+
+  <Target Name="CopyNetLoaderSource"
+          AfterTargets="GenerateEntityExports"
+          DependsOnTargets="GenerateEntityExports"
+          Inputs="$(TargetPath);$(GoldsrcFrameworkEntityExportsCsPath);$(GoldsrcFrameworkNetLoaderSourcePath)"
+          Outputs="$(GoldsrcFrameworkGeneratedLoaderCsPath);$(GoldsrcFrameworkGeneratedNetLoaderProjectPath)">
+    <Error Text="GoldsrcFramework NetLoader source was not found at $(GoldsrcFrameworkNetLoaderSourcePath)."
+           Condition="!Exists('$(GoldsrcFrameworkNetLoaderSourcePath)')" />
+    <Copy SourceFiles="$(GoldsrcFrameworkNetLoaderSourcePath)"
+          DestinationFiles="$(GoldsrcFrameworkGeneratedLoaderCsPath)" />
+    <PropertyGroup>
+      <GoldsrcFrameworkLoaderCsContent>$([System.IO.File]::ReadAllText('$(GoldsrcFrameworkGeneratedLoaderCsPath)'))</GoldsrcFrameworkLoaderCsContent>
+      <GoldsrcFrameworkModifiedLoaderCsContent>$(GoldsrcFrameworkLoaderCsContent.Replace('EntityExportsDemo', 'EntityExports'))</GoldsrcFrameworkModifiedLoaderCsContent>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(GoldsrcFrameworkGeneratedLoaderCsPath)"
+                      Lines="$(GoldsrcFrameworkModifiedLoaderCsContent)"
+                      Overwrite="true" />
+    <WriteLinesToFile File="$(GoldsrcFrameworkGeneratedNetLoaderProjectPath)"
+                      Overwrite="true"
+                      Lines="&lt;Project Sdk=&quot;Microsoft.NET.Sdk&quot;&gt;&#xD;&#xA;  &lt;PropertyGroup&gt;&#xD;&#xA;    &lt;ImplicitUsings&gt;enable&lt;/ImplicitUsings&gt;&#xD;&#xA;    &lt;Nullable&gt;enable&lt;/Nullable&gt;&#xD;&#xA;    &lt;OutputType&gt;Library&lt;/OutputType&gt;&#xD;&#xA;    &lt;AllowUnsafeBlocks&gt;true&lt;/AllowUnsafeBlocks&gt;&#xD;&#xA;    &lt;PublishAot&gt;true&lt;/PublishAot&gt;&#xD;&#xA;    &lt;SelfContained&gt;true&lt;/SelfContained&gt;&#xD;&#xA;    &lt;PublishTrimmed&gt;true&lt;/PublishTrimmed&gt;&#xD;&#xA;    &lt;TrimMode&gt;partial&lt;/TrimMode&gt;&#xD;&#xA;    &lt;NativeLib&gt;Shared&lt;/NativeLib&gt;&#xD;&#xA;    &lt;AssemblyName&gt;client&lt;/AssemblyName&gt;&#xD;&#xA;    &lt;IlcExportUnmanagedEntrypoints&gt;true&lt;/IlcExportUnmanagedEntrypoints&gt;&#xD;&#xA;  &lt;/PropertyGroup&gt;&#xD;&#xA;  &lt;Target Name=&quot;PrepareForNativePublish&quot; AfterTargets=&quot;Build&quot;&gt;&#xD;&#xA;    &lt;ItemGroup&gt;&#xD;&#xA;      &lt;NativeLibrary Include=&quot;$(NetCoreTargetingPackRoot)/Microsoft.NETCore.App.Host.$(RuntimeIdentifier)/$(BundledNETCoreAppPackageVersion)/runtimes/$(RuntimeIdentifier)/native\libnethost.lib&quot; /&gt;&#xD;&#xA;    &lt;/ItemGroup&gt;&#xD;&#xA;  &lt;/Target&gt;&#xD;&#xA;&lt;/Project&gt;" />
+    <Message Text="NetLoader source prepared in $(GoldsrcFrameworkLoaderSourceDir)" Importance="high" />
+  </Target>
+
+  <Target Name="BuildNetLoader"
+          AfterTargets="CopyNetLoaderSource"
+          DependsOnTargets="CopyNetLoaderSource"
+          Inputs="$(TargetPath);$(GoldsrcFrameworkEntityExportsCsPath);$(GoldsrcFrameworkGeneratedLoaderCsPath);$(GoldsrcFrameworkGeneratedNetLoaderProjectPath)"
+          Outputs="$(GoldsrcFrameworkNetLoaderOutputPath)">
+    <Error Text="GoldsrcFramework.runtimeconfig.json not found at $(GoldsrcFrameworkRuntimeConfigPath)."
+           Condition="!Exists('$(GoldsrcFrameworkRuntimeConfigPath)')" />
+    <Copy SourceFiles="$(GoldsrcFrameworkAssemblyPath);$(GoldsrcFrameworkRuntimeConfigPath)"
+          DestinationFolder="$(GoldsrcFrameworkLoaderSourceDir)" />
+    <MSBuild Projects="$(GoldsrcFrameworkGeneratedNetLoaderProjectPath)"
+             Properties="Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier);TargetFramework=$(TargetFramework)"
+             Targets="Restore" />
+    <MSBuild Projects="$(GoldsrcFrameworkGeneratedNetLoaderProjectPath)"
+             Properties="Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier);TargetFramework=$(TargetFramework);PublishDir=$(GoldsrcFrameworkLoaderSourceDir)publish\"
+             Targets="Publish" />
+    <Copy SourceFiles="$(GoldsrcFrameworkGeneratedNetLoaderDllPath)"
+          DestinationFiles="$(GoldsrcFrameworkNetLoaderOutputPath)" />
+    <Copy SourceFiles="$(GoldsrcFrameworkGeneratedNetLoaderPdbPath)"
+          DestinationFiles="$(GoldsrcFrameworkNetLoaderPdbOutputPath)"
+          Condition="Exists('$(GoldsrcFrameworkGeneratedNetLoaderPdbPath)')" />
+    <Message Text="NetLoader built successfully: $(GoldsrcFrameworkNetLoaderOutputPath)" Importance="high" />
+  </Target>
+
+</Project>

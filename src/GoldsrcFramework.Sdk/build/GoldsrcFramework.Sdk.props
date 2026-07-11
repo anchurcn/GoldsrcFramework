@@ -1,0 +1,25 @@
+<Project>
+
+  <PropertyGroup>
+    <GoldsrcFrameworkSdkRoot Condition="'$(GoldsrcFrameworkSdkRoot)' == '' and Exists('$(MSBuildThisFileDirectory)Sdk\Sdk.props')">$(MSBuildThisFileDirectory)</GoldsrcFrameworkSdkRoot>
+    <GoldsrcFrameworkSdkRoot Condition="'$(GoldsrcFrameworkSdkRoot)' == '' and Exists('$(MSBuildThisFileDirectory)..\Sdk\Sdk.props')">$(MSBuildThisFileDirectory)..\</GoldsrcFrameworkSdkRoot>
+
+    <TargetFramework Condition="'$(TargetFramework)' == ''">net10.0</TargetFramework>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x86</RuntimeIdentifier>
+    <GoldsrcFrameworkAllowUnsafeBlocksDefault Condition="'$(GoldsrcFrameworkAllowUnsafeBlocksDefault)' == ''">true</GoldsrcFrameworkAllowUnsafeBlocksDefault>
+    <CopyLocalLockFileAssemblies Condition="'$(CopyLocalLockFileAssemblies)' == ''">true</CopyLocalLockFileAssemblies>
+    <DisableFastUpToDateCheck Condition="'$(DisableFastUpToDateCheck)' == ''">true</DisableFastUpToDateCheck>
+    <GoldsrcFrameworkLoaderKind Condition="'$(GoldsrcFrameworkLoaderKind)' == ''">NetLoader</GoldsrcFrameworkLoaderKind>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(UsingGoldsrcFrameworkSdk)' != 'true' and Exists('$(GoldsrcFrameworkSdkRoot)..\GoldsrcFramework\GoldsrcFramework.csproj')">
+    <ProjectReference Include="$(GoldsrcFrameworkSdkRoot)..\GoldsrcFramework\GoldsrcFramework.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="modSettings.json" Condition="Exists('modSettings.json')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

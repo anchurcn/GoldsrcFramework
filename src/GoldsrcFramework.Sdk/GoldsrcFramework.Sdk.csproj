@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.Build.NoTargets/3.7.134">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>true</IsPackable>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <PackageId>GoldsrcFramework.Sdk</PackageId>
+    <Description>MSBuild SDK assets for GoldsrcFramework mod projects.</Description>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="build\**\*"
+          Pack="true"
+          PackagePath="buildTransitive\" />
+    <None Include="Sdk\**\*"
+          Pack="true"
+          PackagePath="Sdk\" />
+    <None Include="targets\**\*"
+          Pack="true"
+          PackagePath="buildTransitive\targets\" />
+    <None Include="..\GoldsrcFramework.NetLoader\Loader.cs"
+          Pack="true"
+          PackagePath="buildTransitive\tools\GoldsrcFramework.NetLoader\Loader.cs" />
+  </ItemGroup>
+
+</Project>

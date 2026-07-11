@@ -1,0 +1,14 @@
+<Project>
+
+  <PropertyGroup>
+    <GoldsrcFrameworkSdkRoot Condition="'$(GoldsrcFrameworkSdkRoot)' == '' and Exists('$(MSBuildThisFileDirectory)Sdk\Sdk.targets')">$(MSBuildThisFileDirectory)</GoldsrcFrameworkSdkRoot>
+    <GoldsrcFrameworkSdkRoot Condition="'$(GoldsrcFrameworkSdkRoot)' == '' and Exists('$(MSBuildThisFileDirectory)..\Sdk\Sdk.targets')">$(MSBuildThisFileDirectory)..\</GoldsrcFrameworkSdkRoot>
+    <AllowUnsafeBlocks Condition="'$(GoldsrcFrameworkAllowUnsafeBlocksDefault)' == 'true' and '$(AllowUnsafeBlocks)' != 'true'">true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <Import Project="$(GoldsrcFrameworkSdkRoot)targets\Diagnostics.targets"
+          Condition="Exists('$(GoldsrcFrameworkSdkRoot)targets\Diagnostics.targets')" />
+  <Import Project="$(GoldsrcFrameworkSdkRoot)targets\ModBuild.targets"
+          Condition="Exists('$(GoldsrcFrameworkSdkRoot)targets\ModBuild.targets')" />
+
+</Project>

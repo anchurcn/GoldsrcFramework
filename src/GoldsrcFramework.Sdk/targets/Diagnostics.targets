@@ -1,0 +1,11 @@
+<Project>
+
+  <Target Name="GoldsrcFrameworkValidateSdkConfiguration"
+          BeforeTargets="Build">
+    <Error Text="GoldsrcFrameworkLoaderKind must be NetLoader or None. CppLoader is obsolete. Current value: '$(GoldsrcFrameworkLoaderKind)'."
+           Condition="'$(GoldsrcFrameworkLoaderKind)' != 'NetLoader' and '$(GoldsrcFrameworkLoaderKind)' != 'None'" />
+    <Message Text="GoldsrcFramework SDK enabled. UsingGoldsrcFrameworkSdk=$(UsingGoldsrcFrameworkSdk), Loader=$(GoldsrcFrameworkLoaderKind), RuntimeIdentifier=$(RuntimeIdentifier)"
+             Importance="normal" />
+  </Target>
+
+</Project>

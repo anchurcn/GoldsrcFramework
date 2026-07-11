@@ -7,6 +7,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\GoldsrcFramework.Ecs\GoldsrcFramework.Ecs.csproj" />
 		<ProjectReference Include="..\GoldsrcFramework.Engine\GoldsrcFramework.Engine.csproj" />
 		<ProjectReference Include="..\GoldsrcFramework.Math\GoldsrcFramework.Math.csproj" />
 	</ItemGroup>
@@ -25,6 +26,52 @@
 		<PackageReference Include="Stride.Engine" Version="4.3.0.2507" />
 		<PackageReference Include="Stride.Graphics" Version="4.3.0.2507" />
 	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="..\GoldsrcFramework.Sdk\build\**\*" Pack="true" PackagePath="buildTransitive\" />
+		<None Include="..\GoldsrcFramework.Sdk\Sdk\**\*" Pack="true" PackagePath="Sdk\" />
+		<None Include="..\GoldsrcFramework.Sdk\targets\**\*" Pack="true" PackagePath="buildTransitive\targets\" />
+		<None Include="..\GoldsrcFramework.NetLoader\Loader.cs" Pack="true" PackagePath="buildTransitive\tools\GoldsrcFramework.NetLoader\Loader.cs" />
+	</ItemGroup>
+
+	<PropertyGroup>
+		<TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackGoldsrcFrameworkBuildAliases;PackGoldsrcFrameworkBuildTool</TargetsForTfmSpecificContentInPackage>
+	</PropertyGroup>
+
+	<Target Name="PackGoldsrcFrameworkBuildAliases">
+		<PropertyGroup>
+			<GoldsrcFrameworkBuildAliasDir>$(IntermediateOutputPath)GoldsrcFrameworkPackageBuild\</GoldsrcFrameworkBuildAliasDir>
+			<GoldsrcFrameworkBuildPropsAliasPath>$(GoldsrcFrameworkBuildAliasDir)GoldsrcFramework.props</GoldsrcFrameworkBuildPropsAliasPath>
+			<GoldsrcFrameworkBuildTargetsAliasPath>$(GoldsrcFrameworkBuildAliasDir)GoldsrcFramework.targets</GoldsrcFrameworkBuildTargetsAliasPath>
+		</PropertyGroup>
+		<MakeDir Directories="$(GoldsrcFrameworkBuildAliasDir)" />
+		<WriteLinesToFile File="$(GoldsrcFrameworkBuildPropsAliasPath)"
+		                  Lines="&lt;Project&gt;&#xD;&#xA;  &lt;PropertyGroup&gt;&#xD;&#xA;    &lt;UsingGoldsrcFrameworkSdk&gt;true&lt;/UsingGoldsrcFrameworkSdk&gt;&#xD;&#xA;  &lt;/PropertyGroup&gt;&#xD;&#xA;  &lt;Import Project=&quot;$(MSBuildThisFileDirectory)GoldsrcFramework.Sdk.props&quot; Condition=&quot;Exists('$(MSBuildThisFileDirectory)GoldsrcFramework.Sdk.props')&quot; /&gt;&#xD;&#xA;&lt;/Project&gt;"
+		                  Overwrite="true" />
+		<WriteLinesToFile File="$(GoldsrcFrameworkBuildTargetsAliasPath)"
+		                  Lines="&lt;Project&gt;&#xD;&#xA;  &lt;Import Project=&quot;$(MSBuildThisFileDirectory)GoldsrcFramework.Sdk.targets&quot; Condition=&quot;Exists('$(MSBuildThisFileDirectory)GoldsrcFramework.Sdk.targets')&quot; /&gt;&#xD;&#xA;&lt;/Project&gt;"
+		                  Overwrite="true" />
+		<ItemGroup>
+			<TfmSpecificPackageFile Include="$(GoldsrcFrameworkBuildPropsAliasPath)">
+				<PackagePath>buildTransitive\</PackagePath>
+			</TfmSpecificPackageFile>
+			<TfmSpecificPackageFile Include="$(GoldsrcFrameworkBuildTargetsAliasPath)">
+				<PackagePath>buildTransitive\</PackagePath>
+			</TfmSpecificPackageFile>
+		</ItemGroup>
+	</Target>
+
+	<Target Name="BuildGoldsrcFrameworkPackageTools" Condition="'$(NoBuild)' != 'true'">
+		<MSBuild Projects="..\GoldsrcFramework.BuildTool\GoldsrcFramework.BuildTool.csproj" Properties="Configuration=$(Configuration);Platform=AnyCPU;TargetFramework=$(TargetFramework)" Targets="Build" />
+	</Target>
+
+	<Target Name="PackGoldsrcFrameworkBuildTool" DependsOnTargets="BuildGoldsrcFrameworkPackageTools">
+		<ItemGroup>
+			<TfmSpecificPackageFile Include="..\GoldsrcFramework.BuildTool\bin\$(Configuration)\$(TargetFramework)\GoldsrcFramework.BuildTool.*">
+				<PackagePath>buildTransitive\tools\GoldsrcFramework.BuildTool\</PackagePath>
+			</TfmSpecificPackageFile>
+		</ItemGroup>
+	</Target>
 
 	<!-- Include MSBuild.deps.json and MSBuild.runtimeconfig.json in ContentWithTargetPath so they will be copied to the output folder of projects
        that reference this one. -->

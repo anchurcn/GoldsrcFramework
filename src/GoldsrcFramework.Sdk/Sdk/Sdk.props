@@ -1,0 +1,12 @@
+<Project>
+
+  <PropertyGroup>
+    <!-- True only when the project enters through the packaged MSBuild SDK entry point:
+         <Project Sdk="GoldsrcFramework.Sdk">. Source-tree imports, such as Demo.csproj,
+         intentionally leave this unset so targets can use source project references. -->
+    <UsingGoldsrcFrameworkSdk>true</UsingGoldsrcFrameworkSdk>
+  </PropertyGroup>
+
+  <Import Project="..\build\GoldsrcFramework.Sdk.props" />
+
+</Project>
