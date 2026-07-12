@@ -15,5 +15,9 @@
           Condition="Exists('$(GoldsrcFrameworkSdkRoot)targets\Diagnostics.targets')" />
   <Import Project="$(GoldsrcFrameworkSdkRoot)targets\ModBuild.targets"
           Condition="Exists('$(GoldsrcFrameworkSdkRoot)targets\ModBuild.targets')" />
+  <Import Project="$(GoldsrcFrameworkSdkRoot)targets\LegacyDlls.targets"
+          Condition="Exists('$(GoldsrcFrameworkSdkRoot)targets\LegacyDlls.targets')" />
+  <Import Project="$(GoldsrcFrameworkSdkRoot)targets\DeployToHlModDir.targets"
+          Condition="Exists('$(GoldsrcFrameworkSdkRoot)targets\DeployToHlModDir.targets')" />
 
 </Project>

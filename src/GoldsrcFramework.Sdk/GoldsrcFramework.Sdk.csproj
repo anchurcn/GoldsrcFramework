@@ -20,6 +20,9 @@
     <None Include="targets\**\*"
           Pack="true"
           PackagePath="targets\" />
+    <None Include="..\..\artifacts\legacy\win-x86\**\*"
+          Pack="true"
+          PackagePath="tools\GoldsrcFramework.LegacyDlls\win-x86\" />
     <None Include="..\GoldsrcFramework.NetLoader\Loader.cs"
           Pack="true"
           PackagePath="tools\GoldsrcFramework.NetLoader\Loader.cs" />

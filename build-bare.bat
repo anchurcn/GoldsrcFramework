@@ -35,10 +35,10 @@ if "%LegacyPlatformToolset%"=="" (
 
 echo Using PlatformToolset=%LegacyPlatformToolset%
 
-set "SolutionDir=%~dp0external\hlsdk\projects\vs2019\"
+set "SolutionDir=%~dp0external\bare\projects\vs2019\"
 set "ClientOutDir=%SolutionDir%Release\hl_cdll"
 set "ServerOutDir=%SolutionDir%Release\hldll"
-set "LegacyDir=%~dp0artifacts\legacy\win-x86\hl"
+set "LegacyDir=%~dp0artifacts\legacy\win-x86\bare"
 
 MSBuild.exe "%SolutionDir%projects.sln" /t:hl_cdll /p:Configuration=Release /p:Platform="Win32" /p:PlatformToolset=%LegacyPlatformToolset% /p:PostBuildEventUseInBuild=false
 set "BuildExitCode=!errorlevel!"
@@ -66,6 +66,6 @@ if errorlevel 1 (
 
 copy /Y "%ServerOutDir%\hl.pdb" "%LegacyDir%\libserver.pdb" > nul
 
-echo Legacy HL DLLs built and copied to %LegacyDir%
+echo Legacy bare DLLs built and copied to %LegacyDir%
 echo   client.dll -> libclient.dll
 echo   hl.dll     -> libserver.dll

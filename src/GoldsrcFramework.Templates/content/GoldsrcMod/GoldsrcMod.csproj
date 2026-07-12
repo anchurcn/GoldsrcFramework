@@ -3,6 +3,7 @@
   <PropertyGroup>
     <GoldsrcModDirectoryName>mymod</GoldsrcModDirectoryName>
     <GoldsrcModDisplayName>My GoldSrc Mod</GoldsrcModDisplayName>
+    <BaseGame>hl</BaseGame>
   </PropertyGroup>
 
 </Project>

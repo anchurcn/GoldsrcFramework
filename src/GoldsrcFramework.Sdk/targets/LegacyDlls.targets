@@ -1,0 +1,47 @@
+<Project>
+
+  <PropertyGroup>
+    <GoldsrcFrameworkLegacyRuntimeIdentifier Condition="'$(GoldsrcFrameworkLegacyRuntimeIdentifier)' == ''">$(RuntimeIdentifier)</GoldsrcFrameworkLegacyRuntimeIdentifier>
+    <GoldsrcFrameworkLegacyRuntimeIdentifier Condition="'$(GoldsrcFrameworkLegacyRuntimeIdentifier)' == ''">win-x86</GoldsrcFrameworkLegacyRuntimeIdentifier>
+    <GoldsrcFrameworkLegacyDllsDir Condition="'$(UsingGoldsrcFrameworkSdk)' != 'true' and '$(GoldsrcFrameworkLegacyDllsDir)' == ''">$(GoldsrcFrameworkSdkRoot)..\..\artifacts\legacy\$(GoldsrcFrameworkLegacyRuntimeIdentifier)\$(GoldsrcFrameworkBaseGame)\</GoldsrcFrameworkLegacyDllsDir>
+    <GoldsrcFrameworkLegacyDllsDir Condition="'$(UsingGoldsrcFrameworkSdk)' == 'true' and '$(GoldsrcFrameworkLegacyDllsDir)' == ''">$(GoldsrcFrameworkSdkRoot)tools\GoldsrcFramework.LegacyDlls\$(GoldsrcFrameworkLegacyRuntimeIdentifier)\$(GoldsrcFrameworkBaseGame)\</GoldsrcFrameworkLegacyDllsDir>
+  </PropertyGroup>
+
+  <Target Name="ResolveGoldsrcFrameworkLegacyDlls"
+          BeforeTargets="Build">
+    <PropertyGroup>
+      <GoldsrcFrameworkLegacyClientDllPath>$(GoldsrcFrameworkLegacyDllsDir)libclient.dll</GoldsrcFrameworkLegacyClientDllPath>
+      <GoldsrcFrameworkLegacyServerDllPath>$(GoldsrcFrameworkLegacyDllsDir)libserver.dll</GoldsrcFrameworkLegacyServerDllPath>
+    </PropertyGroup>
+
+    <Error Text="Legacy client DLL was not found at $(GoldsrcFrameworkLegacyClientDllPath) for base game '$(GoldsrcFrameworkBaseGame)'. Build the legacy DLLs or choose a different base game."
+           Condition="!Exists('$(GoldsrcFrameworkLegacyClientDllPath)')" />
+    <Error Text="Legacy server DLL was not found at $(GoldsrcFrameworkLegacyServerDllPath) for base game '$(GoldsrcFrameworkBaseGame)'. Build the legacy DLLs or choose a different base game."
+           Condition="!Exists('$(GoldsrcFrameworkLegacyServerDllPath)')" />
+
+    <Message Text="GoldsrcFramework legacy DLLs resolved for base game '$(GoldsrcFrameworkBaseGame)' and runtime '$(GoldsrcFrameworkLegacyRuntimeIdentifier)': $(GoldsrcFrameworkLegacyDllsDir)"
+             Importance="normal" />
+  </Target>
+
+  <Target Name="CopyGoldsrcFrameworkLegacyDlls"
+          AfterTargets="Build"
+          DependsOnTargets="ResolveGoldsrcFrameworkLegacyDlls">
+    <PropertyGroup>
+      <GoldsrcFrameworkClientDllDeployDir Condition="'$(GoldsrcFrameworkClientDllDeployDir)' == ''">$(TargetDir)</GoldsrcFrameworkClientDllDeployDir>
+      <GoldsrcFrameworkServerDllDeployDir Condition="'$(GoldsrcFrameworkServerDllDeployDir)' == ''">$(TargetDir)</GoldsrcFrameworkServerDllDeployDir>
+    </PropertyGroup>
+
+    <MakeDir Directories="$(GoldsrcFrameworkClientDllDeployDir);$(GoldsrcFrameworkServerDllDeployDir)" />
+
+    <Copy SourceFiles="$(GoldsrcFrameworkLegacyClientDllPath)"
+          DestinationFiles="$(GoldsrcFrameworkClientDllDeployDir)libclient.dll"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(GoldsrcFrameworkLegacyServerDllPath)"
+          DestinationFiles="$(GoldsrcFrameworkServerDllDeployDir)libserver.dll"
+          SkipUnchangedFiles="true" />
+
+    <Message Text="Copied legacy DLLs to $(GoldsrcFrameworkClientDllDeployDir) and $(GoldsrcFrameworkServerDllDeployDir)."
+             Importance="normal" />
+  </Target>
+
+</Project>

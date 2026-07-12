@@ -92,9 +92,28 @@ Task("Test")
         }
     });
 
+Task("BuildLegacy")
+    .Description("Builds legacy HL and bare DLLs for packaging.")
+    .Does(() =>
+    {
+        var exitCode = StartProcess(
+            "cmd",
+            new ProcessSettings()
+            {
+                Arguments = "/c build-legacy.bat hl && build-legacy.bat bare",
+                WorkingDirectory = ".",
+            });
+
+        if (exitCode != 0)
+        {
+            throw new Exception("Legacy DLL build failed. Make sure Visual Studio is installed and submodules are initialized.");
+        }
+    });
+
 Task("Pack")
     .Description("Creates GoldsrcFramework NuGet packages.")
     .IsDependentOn("Build")
+    .IsDependentOn("BuildLegacy")
     .Does(() =>
     {
         foreach (var project in packageProjects)

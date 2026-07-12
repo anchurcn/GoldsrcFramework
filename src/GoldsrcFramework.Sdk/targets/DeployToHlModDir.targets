@@ -1,0 +1,52 @@
+<Project>
+
+  <Target Name="DeployGoldsrcFrameworkOutputToHlModDir"
+          AfterTargets="BuildNetLoader"
+          DependsOnTargets="CopyGoldsrcFrameworkLegacyDlls"
+          Condition="'$(HlModDir)' != '' and '$(GoldsrcFrameworkLoaderKind)' == 'NetLoader'">
+    <MakeDir Directories="$(HlModDir)" />
+    <Message Text="GoldsrcFramework deploy: robocopy $(TargetDir) -> $(HlModDir)" Importance="high" />
+    <Exec Command="robocopy &quot;$(TargetDir).&quot; &quot;$(HlModDir)&quot; *.* /E /XO /XX /R:1 /W:1 /NDL /NP /NJH /NJS"
+          IgnoreExitCode="true"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="Low">
+      <Output TaskParameter="ExitCode" PropertyName="_GoldsrcFrameworkDeployRoboCopyExitCode" />
+      <Output TaskParameter="ConsoleOutput" ItemName="_GoldsrcFrameworkDeployRoboCopyOutput" />
+    </Exec>
+    <Message Text="GoldsrcFramework deploy: %(_GoldsrcFrameworkDeployRoboCopyOutput.Identity)"
+             Importance="high"
+             Condition="'@(_GoldsrcFrameworkDeployRoboCopyOutput)' != ''" />
+    <Message Text="GoldsrcFramework deploy: robocopy exit code $(_GoldsrcFrameworkDeployRoboCopyExitCode) (0=no change, 1+=copied/extra info, &gt;=8=error)"
+             Importance="high" />
+    <Error Text="GoldsrcFramework deploy: robocopy failed with exit code $(_GoldsrcFrameworkDeployRoboCopyExitCode)"
+           Condition="$(_GoldsrcFrameworkDeployRoboCopyExitCode) &gt;= 8" />
+  </Target>
+
+  <Target Name="DeployGoldsrcFrameworkOutputToHlModDirWithoutNetLoader"
+          AfterTargets="CopyGoldsrcFrameworkLegacyDlls"
+          Condition="'$(HlModDir)' != '' and '$(GoldsrcFrameworkLoaderKind)' != 'NetLoader'">
+    <MakeDir Directories="$(HlModDir)" />
+    <Message Text="GoldsrcFramework deploy: robocopy $(TargetDir) -> $(HlModDir)" Importance="high" />
+    <Exec Command="robocopy &quot;$(TargetDir).&quot; &quot;$(HlModDir)&quot; *.* /E /XO /XX /R:1 /W:1 /NDL /NP /NJH /NJS"
+          IgnoreExitCode="true"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="Low">
+      <Output TaskParameter="ExitCode" PropertyName="_GoldsrcFrameworkDeployRoboCopyExitCode" />
+      <Output TaskParameter="ConsoleOutput" ItemName="_GoldsrcFrameworkDeployRoboCopyOutput" />
+    </Exec>
+    <Message Text="GoldsrcFramework deploy: %(_GoldsrcFrameworkDeployRoboCopyOutput.Identity)"
+             Importance="high"
+             Condition="'@(_GoldsrcFrameworkDeployRoboCopyOutput)' != ''" />
+    <Message Text="GoldsrcFramework deploy: robocopy exit code $(_GoldsrcFrameworkDeployRoboCopyExitCode) (0=no change, 1+=copied/extra info, &gt;=8=error)"
+             Importance="high" />
+    <Error Text="GoldsrcFramework deploy: robocopy failed with exit code $(_GoldsrcFrameworkDeployRoboCopyExitCode)"
+           Condition="$(_GoldsrcFrameworkDeployRoboCopyExitCode) &gt;= 8" />
+  </Target>
+
+  <Target Name="WarnMissingHlModDirForGoldsrcFrameworkDeploy"
+          AfterTargets="BuildNetLoader"
+          Condition="'$(HlModDir)' == '' and '$(GoldsrcFrameworkLoaderKind)' == 'NetLoader'">
+    <Message Text="GoldsrcFramework deploy: HlModDir is not configured; skip copy to game." Importance="high" />
+  </Target>
+
+</Project>

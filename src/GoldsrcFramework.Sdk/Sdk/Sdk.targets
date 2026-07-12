@@ -1,5 +1,6 @@
 <Project>
 
   <Import Project="..\build\GoldsrcFramework.Sdk.targets" />
+  <Import Project="$(MSBuildSDKsPath)\Microsoft.NET.Sdk\Sdk\Sdk.targets" />
 
 </Project>

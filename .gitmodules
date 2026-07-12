@@ -9,3 +9,6 @@
 	path = external/CppAst.NET
 	url = https://github.com/xoofx/CppAst.NET.git
 	branch = main
+[submodule "external/bare"]
+	path = external/bare
+	url = https://github.com/anchurcn/ball_game.git
