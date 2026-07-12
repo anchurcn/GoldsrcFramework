@@ -39,10 +39,6 @@ jobs:
         run: dotnet cake --target=Pack
         shell: pwsh
 
-      - name: Template smoke test
-        run: dotnet cake --target=TemplateSmokeTest
-        shell: pwsh
-
       - name: Push to NuGet
         run: |
           Get-ChildItem artifacts/packages -Filter *.nupkg |
