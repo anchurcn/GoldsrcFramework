@@ -33,7 +33,7 @@
     "frameworkVersion": {
       "type": "parameter",
       "datatype": "text",
-      "description": "The GoldsrcFramework package version to reference.",
+      "description": "The GoldsrcFramework SDK package version to use.",
       "defaultValue": "0.1.0",
       "replaces": "GOLDSRCFRAMEWORK_VERSION"
     }

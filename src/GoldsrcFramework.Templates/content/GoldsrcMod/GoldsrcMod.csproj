@@ -5,8 +5,4 @@
     <GoldsrcModDisplayName>My GoldSrc Mod</GoldsrcModDisplayName>
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="GoldsrcFramework" Version="GOLDSRCFRAMEWORK_VERSION" />
-  </ItemGroup>
-
 </Project>

@@ -4,7 +4,12 @@
     <GoldsrcFrameworkSdkRoot Condition="'$(GoldsrcFrameworkSdkRoot)' == '' and Exists('$(MSBuildThisFileDirectory)Sdk\Sdk.targets')">$(MSBuildThisFileDirectory)</GoldsrcFrameworkSdkRoot>
     <GoldsrcFrameworkSdkRoot Condition="'$(GoldsrcFrameworkSdkRoot)' == '' and Exists('$(MSBuildThisFileDirectory)..\Sdk\Sdk.targets')">$(MSBuildThisFileDirectory)..\</GoldsrcFrameworkSdkRoot>
     <AllowUnsafeBlocks Condition="'$(GoldsrcFrameworkAllowUnsafeBlocksDefault)' == 'true' and '$(AllowUnsafeBlocks)' != 'true'">true</AllowUnsafeBlocks>
+    <GoldsrcFrameworkPackageVersion Condition="'$(UsingGoldsrcFrameworkSdk)' == 'true' and '$(GoldsrcFrameworkPackageVersion)' == ''">$([System.Text.RegularExpressions.Regex]::Replace('$(MSBuildThisFileDirectory)', '(?i)^.*[\\/]goldsrcframework\.sdk[\\/]([^\\/]+)[\\/]build[\\/]*$', '$1'))</GoldsrcFrameworkPackageVersion>
   </PropertyGroup>
+
+  <ItemGroup Condition="'$(UsingGoldsrcFrameworkSdk)' == 'true' and '$(GoldsrcFrameworkPackageVersion)' != ''">
+    <PackageReference Include="GoldsrcFramework" Version="$(GoldsrcFrameworkPackageVersion)" />
+  </ItemGroup>
 
   <Import Project="$(GoldsrcFrameworkSdkRoot)targets\Diagnostics.targets"
           Condition="Exists('$(GoldsrcFrameworkSdkRoot)targets\Diagnostics.targets')" />
