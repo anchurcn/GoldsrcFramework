@@ -30,8 +30,18 @@ jobs:
         with:
           languages: csharp
 
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore .NET tools
+        run: dotnet tool restore
+        shell: pwsh
+
+      - name: Build
+        run: dotnet cake --target=Build
+        shell: pwsh
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
