@@ -25,21 +25,17 @@ GoldsrcFramework.Templates
 An external mod project should be small:
 
 ```xml
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="GoldsrcFramework.Sdk/1.0.0">
 
   <PropertyGroup>
     <GoldsrcModDirectoryName>mymod</GoldsrcModDirectoryName>
     <GoldsrcModDisplayName>My Mod</GoldsrcModDisplayName>
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="GoldsrcFramework" Version="1.0.0" />
-  </ItemGroup>
-
 </Project>
 ```
 
-The `GoldsrcFramework` package should import SDK build behavior through NuGet `build` or `buildTransitive` assets, so consumers do not need repository-relative imports.
+The `GoldsrcFramework.Sdk` package should add the matching `GoldsrcFramework` runtime package reference, so consumers do not need to write the package reference by hand.
 
 The Demo project is different from external consumers. It should use the same SDK pipeline, but keep source `ProjectReference` items for fast framework development:
 
@@ -213,7 +209,11 @@ dotnet new goldsrcmod
 The generated project should reference only:
 
 ```xml
-<PackageReference Include="GoldsrcFramework" Version="..." />
+<Project Sdk="GoldsrcFramework.Sdk/...">
+  <PropertyGroup>
+    <GoldsrcModDirectoryName>mymod</GoldsrcModDirectoryName>
+  </PropertyGroup>
+</Project>
 ```
 
 The template should not generate repository-specific `ProjectReference` items.

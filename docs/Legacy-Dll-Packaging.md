@@ -144,16 +144,26 @@ CopyGoldsrcFrameworkLegacyDlls
 The copy behavior should be:
 
 ```text
-libclient.dll -> <mod>/cl_dlls/libclient.dll
-libserver.dll -> <mod>/dlls/libserver.dll
+libclient.dll -> $(TargetDir)/libclient.dll
+libserver.dll -> $(TargetDir)/libserver.dll
 ```
 
-For the current Demo workflow, the destination directories can be configurable so the project can continue using its existing mod DLL output location until the full deploy pipeline is finished:
+The output root is important because the generated NetLoader `client.dll` resolves the legacy DLLs from its load directory.
+
+The destination directories remain configurable:
 
 ```xml
 <GoldsrcFrameworkClientDllDeployDir>...</GoldsrcFrameworkClientDllDeployDir>
 <GoldsrcFrameworkServerDllDeployDir>...</GoldsrcFrameworkServerDllDeployDir>
 ```
+
+Copying the final output directory into a local game or engine install is a separate deploy concern. The SDK should keep that in a dedicated deploy target:
+
+```text
+DeployToHlModDir.targets
+```
+
+When `HlModDir` is set, the deploy target should copy `$(TargetDir)` into `$(HlModDir)` with robocopy. In NetLoader mode, this deploy step must run after `BuildNetLoader`, so the generated `client.dll` and the legacy DLLs copied into `$(TargetDir)` are deployed together.
 
 ## Project Examples
 
@@ -195,4 +205,3 @@ A consumer that wants the bare legacy DLLs can opt in:
 5. Add SDK targets to resolve and copy the selected legacy DLLs.
 6. Add diagnostics for unsupported `BaseGame` values and missing DLLs.
 7. Update Demo and template projects to document the default `hl` behavior.
-

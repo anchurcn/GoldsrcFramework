@@ -47,12 +47,10 @@ The template creates projects in this shape:
     <GoldsrcModDirectoryName>mymod</GoldsrcModDirectoryName>
     <GoldsrcModDisplayName>My GoldSrc Mod</GoldsrcModDisplayName>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="GoldsrcFramework" Version="0.1.0" />
-  </ItemGroup>
 </Project>
 ```
+
+The SDK adds the matching `GoldsrcFramework` package reference automatically.
 
 Use `--frameworkVersion` when testing local preview packages:
 
