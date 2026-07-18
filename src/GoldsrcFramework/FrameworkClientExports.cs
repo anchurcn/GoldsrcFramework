@@ -1,12 +1,17 @@
+using System.Runtime.CompilerServices;
 using GoldsrcFramework.Configuration;
 using GoldsrcFramework.DependencyInjection;
 using GoldsrcFramework.Graphics;
 using GoldsrcFramework.LinearMath;
+using GoldsrcFramework.Physics;
 using GoldsrcFramework.Rendering;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NativeInterop;
 using System.Text;
+
+using SVector3 = Stride.Core.Mathematics.Vector3;
+using SQuaternion = Stride.Core.Mathematics.Quaternion;
 
 namespace GoldsrcFramework.Engine.Native;
 
@@ -15,6 +20,10 @@ namespace GoldsrcFramework.Engine.Native;
 /// </summary>
 public unsafe class FrameworkClientExports : IClientExportFuncs
 {
+    private BepuPhysicsDemo? _physicsDemo;
+    private double _physicsFrameTime;
+    private bool _physicsDemoInitialized;
+
     // IClientExportFuncs implementation - all based on LegacyClientInterop
     public virtual int Initialize(ClientEngineFuncs* pEnginefuncs, int iVersion)
     {
@@ -25,6 +34,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
     public virtual void HUD_Init()
     {
         LegacyClientInterop.HUD_Init();
+        InitPhysicsDemo();
     }
 
     public virtual int HUD_VidInit()
@@ -132,6 +142,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
     public virtual void HUD_DrawNormalTriangles()
     {
         LegacyClientInterop.HUD_DrawNormalTriangles();
+        DrawPhysicsDemo();
     }
 
     public virtual void HUD_DrawTransparentTriangles()
@@ -187,6 +198,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
     public virtual void HUD_Frame(double time)
     {
         LegacyClientInterop.HUD_Frame(time);
+        UpdatePhysicsDemo(time);
     }
 
     public virtual int HUD_Key_Event(int eventcode, int keynum, NChar* pszCurrentBinding)
@@ -234,5 +246,114 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
     {
         return LegacyClientInterop.ClientFactory();
     }
+
+    #region Physics Demo
+
+    private void InitPhysicsDemo()
+    {
+        try
+        {
+            _physicsDemo = new BepuPhysicsDemo();
+            _physicsDemo.Initialize();
+            _physicsFrameTime = 0;
+            _physicsDemoInitialized = true;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[BepuPhysicsDemo] Init failed: {ex.Message}");
+        }
+    }
+
+    private void UpdatePhysicsDemo(double time)
+    {
+        if (!_physicsDemoInitialized || _physicsDemo == null)
+            return;
+
+        try
+        {
+            float deltaTime;
+            if (_physicsFrameTime > 0)
+            {
+                deltaTime = (float)(time - _physicsFrameTime);
+            }
+            else
+            {
+                deltaTime = 1f / 60f;
+            }
+            _physicsFrameTime = time;
+
+            _physicsDemo.Update(deltaTime);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[BepuPhysicsDemo] Update failed: {ex.Message}");
+        }
+    }
+
+    private void DrawPhysicsDemo()
+    {
+        if (!_physicsDemoInitialized || _physicsDemo == null)
+            return;
+
+        var triApi = EngineApi.PClient->pTriAPI;
+        if (triApi == null)
+            return;
+
+        try
+        {
+            var pos = _physicsDemo.BoxPosition;
+            var rot = _physicsDemo.BoxRotation;
+
+            // Convert Stride types to System.Numerics for math operations
+            var nPos = Unsafe.As<SVector3, System.Numerics.Vector3>(ref pos);
+            var nRot = Unsafe.As<SQuaternion, System.Numerics.Quaternion>(ref rot);
+
+            // Draw a wireframe box using the triangle API
+            float half = 10f;
+
+            // Calculate 8 corners of the box in local space
+            Span<System.Numerics.Vector3> corners = stackalloc System.Numerics.Vector3[8];
+            corners[0] = new System.Numerics.Vector3(-half, -half, -half);
+            corners[1] = new System.Numerics.Vector3( half, -half, -half);
+            corners[2] = new System.Numerics.Vector3( half,  half, -half);
+            corners[3] = new System.Numerics.Vector3(-half,  half, -half);
+            corners[4] = new System.Numerics.Vector3(-half, -half,  half);
+            corners[5] = new System.Numerics.Vector3( half, -half,  half);
+            corners[6] = new System.Numerics.Vector3( half,  half,  half);
+            corners[7] = new System.Numerics.Vector3(-half,  half,  half);
+
+            // Transform corners by rotation and position
+            for (int i = 0; i < 8; i++)
+            {
+                corners[i] = System.Numerics.Vector3.Transform(corners[i], nRot) + nPos;
+            }
+
+            // 12 edges of the box
+            Span<(int, int)> edges = stackalloc (int, int)[12];
+            edges[0] = (0, 1); edges[1] = (1, 2); edges[2] = (2, 3); edges[3] = (3, 0); // bottom face
+            edges[4] = (4, 5); edges[5] = (5, 6); edges[6] = (6, 7); edges[7] = (7, 4); // top face
+            edges[8] = (0, 4); edges[9] = (1, 5); edges[10] = (2, 6); edges[11] = (3, 7); // verticals
+
+            triApi->RenderMode(5); // kRenderTransAdd
+            triApi->Color4f(0f, 1f, 0f, 1f); // green
+            triApi->Brightness(1f);
+            triApi->CullFace(TRICULLSTYLE.TRI_NONE);
+
+            triApi->Begin(4); // LINES
+            for (int i = 0; i < 12; i++)
+            {
+                var (a, b) = edges[i];
+                triApi->Vertex3f(corners[a].X, corners[a].Y, corners[a].Z);
+                triApi->Vertex3f(corners[b].X, corners[b].Y, corners[b].Z);
+            }
+            triApi->End();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[BepuPhysicsDemo] Draw failed: {ex.Message}");
+        }
+    }
+
+    #endregion
 }
 
