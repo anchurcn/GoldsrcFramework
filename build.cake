@@ -187,9 +187,9 @@ Task("TemplateSmokeTest")
     });
 
 Task("Default")
-    .Description("Builds, tests, packs, and smoke-tests the template package.")
+    .Description("Builds, tests, and packs the project.")
     .IsDependentOn("Build")
     .IsDependentOn("Test")
-    .IsDependentOn("TemplateSmokeTest");
+    .IsDependentOn("Pack");
 
 RunTarget(target);

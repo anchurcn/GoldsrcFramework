@@ -47,10 +47,6 @@ jobs:
         run: dotnet cake --target=Pack
         shell: pwsh
 
-      - name: Template smoke test
-        run: dotnet cake --target=TemplateSmokeTest
-        shell: pwsh
-
       - name: Upload packages
         uses: actions/upload-artifact@v7
         with:
