@@ -5,7 +5,7 @@
   <PropertyGroup>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-    <BaseGame>hl</BaseGame>
+    <BaseGame>bare</BaseGame>
   </PropertyGroup>
 
   <Import Project="..\GoldsrcFramework.Sdk\build\GoldsrcFramework.Sdk.targets" />

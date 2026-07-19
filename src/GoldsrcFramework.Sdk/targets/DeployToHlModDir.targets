@@ -6,7 +6,7 @@
           Condition="'$(HlModDir)' != '' and '$(GoldsrcFrameworkLoaderKind)' == 'NetLoader'">
     <MakeDir Directories="$(HlModDir)" />
     <Message Text="GoldsrcFramework deploy: robocopy $(TargetDir) -> $(HlModDir)" Importance="high" />
-    <Exec Command="robocopy &quot;$(TargetDir).&quot; &quot;$(HlModDir)&quot; *.* /E /XO /XX /R:1 /W:1 /NDL /NP /NJH /NJS"
+    <Exec Command="robocopy &quot;$(TargetDir).&quot; &quot;$(HlModDir)&quot; *.* /E /XX /R:1 /W:1 /NDL /NP /NJH /NJS"
           IgnoreExitCode="true"
           ConsoleToMSBuild="true"
           StandardOutputImportance="Low">
@@ -27,7 +27,7 @@
           Condition="'$(HlModDir)' != '' and '$(GoldsrcFrameworkLoaderKind)' != 'NetLoader'">
     <MakeDir Directories="$(HlModDir)" />
     <Message Text="GoldsrcFramework deploy: robocopy $(TargetDir) -> $(HlModDir)" Importance="high" />
-    <Exec Command="robocopy &quot;$(TargetDir).&quot; &quot;$(HlModDir)&quot; *.* /E /XO /XX /R:1 /W:1 /NDL /NP /NJH /NJS"
+    <Exec Command="robocopy &quot;$(TargetDir).&quot; &quot;$(HlModDir)&quot; *.* /E /XX /R:1 /W:1 /NDL /NP /NJH /NJS"
           IgnoreExitCode="true"
           ConsoleToMSBuild="true"
           StandardOutputImportance="Low">

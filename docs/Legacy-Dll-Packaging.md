@@ -163,7 +163,7 @@ Copying the final output directory into a local game or engine install is a sepa
 DeployToHlModDir.targets
 ```
 
-When `HlModDir` is set, the deploy target should copy `$(TargetDir)` into `$(HlModDir)` with robocopy. In NetLoader mode, this deploy step must run after `BuildNetLoader`, so the generated `client.dll` and the legacy DLLs copied into `$(TargetDir)` are deployed together.
+When `HlModDir` is set, the deploy target should copy `$(TargetDir)` into `$(HlModDir)` with robocopy. The build output is the authoritative source, so the deploy command must not skip older source timestamps; switching `BaseGame` can legitimately replace newer `hl` DLLs with older `bare` DLLs. In NetLoader mode, this deploy step must run after `BuildNetLoader`, so the generated `client.dll` and the legacy DLLs copied into `$(TargetDir)` are deployed together.
 
 ## Project Examples
 

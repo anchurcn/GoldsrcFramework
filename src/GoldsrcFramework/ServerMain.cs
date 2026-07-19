@@ -62,6 +62,7 @@ namespace GoldsrcFramework
             s_engineFuncs = pengfuncsFromEngine;
             s_globalVars = pGlobals;
 
+            EngineApi.ServerApiInit(pengfuncsFromEngine, pGlobals);
             LegacyServerInterop.Initialize(pengfuncsFromEngine, pGlobals);
             // Server instance should be initialized by FrameworkInterop before this call
         }

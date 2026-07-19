@@ -1,5 +1,6 @@
 using GoldsrcFramework;  
 using GoldsrcFramework.Configuration;  
+using GoldsrcFramework.Engine.Native;
 using Microsoft.Extensions.Configuration;  
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;  
@@ -24,6 +25,8 @@ namespace GoldsrcFramework.Demo
         {
             // Call base implementation
             base.ConfigureServices(services, configuration);
+
+            services.AddSingleton<IServerExportFuncs, DemoServerExports>();
 
 
             // Example: Register custom services

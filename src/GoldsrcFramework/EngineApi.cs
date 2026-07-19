@@ -9,6 +9,7 @@ namespace GoldsrcFramework
     {
         public static ClientEngineFuncs* PClient { get; private set; }
         public static ServerEngineFuncs* PServer { get; private set; }
+        public static globalvars_t* PGlobals { get; private set; }
         public static engine_studio_api_t* PStudio { get; private set; }
 
         public static void DrawStringCenter(string text)
@@ -32,13 +33,16 @@ namespace GoldsrcFramework
             PClient = pEnginefuncs;
         }
 
-        internal static void ServerApiInit(ServerEngineFuncs* pEnginefuncs)
+        internal static void ServerApiInit(ServerEngineFuncs* pEnginefuncs, globalvars_t* pGlobals)
         {
             if (pEnginefuncs == null)
                 throw new ArgumentNullException(nameof(pEnginefuncs));
+            if (pGlobals == null)
+                throw new ArgumentNullException(nameof(pGlobals));
             if (PServer != null)
                 return; // Already initialized
             PServer = pEnginefuncs;
+            PGlobals = pGlobals;
         }
 
         internal static void StudioApiInit(engine_studio_api_t* pstudio)

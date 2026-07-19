@@ -10,10 +10,6 @@
     <CopyLocalLockFileAssemblies Condition="'$(CopyLocalLockFileAssemblies)' == ''">true</CopyLocalLockFileAssemblies>
     <DisableFastUpToDateCheck Condition="'$(DisableFastUpToDateCheck)' == ''">true</DisableFastUpToDateCheck>
     <GoldsrcFrameworkLoaderKind Condition="'$(GoldsrcFrameworkLoaderKind)' == ''">NetLoader</GoldsrcFrameworkLoaderKind>
-
-    <GoldsrcFrameworkBaseGame Condition="'$(GoldsrcFrameworkBaseGame)' == ''">$(BaseGame)</GoldsrcFrameworkBaseGame>
-    <GoldsrcFrameworkBaseGame Condition="'$(GoldsrcFrameworkBaseGame)' == ''">hl</GoldsrcFrameworkBaseGame>
-    <GoldsrcFrameworkBaseGame>$([System.String]::new('$(GoldsrcFrameworkBaseGame)').ToLowerInvariant())</GoldsrcFrameworkBaseGame>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(UsingGoldsrcFrameworkSdk)' != 'true' and Exists('$(GoldsrcFrameworkSdkRoot)..\GoldsrcFramework\GoldsrcFramework.csproj')">
