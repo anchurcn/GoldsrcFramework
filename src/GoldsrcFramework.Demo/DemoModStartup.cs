@@ -1,11 +1,9 @@
-using GoldsrcFramework;  
-using GoldsrcFramework.Configuration;  
+using GoldsrcFramework.Configuration;
 using GoldsrcFramework.Engine.Native;
-using Microsoft.Extensions.Configuration;  
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;  
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Runtime.InteropServices;
 
 namespace GoldsrcFramework.Demo
 {
