@@ -2,6 +2,7 @@ using GoldsrcFramework.Configuration;
 using GoldsrcFramework.Engine.Native;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using System.Reflection;
 
@@ -274,83 +275,9 @@ namespace GoldsrcFramework.DependencyInjection
         /// </summary>
         private static void ConfigureCoreServices(IServiceCollection services, IConfiguration configuration)
         {
-            // Register server exports
-            services.AddSingleton<IServerExportFuncs>(sp =>
-            {
-                var logger = sp.GetRequiredService<ILogger<object>>();
-                var frameworkSettings = configuration.GetSection("Framework");
-                var serverAssemblyName = frameworkSettings.GetValue<string>("GameServerAssembly");
-
-                if (!string.IsNullOrEmpty(serverAssemblyName))
-                {
-                    try
-                    {
-                        var frameworkDir = Path.GetDirectoryName(typeof(ServiceContainer).Assembly.Location);
-                        var serverAssemblyPath = Path.Combine(frameworkDir!, serverAssemblyName);
-
-                        if (File.Exists(serverAssemblyPath))
-                        {
-                            var assembly = AssemblyLoadContext.GetLoadContext(typeof(ServiceContainer).Assembly)!
-                                .LoadFromAssemblyPath(serverAssemblyPath);
-
-                            var serverType = assembly.GetTypes()
-                                .FirstOrDefault(x => x.GetInterface(nameof(IServerExportFuncs)) == typeof(IServerExportFuncs));
-
-                            if (serverType != null)
-                            {
-                                logger.LogInformation("Loading custom server implementation: {ServerType}", serverType.FullName);
-                                return (IServerExportFuncs)Activator.CreateInstance(serverType)!;
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogError(ex, "Failed to load custom server assembly: {AssemblyName}", serverAssemblyName);
-                    }
-                }
-
-                logger.LogInformation("Using default server implementation: FrameworkServerExports");
-                return new FrameworkServerExports();
-            });
-
-            // Register client exports
-            services.AddSingleton<IClientExportFuncs>(sp =>
-            {
-                var logger = sp.GetRequiredService<ILogger<object>>();
-                var frameworkSettings = configuration.GetSection("Framework");
-                var clientAssemblyName = frameworkSettings.GetValue<string>("GameClientAssembly");
-
-                if (!string.IsNullOrEmpty(clientAssemblyName))
-                {
-                    try
-                    {
-                        var frameworkDir = Path.GetDirectoryName(typeof(ServiceContainer).Assembly.Location);
-                        var clientAssemblyPath = Path.Combine(frameworkDir!, clientAssemblyName);
-
-                        if (File.Exists(clientAssemblyPath))
-                        {
-                            var assembly = AssemblyLoadContext.GetLoadContext(typeof(ServiceContainer).Assembly)!
-                                .LoadFromAssemblyPath(clientAssemblyPath);
-
-                            var clientType = assembly.GetTypes()
-                                .FirstOrDefault(x => x.GetInterface(nameof(IClientExportFuncs)) == typeof(IClientExportFuncs));
-
-                            if (clientType != null)
-                            {
-                                logger.LogInformation("Loading custom client implementation: {ClientType}", clientType.FullName);
-                                return (IClientExportFuncs)Activator.CreateInstance(clientType)!;
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogError(ex, "Failed to load custom client assembly: {AssemblyName}", clientAssemblyName);
-                    }
-                }
-
-                logger.LogInformation("Using default client implementation: FrameworkClientExports");
-                return new FrameworkClientExports();
-            });
+            // Register default server exports; mods can override in ConfigureServices.
+            services.TryAddSingleton<IClientExportFuncs, FrameworkClientExports>();
+            services.TryAddSingleton<IServerExportFuncs, FrameworkServerExports>();
         }
 
         /// <summary>

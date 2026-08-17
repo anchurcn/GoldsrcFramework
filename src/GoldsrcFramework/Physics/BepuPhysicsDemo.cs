@@ -106,7 +106,7 @@ public class BepuPhysicsDemo
         // 1. Create BepuSimulation (creates its own ThreadDispatcher, BufferPool, Simulation internally)
         _bepuSimulation = new BepuSimulation
         {
-            PoseGravity = new SVector3(0, 0, -800f) // Match Goldsrc gravity
+            PoseGravity = new SVector3(0, 0, -10f) // Match Goldsrc gravity
         };
 
         // 2. Create BepuConfiguration with our simulation

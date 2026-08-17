@@ -24,8 +24,9 @@ namespace GoldsrcFramework.Demo
             // Call base implementation
             base.ConfigureServices(services, configuration);
 
-            services.AddSingleton<IServerExportFuncs, DemoServerExports>();
-
+            // Register the demo server implementation explicitly.
+            // This lets the mod choose which IServerExportFuncs implementation to use
+            // when multiple candidates exist in the game assembly.
 
             // Example: Register custom services
             // services.AddSingleton<IMyCustomService, MyCustomService>();

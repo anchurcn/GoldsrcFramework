@@ -142,12 +142,12 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
     public virtual void HUD_DrawNormalTriangles()
     {
         LegacyClientInterop.HUD_DrawNormalTriangles();
-        DrawPhysicsDemo();
     }
 
     public virtual void HUD_DrawTransparentTriangles()
     { 
         LegacyClientInterop.HUD_DrawTransparentTriangles();
+        DrawPhysicsDemo();
     }
 
     public virtual void HUD_StudioEvent(mstudioevent_t* @event, cl_entity_t* entity)
