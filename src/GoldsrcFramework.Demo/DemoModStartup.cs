@@ -21,8 +21,17 @@ namespace GoldsrcFramework.Demo
         /// </summary>
         public override void ConfigureServices(IServiceCollection services, IConfiguration configuration)
         {
+            // For Stride engine.
+            if (AppContext.BaseDirectory is null or "")
+            {
+                var baseDir = Path.GetDirectoryName(typeof(DemoModStartup).Assembly.Location)
+                              ?? Environment.CurrentDirectory;
+                AppContext.SetData("APP_CONTEXT_BASE_DIRECTORY", baseDir);
+            }
             // Call base implementation
             base.ConfigureServices(services, configuration);
+
+            services.AddSingleton<IClientExportFuncs, DemoClientExports>();
 
             // Register the demo server implementation explicitly.
             // This lets the mod choose which IServerExportFuncs implementation to use

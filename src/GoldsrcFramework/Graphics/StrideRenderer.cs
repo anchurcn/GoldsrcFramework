@@ -65,7 +65,7 @@ public unsafe class StrideRenderer : IDisposable
 
             var adapters = GraphicsAdapterFactory.Adapters;
             return true;
-            _graphicsDevice = GraphicsDevice.New(GraphicsAdapterFactory.Default ,DeviceCreationFlags.None);
+            _graphicsDevice = GraphicsDevice.New(GraphicsAdapterFactory.DefaultAdapter ,DeviceCreationFlags.None);
             _logger?.LogInformation("GraphicsDevice created with OpenGL backend");
 
             return true;

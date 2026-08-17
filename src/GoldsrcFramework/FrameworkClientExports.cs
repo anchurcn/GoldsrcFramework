@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using GoldsrcFramework.Configuration;
 using GoldsrcFramework.DependencyInjection;
 using GoldsrcFramework.Graphics;
@@ -8,10 +7,10 @@ using GoldsrcFramework.Rendering;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NativeInterop;
-using System.Text;
-
 using SVector3 = Stride.Core.Mathematics.Vector3;
 using SQuaternion = Stride.Core.Mathematics.Quaternion;
+using System.Runtime.CompilerServices;
+
 
 namespace GoldsrcFramework.Engine.Native;
 

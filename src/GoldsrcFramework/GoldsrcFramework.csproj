@@ -28,8 +28,8 @@
 		<PackageReference Include="Silk.NET.OpenGL" Version="2.23.0" />
 		<PackageReference Include="Stride.CommunityToolkit.Bepu" Version="1.0.0-preview.62" />
 		<PackageReference Include="Stride.CommunityToolkit.Windows" Version="1.0.0-preview.62" />
-		<PackageReference Include="Stride.Engine" Version="4.3.0.2507" />
-		<PackageReference Include="Stride.Graphics" Version="4.3.0.2507" />
+		<PackageReference Include="Stride.Engine" Version="4.4.0-beta4" />
+		<PackageReference Include="Stride.Graphics" Version="4.4.0-beta4" />
 	</ItemGroup>
 
 	<PropertyGroup>
