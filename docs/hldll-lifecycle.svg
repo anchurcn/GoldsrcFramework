@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1480" role="img" aria-label="HLSDK cl_dll lifecycle">
+  <defs>
+    <style type="text/css"><![CDATA[
+      .nd-user rect { fill: #FFFFFF; stroke: #3A3A3A; stroke-width: 1.5; }
+      .nd-engine rect { fill: #D0D1D5; stroke: #777777; stroke-width: 1; }
+      .nd-user text { fill: #1A1A1A; font-weight: 700; font-size: 14px; font-family: "JetBrains Mono",ui-monospace,monospace; }
+      .nd-engine text { fill: #1A1A1A; font-weight: 600; font-size: 13px; font-family: "JetBrains Mono",ui-monospace,monospace; }
+      .outer-bg { fill: #F2F2F4; stroke: none; }
+      .inner-box { fill: #E6E6EA; stroke: #AAAAAA; stroke-width: 1; stroke-dasharray: 5 3; }
+      .inner-title { fill: #777777; font-size: 13px; font-weight: 700; font-family: "SF Pro Text",system-ui,sans-serif; }
+      .outer-title { fill: #888888; font-size: 15px; font-weight: 700; font-family: "SF Pro Text",system-ui,sans-serif; }
+      .note-box { fill: #FFFFFF; stroke: #BBBBBB; stroke-width: 1; stroke-dasharray: 3 3; }
+      .note-text { fill: #555555; font-size: 11px; font-family: "SF Pro Text",system-ui,sans-serif; }
+      .note-line { fill: none; stroke: #BBBBBB; stroke-width: 1; stroke-dasharray: 2 2; }
+      .conn { fill: none; stroke: #888888; stroke-width: 2; stroke-linecap: round; }
+      .conn-dash { fill: none; stroke: #888888; stroke-width: 2; stroke-dasharray: 4 4; stroke-linecap: round; }
+      .legend-box { fill: #FAFAFA; stroke: rgba(0,0,0,0.10); stroke-width: 1.5; }
+      .legend-text { fill: #525252; font-size: 12px; font-family: "SF Pro Text",system-ui,sans-serif; }
+    ]]></style>
+    <marker id="arr3" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M1 1 L7 4 L1 7 Z" fill="#888888"/>
+    </marker>
+  </defs>
+
+  <!-- ===================== Legend ===================== -->
+  <g>
+    <rect class="legend-box" x="20" y="15" width="260" height="56" rx="8"/>
+    <rect x="34" y="27" width="22" height="16" rx="8" fill="#FFFFFF" stroke="#3A3A3A" stroke-width="1.5"/>
+    <text x="64" y="40" class="legend-text">User callback</text>
+    <rect x="34" y="49" width="22" height="16" rx="4" fill="#D0D1D5" stroke="#777777" stroke-width="1"/>
+    <text x="64" y="62" class="legend-text">Engine internal call</text>
+  </g>
+
+  <!-- ===================== Outer: Initialization ===================== -->
+  <rect class="outer-bg" x="10" y="85" width="980" height="490"/>
+  <text class="outer-title" x="24" y="108">Initialization</text>
+
+  <!-- n1 CL_LoadProgs (engine, NOTE_RIGHT) -->
+  <g class="nd-engine">
+    <rect x="350" y="118" width="300" height="48" rx="6"/>
+    <text x="500" y="147" text-anchor="middle">CL_LoadProgs()</text>
+  </g>
+  <g>
+    <rect class="note-box" x="680" y="116" width="290" height="52" rx="4"/>
+    <text class="note-text" x="690" y="134">Load client.dll ·</text>
+    <text class="note-text" x="690" y="148">GetProcAddress of</text>
+    <text class="note-text" x="690" y="162">HUD_* exports</text>
+  </g>
+  <line class="note-line" x1="650" y1="142" x2="680" y2="142"/>
+  <line class="conn" x1="500" y1="166" x2="500" y2="184" marker-end="url(#arr3)"/>
+
+  <!-- n2 Initialize (user, NOTE_RIGHT) -->
+  <g class="nd-user">
+    <rect x="350" y="184" width="300" height="48" rx="16"/>
+    <text x="500" y="213" text-anchor="middle">Initialize()</text>
+  </g>
+  <g>
+    <rect class="note-box" x="680" y="182" width="290" height="52" rx="4"/>
+    <text class="note-text" x="690" y="200">save gEngfuncs;</text>
+    <text class="note-text" x="690" y="214">check iVersion;</text>
+    <text class="note-text" x="690" y="228">return 1 on match</text>
+  </g>
+  <line class="note-line" x1="650" y1="208" x2="680" y2="208"/>
+  <line class="conn" x1="500" y1="232" x2="500" y2="250" marker-end="url(#arr3)"/>
+
+  <!-- n3 HUD_Init (user, NOTE_LEFT) -->
+  <g class="nd-user">
+    <rect x="350" y="250" width="300" height="48" rx="16"/>
+    <text x="500" y="279" text-anchor="middle">HUD_Init()</text>
+  </g>
+  <g>
+    <rect class="note-box" x="20" y="248" width="270" height="52" rx="4"/>
+    <text class="note-text" x="30" y="266">CVars · UserMsg ·</text>
+    <text class="note-text" x="30" y="280">Event hooks · Init</text>
+    <text class="note-text" x="30" y="294">client weapons</text>
+  </g>
+  <line class="note-line" x1="290" y1="274" x2="350" y2="274"/>
+
+  <!-- connector into Video inner box -->
+  <line class="conn" x1="500" y1="298" x2="500" y2="338" marker-end="url(#arr3)"/>
+
+  <!-- ===================== Inner: Video ===================== -->
+  <rect class="inner-box" x="30" y="308" width="940" height="154" rx="4"/>
+  <text class="inner-title" x="44" y="328">Video</text>
+
+  <!-- n4 HUD_VidInit (user, NOTE_RIGHT) -->
+  <g class="nd-user">
+    <rect x="350" y="338" width="300" height="48" rx="16"/>
+    <text x="500" y="367" text-anchor="middle">HUD_VidInit()</text>
+  </g>
+  <g>
+    <rect class="note-box" x="680" y="329" width="290" height="66" rx="4"/>
+    <text class="note-text" x="690" y="347">Be called if vid restart,</text>
+    <text class="note-text" x="690" y="361">map loaded, resolution</text>
+    <text class="note-text" x="690" y="375">changed, fullscreen mode</text>
+    <text class="note-text" x="690" y="389">changed</text>
+  </g>
+  <line class="note-line" x1="650" y1="362" x2="680" y2="362"/>
+  <line class="conn" x1="500" y1="386" x2="500" y2="404" marker-end="url(#arr3)"/>
+
+  <!-- n5 HUD_Reset (user, NOTE_LEFT) -->
+  <g class="nd-user">
+    <rect x="350" y="404" width="300" height="48" rx="16"/>
+    <text x="500" y="433" text-anchor="middle">HUD_Reset()</text>
+  </g>
+  <g>
+    <rect class="note-box" x="20" y="402" width="270" height="52" rx="4"/>
+    <text class="note-text" x="30" y="420">Be called if demo</text>
+    <text class="note-text" x="30" y="434">jump/stop, fullupdate,</text>
+    <text class="note-text" x="30" y="448">reconnect</text>
+  </g>
+  <line class="note-line" x1="290" y1="428" x2="350" y2="428"/>
+
+  <!-- connector into Map loading inner box -->
+  <line class="conn" x1="500" y1="452" x2="500" y2="502" marker-end="url(#arr3)"/>
+
+  <!-- ===================== Inner: Map loading ===================== -->
+  <rect class="inner-box" x="30" y="472" width="940" height="88" rx="4"/>
+  <text class="inner-title" x="44" y="492">Map loading</text>
+
+  <!-- n6 HUD_NewMap (user, NOTE_RIGHT) -->
+  <g class="nd-user">
+    <rect x="350" y="502" width="300" height="48" rx="16"/>
+    <text x="500" y="531" text-anchor="middle">HUD_NewMap()</text>
+  </g>
+  <g>
+    <rect class="note-box" x="680" y="507" width="290" height="38" rx="4"/>
+    <text class="note-text" x="690" y="522">Framework's callback</text>
+    <text class="note-text" x="690" y="536">on map loaded.</text>
+  </g>
+  <line class="note-line" x1="650" y1="526" x2="680" y2="526"/>
+
+  <!-- dashed connector: Init → Main frame loop -->
+  <line class="conn-dash" x1="500" y1="575" x2="500" y2="628" marker-end="url(#arr3)"/>
+
+  <!-- ===================== Outer: Main frame loop ===================== -->
+  <rect class="outer-bg" x="10" y="595" width="980" height="754"/>
+  <text class="outer-title" x="24" y="618">Main frame loop</text>
+
+  <!-- n7 FrameBegin (engine, NOTE_RIGHT) -->
+  <g class="nd-engine">
+    <rect x="350" y="628" width="300" height="48" rx="6"/>
+    <text x="500" y="657" text-anchor="middle">FrameBegin()</text>
+  </g>
+  <g>
+    <rect class="note-box" x="680" y="633" width="290" height="38" rx="4"/>
+    <text class="note-text" x="690" y="648">cl.time += dt ·</text>
+    <text class="note-text" x="690" y="662">host_frame</text>
+  </g>
+  <line class="note-line" x1="650" y1="652" x2="680" y2="652"/>
+  <line class="conn" x1="500" y1="676" x2="500" y2="694" marker-end="url(#arr3)"/>
+
+  <!-- n8 LinkPacketEntities (engine, NOTE_RIGHT) -->
+  <g class="nd-engine">
+    <rect x="350" y="694" width="300" height="48" rx="6"/>
+    <text x="500" y="723" text-anchor="middle">LinkPacketEntities()</text>
+  </g>
+  <g>
+    <rect class="note-box" x="680" y="699" width="290" height="38" rx="4"/>
+    <text class="note-text" x="690" y="714">CL_LinkPlayers /</text>
+    <text class="note-text" x="690" y="728">CL_LinkPacketEntities</text>
+  </g>
+  <line class="note-line" x1="650" y1="718" x2="680" y2="718"/>
+  <line class="conn" x1="500" y1="742" x2="500" y2="760" marker-end="url(#arr3)"/>
+
+  <!-- n9 HUD_CreateEntities (user, NOTE_LEFT) -->
+  <g class="nd-user">
+    <rect x="350" y="760" width="300" height="48" rx="16"/>
+    <text x="500" y="789" text-anchor="middle">HUD_CreateEntities()</text>
+  </g>
+  <g>
+    <rect class="note-box" x="20" y="765" width="270" height="38" rx="4"/>
+    <text class="note-text" x="30" y="780">Give client a chance</text>
+    <text class="note-text" x="30" y="794">to spawn tempent.</text>
+  </g>
+  <line class="note-line" x1="290" y1="784" x2="350" y2="784"/>
+  <line class="conn" x1="500" y1="808" x2="500" y2="826" marker-end="url(#arr3)"/>
+
+  <!-- n10 HUD_TempEntUpdate (user, NOTE_RIGHT) -->
+  <g class="nd-user">
+    <rect x="350" y="826" width="300" height="48" rx="16"/>
+    <text x="500" y="855" text-anchor="middle">HUD_TempEntUpdate()</text>
+  </g>
+  <g>
+    <rect class="note-box" x="680" y="831" width="290" height="38" rx="4"/>
+    <text class="note-text" x="690" y="846">Be called right after</text>
+    <text class="note-text" x="690" y="860">HUD_CreateEntities.</text>
+  </g>
+  <line class="note-line" x1="650" y1="850" x2="680" y2="850"/>
+  <line class="conn" x1="500" y1="874" x2="500" y2="892" marker-end="url(#arr3)"/>
+
+  <!-- n11 CL_FireEvents (engine) -->
+  <g class="nd-engine">
+    <rect x="350" y="892" width="300" height="48" rx="6"/>
+    <text x="500" y="921" text-anchor="middle">CL_FireEvents()</text>
+  </g>
+
+  <!-- connector into 3D inner box -->
+  <line class="conn" x1="500" y1="940" x2="500" y2="980" marker-end="url(#arr3)"/>
+
+  <!-- ===================== Inner: 3D world draw ===================== -->
+  <rect class="inner-box" x="30" y="950" width="940" height="220" rx="4"/>
+  <text class="inner-title" x="44" y="970">3D world draw</text>
+
+  <!-- n12 V_RenderView (engine) -->
+  <g class="nd-engine">
+    <rect x="350" y="980" width="300" height="48" rx="6"/>
+    <text x="500" y="1009" text-anchor="middle">V_RenderView()</text>
+  </g>
+  <line class="conn" x1="500" y1="1028" x2="500" y2="1046" marker-end="url(#arr3)"/>
+
+  <!-- n13 HUD_DrawNormalTriangles (user, NOTE_LEFT) -->
+  <g class="nd-user">
+    <rect x="350" y="1046" width="300" height="48" rx="16"/>
+    <text x="500" y="1075" text-anchor="middle">HUD_DrawNormalTriangles()</text>
+  </g>
+  <g>
+    <rect class="note-box" x="20" y="1044" width="270" height="52" rx="4"/>
+    <text class="note-text" x="30" y="1062">Client using TriAPI here.</text>
+    <text class="note-text" x="30" y="1076">blend/alpha/additive</text>
+    <text class="note-text" x="30" y="1090">are disabled.</text>
+  </g>
+  <line class="note-line" x1="290" y1="1070" x2="350" y2="1070"/>
+  <line class="conn" x1="500" y1="1094" x2="500" y2="1112" marker-end="url(#arr3)"/>
+
+  <!-- n14 HUD_DrawTransparentTriangles (user) -->
+  <g class="nd-user">
+    <rect x="350" y="1112" width="300" height="48" rx="16"/>
+    <text x="500" y="1141" text-anchor="middle">HUD_DrawTransparentTriangles()</text>
+  </g>
+
+  <!-- connector into 2D inner box -->
+  <line class="conn" x1="500" y1="1160" x2="500" y2="1210" marker-end="url(#arr3)"/>
+
+  <!-- ===================== Inner: 2D HUD draw ===================== -->
+  <rect class="inner-box" x="30" y="1180" width="940" height="154" rx="4"/>
+  <text class="inner-title" x="44" y="1200">2D HUD draw</text>
+
+  <!-- n15 Engine2DPrimitives (engine, NOTE_RIGHT) -->
+  <g class="nd-engine">
+    <rect x="350" y="1210" width="300" height="48" rx="6"/>
+    <text x="500" y="1239" text-anchor="middle">Engine2DPrimitives()</text>
+  </g>
+  <g>
+    <rect class="note-box" x="680" y="1208" width="290" height="52" rx="4"/>
+    <text class="note-text" x="690" y="1226">Crosshair ·</text>
+    <text class="note-text" x="690" y="1240">ScreenFade ·</text>
+    <text class="note-text" x="690" y="1254">CenterPrint</text>
+  </g>
+  <line class="note-line" x1="650" y1="1234" x2="680" y2="1234"/>
+  <line class="conn" x1="500" y1="1258" x2="500" y2="1276" marker-end="url(#arr3)"/>
+
+  <!-- n16 HUD_Redraw (user) -->
+  <g class="nd-user">
+    <rect x="350" y="1276" width="300" height="48" rx="16"/>
+    <text x="500" y="1305" text-anchor="middle">HUD_Redraw()</text>
+  </g>
+
+  <!-- dashed connector: Main frame loop → Shutdown -->
+  <line class="conn-dash" x1="500" y1="1349" x2="500" y2="1384" marker-end="url(#arr3)"/>
+
+  <!-- ===================== Outer: Shutdown ===================== -->
+  <rect class="outer-bg" x="10" y="1369" width="980" height="90"/>
+  <text class="outer-title" x="24" y="1392">Shutdown</text>
+
+  <!-- n17 HUD_Shutdown (user, NOTE_RIGHT) -->
+  <g class="nd-user">
+    <rect x="350" y="1384" width="300" height="48" rx="16"/>
+    <text x="500" y="1413" text-anchor="middle">HUD_Shutdown()</text>
+  </g>
+  <g>
+    <rect class="note-box" x="680" y="1382" width="290" height="52" rx="4"/>
+    <text class="note-text" x="690" y="1400">Symmetric release of</text>
+    <text class="note-text" x="690" y="1414">all resources from</text>
+    <text class="note-text" x="690" y="1428">Initialize / HUD_Init</text>
+  </g>
+  <line class="note-line" x1="650" y1="1408" x2="680" y2="1408"/>
+
+</svg>

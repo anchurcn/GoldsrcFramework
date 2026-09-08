@@ -30,7 +30,7 @@ public unsafe class GameClientExports : FrameworkClientExports
     {
         // Call base framework HUD initialization
         base.HUD_Init();
-        
+
         // Add custom HUD elements initialization here
         // For example: Initialize custom HUD components, load sprites, etc.
     }

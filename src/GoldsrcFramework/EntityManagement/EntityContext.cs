@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace GoldsrcFramework.Entity
+namespace GoldsrcFramework.EntityManagement
 {
     public class EntityContext
     {

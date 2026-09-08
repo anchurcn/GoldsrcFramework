@@ -1,4 +1,4 @@
-using GoldsrcFramework.Entity;
+using GoldsrcFramework.EntityManagement;
 using GoldsrcFramework.Engine.Native;
 using GoldsrcFramework.DependencyInjection;
 using System.Reflection;

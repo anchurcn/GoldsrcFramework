@@ -1,15 +1,8 @@
-using GoldsrcFramework.Configuration;
-using GoldsrcFramework.DependencyInjection;
-using GoldsrcFramework.Graphics;
+using GoldsrcFramework.Ecs;
 using GoldsrcFramework.LinearMath;
-using GoldsrcFramework.Physics;
 using GoldsrcFramework.Rendering;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using NativeInterop;
-using SVector3 = Stride.Core.Mathematics.Vector3;
-using SQuaternion = Stride.Core.Mathematics.Quaternion;
-using System.Runtime.CompilerServices;
+using System.Text;
 
 
 namespace GoldsrcFramework.Engine.Native;
@@ -19,9 +12,29 @@ namespace GoldsrcFramework.Engine.Native;
 /// </summary>
 public unsafe class FrameworkClientExports : IClientExportFuncs
 {
-    private BepuPhysicsDemo? _physicsDemo;
-    private double _physicsFrameTime;
-    private bool _physicsDemoInitialized;
+    private const int MaxLevelNameLength = 260;
+
+    private GoldsrcClientGame? clientGame;
+
+    /// <summary>
+    /// True when <see cref="HUD_VidInit"/> announced a (potential) map change and the
+    /// framework is still waiting for <see cref="HUD_ProcessPlayerState"/> to confirm it.
+    /// </summary>
+    private bool isNewMapPending;
+
+    /// <summary>
+    /// Name of the currently loaded level (e.g. "maps/crossfire.bsp"), as reported by the
+    /// engine when the last <see cref="HUD_NewMap"/> callback fired. Null before the first map load.
+    /// </summary>
+    public string? CurrentLevelName { get; private set; }
+
+    /// <summary>
+    /// Raised when a new map has finished loading (see <see cref="HUD_NewMap"/>).
+    /// The string argument is the level name, e.g. "maps/crossfire.bsp".
+    /// Exceptions thrown by subscribers are caught and logged; they never propagate
+    /// back into the engine callback.
+    /// </summary>
+    public event Action<string>? NewMapLoaded;
 
     // IClientExportFuncs implementation - all based on LegacyClientInterop
     public virtual int Initialize(ClientEngineFuncs* pEnginefuncs, int iVersion)
@@ -33,12 +46,15 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
     public virtual void HUD_Init()
     {
         LegacyClientInterop.HUD_Init();
-        InitPhysicsDemo();
+            var game = new GoldsrcClientGame();
+            clientGame = game;
     }
 
     public virtual int HUD_VidInit()
     {
-        return LegacyClientInterop.HUD_VidInit();
+        int result = LegacyClientInterop.HUD_VidInit();
+        NewMapBegin(true);
+        return result;
     }
 
     public virtual int HUD_Redraw(float flTime, int intermission)
@@ -130,7 +146,16 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
 
     public virtual int HUD_AddEntity(int type, cl_entity_t* ent, NChar* modelname)
     {
-        return LegacyClientInterop.HUD_AddEntity(type, ent, (sbyte*)modelname);
+        var result = LegacyClientInterop.HUD_AddEntity(type, ent, (sbyte*)modelname);
+
+        // Mark this entity as visible for the ClientSceneManagementSystem.
+        // Only normal entities (ET_NORMAL) and players are tracked.
+        if (type == 0 || type == 1) // ET_NORMAL = 0, ET_PLAYER = 1
+        {
+            clientGame?.SceneManagement.MarkEntityVisible(ent->index);
+        }
+
+        return result;
     }
 
     public virtual void HUD_CreateEntities()
@@ -146,7 +171,6 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
     public virtual void HUD_DrawTransparentTriangles()
     { 
         LegacyClientInterop.HUD_DrawTransparentTriangles();
-        DrawPhysicsDemo();
     }
 
     public virtual void HUD_StudioEvent(mstudioevent_t* @event, cl_entity_t* entity)
@@ -161,6 +185,9 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
 
     public virtual void HUD_Shutdown()
     {
+        isNewMapPending = false;
+        CurrentLevelName = null;
+        clientGame?.Dispose();
         LegacyClientInterop.HUD_Shutdown();
     }
 
@@ -172,6 +199,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
     public virtual void HUD_ProcessPlayerState(entity_state_t* dst, entity_state_t* src)
     {
         LegacyClientInterop.HUD_ProcessPlayerState(dst, src);
+        NewMapBegin(false);
     }
 
     public virtual void HUD_TxferPredictionData(entity_state_t* ps, entity_state_t* pps, clientdata_t* pcd, clientdata_t* ppcd, weapon_data_t* wd, weapon_data_t* pwd)
@@ -197,7 +225,6 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
     public virtual void HUD_Frame(double time)
     {
         LegacyClientInterop.HUD_Frame(time);
-        UpdatePhysicsDemo(time);
     }
 
     public virtual int HUD_Key_Event(int eventcode, int keynum, NChar* pszCurrentBinding)
@@ -208,6 +235,13 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
     public virtual void HUD_TempEntUpdate(double frametime, double client_time, double cl_gravity, TEMPENTITY** ppTempEntFree, TEMPENTITY** ppTempEntActive, delegate* unmanaged[Cdecl]<cl_entity_t*, int> Callback_AddVisibleEntity, delegate* unmanaged[Cdecl]<TEMPENTITY*, float, void> Callback_TempEntPlaySound)
     {
         LegacyClientInterop.HUD_TempEntUpdate(frametime, client_time, cl_gravity, ppTempEntFree, ppTempEntActive, Callback_AddVisibleEntity, Callback_TempEntPlaySound);
+
+        if (clientGame is not { } game)
+            return;
+
+        game.SyncGravity(cl_gravity);
+        game.Tick(TimeSpan.FromSeconds(client_time), TimeSpan.FromSeconds(Math.Min(frametime, 0.1)));
+
     }
 
     public virtual cl_entity_t* HUD_GetUserEntity(int index)
@@ -246,113 +280,145 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         return LegacyClientInterop.ClientFactory();
     }
 
-    #region Physics Demo
-
-    private void InitPhysicsDemo()
+    /// <summary>
+    /// Constructed lifecycle callback: a new map has finished loading and is ready to use.
+    /// </summary>
+    /// <remarks>
+    /// The engine has no native "map loaded" callback for client DLLs, so the framework
+    /// derives one from two engine callbacks (two-phase handshake):
+    /// <list type="number">
+    /// <item><see cref="HUD_VidInit"/> is called right after a level change, but at that point
+    /// client state is not fully set up yet - it only marks the map change as pending.</item>
+    /// <item>The next <see cref="HUD_ProcessPlayerState"/> (called early every frame once the
+    /// local player state is available) confirms the transition. Only then does the framework
+    /// validate <c>pfnGetLevelName()</c> and fire this callback.</item>
+    /// </list>
+    /// Override this method (or subscribe to <see cref="NewMapLoaded"/>) to rebuild per-map
+    /// state such as physics scenes, particle caches or level-specific resources.
+    /// Note that <see cref="HUD_VidInit"/> is also invoked on video mode changes, so this
+    /// callback may fire again without an actual level change - keep handlers idempotent.
+    /// </remarks>
+    /// <param name="levelName">Name of the loaded level, e.g. "maps/crossfire.bsp".</param>
+    public void HUD_NewMap(string levelName)
     {
-        try
+        CurrentLevelName = levelName;
+
+        // Clear all per-map physics entities from the previous map,
+        clientGame?.Reset();
+        if (NewMapLoaded is null)
+            return;
+
+        foreach (Action<string> handler in NewMapLoaded.GetInvocationList())
         {
-            _physicsDemo = new BepuPhysicsDemo();
-            _physicsDemo.Initialize();
-            _physicsFrameTime = 0;
-            _physicsDemoInitialized = true;
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[BepuPhysicsDemo] Init failed: {ex.Message}");
+            try
+            {
+                handler(levelName);
+            }
+            catch (Exception exception)
+            {
+                System.Diagnostics.Debug.WriteLine($"[NewMapLoaded] subscriber failed: {exception}");
+            }
         }
     }
 
-    private void UpdatePhysicsDemo(double time)
+    /// <summary>
+    /// Two-phase map change detection. Called with <c>true</c> from <see cref="HUD_VidInit"/>
+    /// ("a map change may have just happened") and with <c>false</c> from
+    /// <see cref="HUD_ProcessPlayerState"/> every frame ("client state is now available").
+    /// </summary>
+    private void NewMapBegin(bool isNewMap)
     {
-        if (!_physicsDemoInitialized || _physicsDemo == null)
+        if (isNewMap)
+        {
+            isNewMapPending = true;
+            return;
+        }
+
+        if (!isNewMapPending)
             return;
 
-        try
-        {
-            float deltaTime;
-            if (_physicsFrameTime > 0)
-            {
-                deltaTime = (float)(time - _physicsFrameTime);
-            }
-            else
-            {
-                deltaTime = 1f / 60f;
-            }
-            _physicsFrameTime = time;
+        isNewMapPending = false;
 
-            _physicsDemo.Update(deltaTime);
-        }
-        catch (Exception ex)
+        Span<byte> buffer = stackalloc byte[MaxLevelNameLength];
+        if (TryReadLevelName(buffer, out int length))
         {
-            System.Diagnostics.Debug.WriteLine($"[BepuPhysicsDemo] Update failed: {ex.Message}");
+            CurrentLevelName = Encoding.ASCII.GetString(buffer[..length]);
+            HUD_NewMap(CurrentLevelName);
+        }
+        else
+        {
+            // Should not happen: the engine is in a map but reports no level name.
+            // Bail out instead of running with stale per-map state.
+            ExecuteClientCommand("disconnect\n");
+            PrintConsole("GoldsrcFramework: couldn't get map name from level name!\n");
         }
     }
 
-    private void DrawPhysicsDemo()
+    /// <summary>
+    /// Reads the null-terminated level name from <c>pfnGetLevelName()</c> into
+    /// <paramref name="buffer"/> without allocating a managed string.
+    /// Returns false when unavailable or empty.
+    /// </summary>
+    private static bool TryReadLevelName(Span<byte> buffer, out int length)
     {
-        if (!_physicsDemoInitialized || _physicsDemo == null)
-            return;
+        length = 0;
+        ClientEngineFuncs* engine = EngineApi.PClient;
+        if (engine == null || engine->GetLevelName == null)
+            return false;
 
-        var triApi = EngineApi.PClient->pTriAPI;
-        if (triApi == null)
-            return;
+        NChar* levelName = engine->GetLevelName();
+        if (levelName == null)
+            return false;
 
-        try
+        while (length < buffer.Length && length < MaxLevelNameLength && (byte)levelName[length] != 0)
         {
-            var pos = _physicsDemo.BoxPosition;
-            var rot = _physicsDemo.BoxRotation;
-
-            // Convert Stride types to System.Numerics for math operations
-            var nPos = Unsafe.As<SVector3, System.Numerics.Vector3>(ref pos);
-            var nRot = Unsafe.As<SQuaternion, System.Numerics.Quaternion>(ref rot);
-
-            // Draw a wireframe box using the triangle API
-            float half = 10f;
-
-            // Calculate 8 corners of the box in local space
-            Span<System.Numerics.Vector3> corners = stackalloc System.Numerics.Vector3[8];
-            corners[0] = new System.Numerics.Vector3(-half, -half, -half);
-            corners[1] = new System.Numerics.Vector3( half, -half, -half);
-            corners[2] = new System.Numerics.Vector3( half,  half, -half);
-            corners[3] = new System.Numerics.Vector3(-half,  half, -half);
-            corners[4] = new System.Numerics.Vector3(-half, -half,  half);
-            corners[5] = new System.Numerics.Vector3( half, -half,  half);
-            corners[6] = new System.Numerics.Vector3( half,  half,  half);
-            corners[7] = new System.Numerics.Vector3(-half,  half,  half);
-
-            // Transform corners by rotation and position
-            for (int i = 0; i < 8; i++)
-            {
-                corners[i] = System.Numerics.Vector3.Transform(corners[i], nRot) + nPos;
-            }
-
-            // 12 edges of the box
-            Span<(int, int)> edges = stackalloc (int, int)[12];
-            edges[0] = (0, 1); edges[1] = (1, 2); edges[2] = (2, 3); edges[3] = (3, 0); // bottom face
-            edges[4] = (4, 5); edges[5] = (5, 6); edges[6] = (6, 7); edges[7] = (7, 4); // top face
-            edges[8] = (0, 4); edges[9] = (1, 5); edges[10] = (2, 6); edges[11] = (3, 7); // verticals
-
-            triApi->RenderMode(5); // kRenderTransAdd
-            triApi->Color4f(0f, 1f, 0f, 1f); // green
-            triApi->Brightness(1f);
-            triApi->CullFace(TRICULLSTYLE.TRI_NONE);
-
-            triApi->Begin(4); // LINES
-            for (int i = 0; i < 12; i++)
-            {
-                var (a, b) = edges[i];
-                triApi->Vertex3f(corners[a].X, corners[a].Y, corners[a].Z);
-                triApi->Vertex3f(corners[b].X, corners[b].Y, corners[b].Z);
-            }
-            triApi->End();
+            buffer[length] = (byte)levelName[length];
+            length++;
         }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[BepuPhysicsDemo] Draw failed: {ex.Message}");
-        }
+
+        return length > 0;
     }
 
-    #endregion
+    /// <summary>
+    /// Executes a console command on the client (e.g. "disconnect\n").
+    /// </summary>
+    private static void ExecuteClientCommand(string command)
+    {
+        ClientEngineFuncs* engine = EngineApi.PClient;
+        if (engine == null || engine->ClientCmd == null)
+            return;
+
+        if (command.Length >= 128)
+            command = command[..127];
+
+        Span<byte> buffer = stackalloc byte[128];
+        int length = Encoding.ASCII.GetBytes(command, buffer);
+        buffer[length] = 0;
+
+        fixed (byte* pointer = buffer)
+            engine->ClientCmd((NChar*)pointer);
+    }
+
+    /// <summary>
+    /// Prints a message to the client console via <c>Con_Printf</c>.
+    /// The message must not contain printf format specifiers.
+    /// </summary>
+    private static void PrintConsole(string message)
+    {
+        ClientEngineFuncs* engine = EngineApi.PClient;
+        if (engine == null || engine->Con_Printf == null)
+            return;
+
+        if (message.Length >= 512)
+            message = message[..511];
+
+        Span<byte> buffer = stackalloc byte[512];
+        int length = Encoding.ASCII.GetBytes(message, buffer);
+        buffer[length] = 0;
+
+        fixed (byte* pointer = buffer)
+            engine->Con_Printf((NChar*)pointer);
+    }
+
 }
 

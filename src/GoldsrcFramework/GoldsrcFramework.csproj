@@ -26,8 +26,6 @@
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.0" />
 		<PackageReference Include="Silk.NET.OpenGL" Version="2.23.0" />
-		<PackageReference Include="Stride.CommunityToolkit.Bepu" Version="1.0.0-preview.62" />
-		<PackageReference Include="Stride.CommunityToolkit.Windows" Version="1.0.0-preview.62" />
 		<PackageReference Include="Stride.Engine" Version="4.4.0-beta4" />
 		<PackageReference Include="Stride.Graphics" Version="4.4.0-beta4" />
 	</ItemGroup>

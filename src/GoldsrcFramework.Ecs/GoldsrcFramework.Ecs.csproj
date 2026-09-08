@@ -5,7 +5,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Stride.Engine" Version="4.3.0.2507" />
+    <PackageReference Include="Stride.BepuPhysics" Version="4.4.0-beta4" />
+    <PackageReference Include="Stride.Engine" Version="4.4.0-beta4" />
   </ItemGroup>
 
   <ItemGroup>
