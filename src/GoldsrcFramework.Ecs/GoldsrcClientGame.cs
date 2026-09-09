@@ -28,6 +28,14 @@ public sealed class GoldsrcClientGame : IDisposable
         Services.ServiceAdded += OnServiceAdded;
         Services.ServiceRemoved += OnServiceRemoved;
 
+        // Register the script systems before GoldsrcSceneSystem: its constructor adds
+        // the script processors, whose OnSystemAdd resolves these services synchronously.
+        ScriptSystem = new GoldsrcScriptSystem(Services);
+        Services.AddService(ScriptSystem);
+
+        LateUpdateSystem = new LateUpdateScriptSystem(Services);
+        Services.AddService(LateUpdateSystem);
+
         SceneSystem = new GoldsrcSceneSystem(Services);
         Services.AddService(SceneSystem);
 
@@ -35,12 +43,6 @@ public sealed class GoldsrcClientGame : IDisposable
         Services.AddService(SceneManagement);
 
         transformSync = new GoldsrcTransformSyncSystem(Services);
-
-        ScriptSystem = new GoldsrcScriptSystem(Services);
-        Services.AddService(ScriptSystem);
-
-        LateUpdateSystem = new LateUpdateScriptSystem(Services);
-        Services.AddService(LateUpdateSystem);
 
         Time = new GameTime();
 

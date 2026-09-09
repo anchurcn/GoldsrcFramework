@@ -1,6 +1,6 @@
 ﻿using System.Reflection;
 using System.Text;
-using GoldsrcFramework.Entity;
+using GoldsrcFramework.EntityManagement;
 
 namespace GoldsrcFramework.BuildTool
 {
@@ -139,7 +139,7 @@ namespace GoldsrcFramework.BuildTool
             Assembly assembly = Assembly.LoadFrom(dllPath);
 
             // Get the EntityContext type
-            Type? entityContextType = assembly.GetType("GoldsrcFramework.Entity.EntityContext");
+            Type? entityContextType = assembly.GetType("GoldsrcFramework.EntityManagement.EntityContext");
             if (entityContextType == null)
             {
                 throw new InvalidOperationException("EntityContext type not found in the assembly");
