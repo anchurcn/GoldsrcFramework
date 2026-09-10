@@ -44,10 +44,13 @@ public sealed class GoldsrcClientGame : IDisposable
 
         transformSync = new GoldsrcTransformSyncSystem(Services);
 
+        prePhysicsPoseSync = new PrePhysicsPoseSync(Services, SceneSystem);
+
         Time = new GameTime();
 
         GameSystems.Add(SceneManagement);
         GameSystems.Add(transformSync);
+        GameSystems.Add(prePhysicsPoseSync);
         GameSystems.Add(SceneSystem);
         GameSystems.Add(ScriptSystem);
         GameSystems.Add(LateUpdateSystem);
@@ -67,6 +70,7 @@ public sealed class GoldsrcClientGame : IDisposable
     public LateUpdateScriptSystem LateUpdateSystem { get; }
 
     private readonly GoldsrcTransformSyncSystem transformSync;
+    private readonly PrePhysicsPoseSync prePhysicsPoseSync;
 
     public GameTime Time { get; }
 

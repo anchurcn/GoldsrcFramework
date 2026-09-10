@@ -10,6 +10,7 @@ namespace GoldsrcFramework.Ecs;
 /// <c>HUD_AddEntity</c>), and the system settles adds/removes during <see cref="ProcessEntityLifecycle"/>.
 /// <see cref="IEnterExitCallable.OnEnter"/> / <see cref="IEnterExitCallable.OnExit"/> are called
 /// automatically by the base <see cref="SceneEntityLifecycleSystem"/> via <see cref="EntityManager"/> events.
+/// Worldspawn (entity 0) is handled specially: created once on first frame and never PVS-managed.
 /// </summary>
 public sealed class ClientSceneManagementSystem : SceneEntityLifecycleSystem
 {
@@ -19,6 +20,7 @@ public sealed class ClientSceneManagementSystem : SceneEntityLifecycleSystem
     private HashSet<int> lastFrameVisible = [];
     private readonly List<Entity> pendingAdd = [];
     private readonly List<Entity> pendingRemove = [];
+    private bool hasWorldspawn;
 
     public ClientSceneManagementSystem(IServiceRegistry services, GoldsrcClientGame game, GoldsrcSceneSystem sceneSystem)
         : base(services, sceneSystem)
@@ -26,9 +28,10 @@ public sealed class ClientSceneManagementSystem : SceneEntityLifecycleSystem
         this.game = game ?? throw new ArgumentNullException(nameof(game));
     }
 
-    /// <summary>
-    /// Returns the entity associated with an entindex, or null if none exists.
-    /// </summary>
+    /// <summary>Content manager injected into <see cref="HalfLifeBehavior"/> for physics prefab loading.</summary>
+    public IContentManager? ContentManager { get; set; }
+
+    /// <summary>Returns the entity associated with an entindex, or null if none exists.</summary>
     public Entity? GetEntity(int entindex)
     {
         activeEntities.TryGetValue(entindex, out var entity);
@@ -37,14 +40,26 @@ public sealed class ClientSceneManagementSystem : SceneEntityLifecycleSystem
 
     /// <summary>
     /// Marks an entity as visible this frame. Called from <c>HUD_AddEntity</c>.
+    /// Entity 0 (worldspawn) is ignored — it is created once and never PVS-managed.
     /// </summary>
     public void MarkEntityVisible(int entindex)
     {
+        if (entindex == 0)
+            return; // worldspawn handled separately
         thisFrameVisible.Add(entindex);
     }
 
     protected override void ProcessEntityLifecycle(GameTime gameTime)
     {
+        // Create worldspawn once on first frame (after map data is available).
+        if (!hasWorldspawn)
+        {
+            var worldspawn = CreateWorldspawnEntity();
+            activeEntities[0] = worldspawn;
+            game.Add(worldspawn);
+            hasWorldspawn = true;
+        }
+
         // Collect entities that entered this frame (visible now, not visible last frame)
         foreach (var entindex in thisFrameVisible)
         {
@@ -66,7 +81,7 @@ public sealed class ClientSceneManagementSystem : SceneEntityLifecycleSystem
             }
         }
 
-        // Collect entities that left this frame (visible last frame, not visible now)
+        // Collect entities that left this frame
         foreach (var entindex in lastFrameVisible)
         {
             if (thisFrameVisible.Contains(entindex))
@@ -76,7 +91,7 @@ public sealed class ClientSceneManagementSystem : SceneEntityLifecycleSystem
                 pendingRemove.Add(entity);
         }
 
-        // Apply removals first (EntityRemoved event → OnExit), then adds (EntityAdded event → OnEnter)
+        // Apply removals first (EntityRemoved → OnExit), then adds (EntityAdded → OnEnter)
         foreach (var entity in pendingRemove)
             game.Remove(entity);
 
@@ -86,16 +101,47 @@ public sealed class ClientSceneManagementSystem : SceneEntityLifecycleSystem
         pendingAdd.Clear();
         pendingRemove.Clear();
 
-        // Swap for next frame: lastFrameVisible ← thisFrameVisible, thisFrameVisible ← cleared
+        // Swap for next frame
         (lastFrameVisible, thisFrameVisible) = (thisFrameVisible, lastFrameVisible);
         thisFrameVisible.Clear();
     }
 
-    private static Entity CreateEntity(int entindex)
+    private Entity CreateEntity(int entindex)
     {
         var entity = new Entity($"Entity@{entindex}");
         entity.Components.Add(new GoldsrcTransformLinkComponent());
-        entity.Components.Add(new HalfLifeBehavior());
+
+        var behavior = new HalfLifeBehavior
+        {
+            ContentManager = ContentManager
+        };
+        entity.Components.Add(behavior);
+
+        return entity;
+    }
+
+    private Entity CreateWorldspawnEntity()
+    {
+        var entity = new Entity("Entity@0(\"worldspawn\")");
+        entity.Components.Add(new GoldsrcTransformLinkComponent());
+
+        // worldspawn uses StaticComponent + MeshCollider, no PhysicsController/HalfLifeBehavior.
+        // The physics prefab is loaded by ContentManager and instantiated here.
+        if (ContentManager is not null)
+        {
+            const string worldspawnKey = "*1"; // worldspawn is always model index 1
+            if (ContentManager.IsExist(worldspawnKey))
+            {
+                var prefab = ContentManager.Load<Prefab>(worldspawnKey);
+                if (prefab is not null)
+                {
+                    var bones = prefab.Instantiate();
+                    foreach (var bone in bones)
+                        bone.Transform.Parent = entity.Transform;
+                }
+            }
+        }
+
         return entity;
     }
 }
