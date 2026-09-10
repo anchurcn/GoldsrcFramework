@@ -17,9 +17,19 @@ public static class RagdollHelper
     /// </summary>
     /// <param name="originalEntity">The entity whose physics skeleton is cloned.</param>
     /// <param name="modelName">Optional model name, only used to name the temp entity.</param>
-    /// <param name="initialPose">The current animation pose used to initialize the ragdoll.</param>
+    /// <param name="initialPose">
+    /// Studio bone world-space matrices used to place the ragdoll's simulated bones.
+    /// </param>
+    /// <param name="poseSnapshot">
+    /// Pose captured from <paramref name="initialPose"/>, applied to the ragdoll so that bones without
+    /// a rigid body keep the pose they had at the moment of death.
+    /// </param>
     /// <returns>The ragdoll entity, or null when it could not be created.</returns>
-    public static Entity? CreateRagdollFor(Entity originalEntity, string? modelName, ReadOnlySpan<Matrix3x4> initialPose)
+    public static Entity? CreateRagdollFor(
+        Entity originalEntity,
+        string? modelName,
+        ReadOnlySpan<Matrix3x4> initialPose,
+        PoseSnapshot poseSnapshot)
     {
         var originPhysics = originalEntity.Get<PhysicsController>();
         if (originPhysics is null || originPhysics.IsNullSkeleton || !originPhysics.IsEnabled)
@@ -46,12 +56,13 @@ public static class RagdollHelper
         // 3. Bring it into the scene first so the bodies land in the same simulation.
         rootScene.Entities.Add(ragdollEntity);
 
-        // 4. Load and attach the cloned skeleton, then initialize its pose.
-        //    Enable() must come before SetPose so the bodies exist in the simulation and Teleport
-        //    actually writes into them.
-        ragdollPhysics.LoadSkeleton(clonedBones);
+        // 4. Load and attach the cloned skeleton, reusing the original's bone hierarchy, then
+        //    initialize its pose. Enable() must come before SetPose so the bodies exist in the
+        //    simulation and Teleport actually writes into them.
+        ragdollPhysics.LoadSkeleton(clonedBones, originPhysics.StudioBoneParents.Span);
         ragdollPhysics.Enable();
         ragdollPhysics.SetPose(initialPose);
+        ragdollPhysics.ApplyPoseSnapshot(poseSnapshot);
 
         // 5. Lightweight behavior that keeps the entity transform in sync with the pivot bone.
         ragdollEntity.Components.Add(new RagdollBehavior());

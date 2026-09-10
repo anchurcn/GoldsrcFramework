@@ -89,11 +89,17 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
 
         if (IsPlayingDeathSequence)
         {
-            var initialPose = GetCurrentPose();
-            if (initialPose is not null && RagdollHelper.CreateRagdollFor(Entity, ModelKey, initialPose) is not null)
+            // Hand the current pose over to the ragdoll. The snapshot keeps the pose of bones that
+            // have no rigid body - a fist stays clenched instead of relaxing into the bind pose.
+            var deathPose = GetCurrentPose();
+            if (deathPose is not null)
             {
-                physics.Disable();
-                RagdollRigged = true;
+                var snapshot = physics.CapturePoseSnapshot(deathPose);
+                if (RagdollHelper.CreateRagdollFor(Entity, ModelKey, deathPose, snapshot) is not null)
+                {
+                    physics.Disable();
+                    RagdollRigged = true;
+                }
             }
 
             return;
@@ -143,15 +149,17 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
             var prefab = ContentManager.Load<Prefab>(ModelKey!);
             if (prefab is not null)
             {
-                // LoadSkeleton detaches and releases the previous skeleton.
-                physics.LoadSkeleton(prefab.Instantiate());
+                // LoadSkeleton detaches and releases the previous skeleton. The bone hierarchy is
+                // needed so that bones without a rigid body can be anchored to a simulated ancestor.
+                var boneParents = ContentManager.GetStudioBoneParents(ModelKey!);
+                physics.LoadSkeleton(prefab.Instantiate(), boneParents);
                 physics.Enable();
                 return;
             }
         }
 
         // No physics data for this model: NullPhysicsSkeleton, rendering still works.
-        physics.LoadSkeleton([]);
+        physics.LoadSkeleton([], []);
     }
 
     private IntPtr GetCurrentModelPointer()
@@ -174,9 +182,9 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
     /// source is available.
     /// </summary>
     /// <remarks>
-    /// Brush models own a single physics bone, so <c>pose[0]</c> (the model origin world transform)
-    /// is all that is needed. Studio models require <c>PreStudioModelRenderer.SetupBones</c>, which is
-    /// not implemented in this part.
+    /// Brush models have a single implicit root bone that sits at the model origin, so a one element
+    /// pose is the whole skeleton. Studio models need the full studio bone array, which comes from
+    /// <c>PreStudioModelRenderer.SetupBones</c> - not implemented in this part.
     /// </remarks>
     private Matrix3x4[]? GetCurrentPose()
     {

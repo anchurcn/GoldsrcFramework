@@ -22,6 +22,16 @@ public interface IContentManager
     T? Load<T>(string key) where T : class;
 
     /// <summary>
+    /// Returns the studio bone hierarchy of a model: for every studio bone, its parent bone index
+    /// (-1 for a root bone). Brush models have a single implicit root bone, so they return <c>[-1]</c>.
+    /// </summary>
+    /// <remarks>
+    /// Returns an empty array when the hierarchy is unknown. Skeletons still work, but bones without a
+    /// rigid body can then only be anchored to the pivot bone instead of their real parent chain.
+    /// </remarks>
+    int[] GetStudioBoneParents(string key);
+
+    /// <summary>
     /// Pre-caches all brush model physics prefabs during map load.
     /// </summary>
     void PreloadBrushModels(object? nativeMapData);
