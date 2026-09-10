@@ -6,25 +6,42 @@ namespace GoldsrcFramework.Ecs;
 
 /// <summary>
 /// Implements Half-Life-specific physics behavior for an entity.
-/// Manages the <see cref="PhysicsController"/> lifecycle: creation on enter,
-/// disable on exit, model validation, and death/ragdoll transitions.
+/// <para>
+/// Owns the entity level state (<see cref="PhysicsController"/> lifecycle, model identity tracking,
+/// death/ragdoll state) and drives the physics skeleton: it reloads the skeleton when the model
+/// changes and writes the current animation pose into it every frame.
+/// </para>
+/// <para>
+/// Runs inside <see cref="GoldsrcScriptSystem"/> (UpdateOrder -90), which is scheduled after
+/// <see cref="GoldsrcSceneSystem"/> and before <c>PhysicsGameSystem</c>, so anything written here
+/// takes effect in the same physics step.
+/// </para>
 /// </summary>
 public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
 {
     /// <summary>The physics controller for this entity, created during <see cref="OnEnter"/>.</summary>
     public PhysicsController? PhysicsController { get; private set; }
 
-    /// <summary>Whether this entity is a player (uses model name instead of model pointer for validation).</summary>
+    /// <summary>Whether this entity is a player (model validated by name instead of by pointer).</summary>
     public bool IsPlayer { get; set; }
 
     /// <summary>Whether the entity is currently playing a death sequence. Set externally.</summary>
     public bool IsPlayingDeathSequence { get; set; }
 
+    /// <summary>
+    /// True while this entity's physics skeleton has been detached into a ragdoll temp entity.
+    /// </summary>
+    public bool RagdollRigged { get; private set; }
+
     /// <summary>Content manager used to load physics prefabs. Set by the entity creation system.</summary>
     public IContentManager? ContentManager { get; set; }
 
-    /// <summary>The model key used for loading physics prefab. Set externally each frame.</summary>
+    /// <summary>The model key used for loading the physics prefab. Set externally each frame.</summary>
     public string? ModelKey { get; set; }
+
+    private IntPtr modelPointer;
+    private string modelName = string.Empty;
+    private bool skeletonLoaded;
 
     public void OnEnter()
     {
@@ -32,9 +49,12 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
         {
             PhysicsController = new PhysicsController();
             Entity.Components.Add(PhysicsController);
+
+            // First time we see this entity: load (and enable) the skeleton.
+            EnsureSkeletonLoaded();
         }
 
-        EnsureSkeletonLoaded();
+        // Coming back into the PVS: the skeleton is still loaded, just re-attach it.
         PhysicsController.Enable();
     }
 
@@ -43,43 +63,50 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
         PhysicsController?.Disable();
     }
 
-    public override void Start()
-    {
-        
-    }
-
     public override void Update(GameTime gameTime)
     {
-        if (PhysicsController is null)
+        var physics = PhysicsController;
+        if (physics is null)
             return;
 
-        // RagdollRigged state: only check for respawn
-        if (PhysicsController.RagdollRigged)
+        // The skeleton is currently living in a ragdoll temp entity: only watch for respawn.
+        if (RagdollRigged)
         {
             if (!IsPlayingDeathSequence)
-                PhysicsController.ReattachSkeleton();
+            {
+                RagdollRigged = false;
+                physics.Enable();
+            }
+
             return;
         }
 
         EnsureSkeletonLoaded();
 
-        // Death → ragdoll
-        if (IsPlayingDeathSequence && !PhysicsController.RagdollRigged)
+        // Only a kinematic, enabled skeleton is driven by the animation each frame.
+        if (!physics.IsEnabled || physics.MotionType != PhysicsMotionType.Kinematic)
+            return;
+
+        if (IsPlayingDeathSequence)
         {
-            // Get current animation pose to initialize the ragdoll.
-            // For studio models this comes from PreStudioModelRenderer.SetupBones;
-            // for brush models it's the root entity's world transform.
-            // Pose source is provided externally; here we use a placeholder.
             var initialPose = GetCurrentPose();
-            if (initialPose is not null)
+            if (initialPose is not null && RagdollHelper.CreateRagdollFor(Entity, ModelKey, initialPose) is not null)
             {
-                RagdollHelper.CreateRagdollFor(Entity, initialPose);
+                physics.Disable();
+                RagdollRigged = true;
             }
+
+            return;
         }
+
+        var pose = GetCurrentPose();
+        if (pose is not null)
+            physics.SetPose(pose);
     }
 
     /// <summary>
-    /// Validates the model hasn't changed and reloads the physics skeleton if needed.
+    /// Compares the current model identity against the last loaded one and reloads the skeleton when
+    /// it changed. The first call always loads.
     /// </summary>
     private void EnsureSkeletonLoaded()
     {
@@ -89,59 +116,42 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
         bool modelChanged;
         if (IsPlayer)
         {
-            string currentName = Entity.Get<PlayerInfoComponent>()?.ModelName ?? string.Empty;
-            modelChanged = !PhysicsController!.ValidateModel(currentName);
+            var currentName = Entity.Get<PlayerInfoComponent>()?.ModelName ?? string.Empty;
+            modelChanged = !string.Equals(modelName, currentName, StringComparison.OrdinalIgnoreCase);
+            modelName = currentName;
         }
         else
         {
-            IntPtr currentPointer = GetCurrentModelPointer();
-            modelChanged = !PhysicsController!.ValidateModel(currentPointer);
+            var currentPointer = GetCurrentModelPointer();
+            modelChanged = modelPointer != currentPointer;
+            modelPointer = currentPointer;
         }
 
-        if (!modelChanged && !PhysicsController.IsNullSkeleton)
+        if (skeletonLoaded && !modelChanged)
             return;
 
+        skeletonLoaded = true;
         ReloadSkeleton();
     }
 
     private void ReloadSkeleton()
     {
-        // Remove old physics bones
-        foreach (var bone in PhysicsController!.PhysicsBones)
-            bone.Transform.Parent = null;
+        var physics = PhysicsController!;
 
         if (ContentManager!.IsExist(ModelKey!))
         {
             var prefab = ContentManager.Load<Prefab>(ModelKey!);
             if (prefab is not null)
             {
-                var bones = Stride.Engine.Design.EntityCloner.Instantiate(prefab);
-                foreach (var bone in bones)
-                    bone.Transform.Parent = Entity.Transform;
+                // LoadSkeleton detaches and releases the previous skeleton.
+                physics.LoadSkeleton(prefab.Instantiate());
+                physics.Enable();
+                return;
+            }
+        }
 
-                if (IsPlayer)
-                {
-                    string modelName = Entity.Get<PlayerInfoComponent>()?.ModelName ?? string.Empty;
-                    PhysicsController.LoadSkeleton(bones, modelName, true);
-                }
-                else
-                {
-                    PhysicsController.LoadSkeleton(bones, GetCurrentModelPointer(), false);
-                }
-            }
-            else
-            {
-                PhysicsController.LoadSkeleton([], GetCurrentModelPointer(), false);
-            }
-        }
-        else
-        {
-            // NullPhysicsSkeleton
-            if (IsPlayer)
-                PhysicsController.LoadSkeleton([], Entity.Get<PlayerInfoComponent>()?.ModelName ?? string.Empty, true);
-            else
-                PhysicsController.LoadSkeleton([], GetCurrentModelPointer(), false);
-        }
+        // No physics data for this model: NullPhysicsSkeleton, rendering still works.
+        physics.LoadSkeleton([]);
     }
 
     private IntPtr GetCurrentModelPointer()
@@ -155,21 +165,27 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
                 return (IntPtr)clEntity.NativeEntity->model;
             }
         }
+
         return IntPtr.Zero;
     }
 
     /// <summary>
-    /// Returns the current animation pose for initializing a ragdoll.
-    /// For studio models, this should be provided by PreStudioModelRenderer.SetupBones.
-    /// For brush models, it's the root entity's world transform.
-    /// Returns null if pose is not available (ragdoll creation is skipped).
+    /// Returns the current animation pose used to drive the physics skeleton, or null when no pose
+    /// source is available.
     /// </summary>
+    /// <remarks>
+    /// Brush models own a single physics bone, so <c>pose[0]</c> (the model origin world transform)
+    /// is all that is needed. Studio models require <c>PreStudioModelRenderer.SetupBones</c>, which is
+    /// not implemented in this part.
+    /// </remarks>
     private Matrix3x4[]? GetCurrentPose()
     {
-        // TODO: integrate with PreStudioModelRenderer for studio models.
-        // For now, return the root entity's world transform as pose[0] (brush model case).
-        var pose = new Matrix3x4[1];
-        pose[0] = Entity.Transform.WorldMatrix.ToMatrix3x4();
-        return pose;
+        if (PhysicsController!.PhysicsBones.Count != 1)
+            return null;
+
+        // World matrices are only refreshed during the Draw phase, so refresh explicitly before
+        // reading one inside the Update phase.
+        Entity.Transform.UpdateWorldMatrix();
+        return [Entity.Transform.WorldMatrix.ToMatrix3x4()];
     }
 }

@@ -44,13 +44,13 @@ public sealed class GoldsrcClientGame : IDisposable
 
         transformSync = new GoldsrcTransformSyncSystem(Services);
 
-        prePhysicsPoseSync = new PrePhysicsPoseSync(Services, SceneSystem);
-
         Time = new GameTime();
 
+        // The effective order is driven by each system's UpdateOrder; the calls below only need to be
+        // consistent with it. Scripts (-90) run after the scene (-100) and before physics (-49), so
+        // everything they write into the physics skeleton is stepped in the same frame.
         GameSystems.Add(SceneManagement);
         GameSystems.Add(transformSync);
-        GameSystems.Add(prePhysicsPoseSync);
         GameSystems.Add(SceneSystem);
         GameSystems.Add(ScriptSystem);
         GameSystems.Add(LateUpdateSystem);
@@ -70,7 +70,6 @@ public sealed class GoldsrcClientGame : IDisposable
     public LateUpdateScriptSystem LateUpdateSystem { get; }
 
     private readonly GoldsrcTransformSyncSystem transformSync;
-    private readonly PrePhysicsPoseSync prePhysicsPoseSync;
 
     public GameTime Time { get; }
 

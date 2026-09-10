@@ -4,10 +4,18 @@ using Stride.Games;
 namespace GoldsrcFramework.Ecs;
 
 /// <summary>
-/// Starts and updates synchronous GoldSrc scripts after Stride physics.
+/// Starts and updates synchronous GoldSrc scripts.
 /// </summary>
+/// <remarks>
+/// Runs after <see cref="GoldsrcSceneSystem"/> (-100) and before the Bepu
+/// <c>PhysicsGameSystem</c> (-49) so that whatever scripts write into the physics
+/// skeleton takes effect in the same physics step.
+/// </remarks>
 public sealed class GoldsrcScriptSystem : GameSystemBase
 {
+    /// <summary>Runs after <see cref="GoldsrcSceneSystem"/> and before the physics step.</summary>
+    public const int DefaultUpdateOrder = -90;
+
     private readonly HashSet<ScriptComponentBase> scripts = [];
     private readonly HashSet<ScriptComponentBase> startedScripts = [];
     private readonly HashSet<ScriptComponentBase> pendingAdditions = [];
@@ -18,6 +26,7 @@ public sealed class GoldsrcScriptSystem : GameSystemBase
         : base(services)
     {
         Enabled = true;
+        UpdateOrder = DefaultUpdateOrder;
     }
 
     internal void Add(ScriptComponentBase script)

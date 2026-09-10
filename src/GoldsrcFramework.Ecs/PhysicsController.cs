@@ -1,132 +1,318 @@
 using GoldsrcFramework.LinearMath;
 using Stride.BepuPhysics;
 using Stride.BepuPhysics.Constraints;
-using StrideMatrix = Stride.Core.Mathematics.Matrix;
-using StrideVector3 = Stride.Core.Mathematics.Vector3;
-using StrideQuaternion = Stride.Core.Mathematics.Quaternion;
 using Stride.Engine;
+using StrideMatrix = Stride.Core.Mathematics.Matrix;
+using StrideQuaternion = Stride.Core.Mathematics.Quaternion;
+using StrideVector3 = Stride.Core.Mathematics.Vector3;
 
 namespace GoldsrcFramework.Ecs;
 
 /// <summary>
-/// Manages the physics bodies attached to a GoldSrc entity. Placed on the root entity
-/// (not a prefab) and created at runtime by <see cref="HalfLifeBehavior"/>.
-/// The physics skeleton (a set of child entities with <see cref="BodyComponent"/> and
-/// constraints) is loaded via <see cref="LoadSkeleton"/> and can be detached/reattached
-/// for ragdoll transitions.
+/// Manages the physics skeleton of a GoldSrc entity: a set of child entities carrying physics
+/// bodies and constraints (produced by instantiating a prefab, or by cloning for ragdolls).
+/// Lives on the root entity, not in a prefab.
+/// <para>
+/// Responsibilities are deliberately narrow: enable/disable the skeleton, write studio model bone
+/// transforms into it (<see cref="SetPose"/>), read them back (<see cref="GetPose"/>), and derive
+/// the model root transform (<see cref="GetModelRootTransform"/>). Entity level concerns such as
+/// model identity tracking and ragdoll state belong to <see cref="HalfLifeBehavior"/>.
+/// </para>
 /// </summary>
 public sealed class PhysicsController : EntityComponent
 {
-    // ── 公共状态 ──────────────────────────────────────────
-    public PhysicsMotionType MotionType { get; set; } = PhysicsMotionType.Kinematic;
+    /// <summary>
+    /// Per-bone internal state, rebuilt by <see cref="LoadSkeleton"/>.
+    /// </summary>
+    private sealed class PhysicsBoneData
+    {
+        public Entity Bone = null!;
+        public CollidableComponent Collidable = null!;
+        public BodyComponent? Body;
+        public int StudioBoneIndex;
+        public bool IsAddon;
+    }
 
-    /// <summary>The bone used as the pivot for computing the model origin from physics transforms.</summary>
-    public Entity? PivotPhysicsBone { get; private set; }
+    private readonly List<PhysicsBoneData> physicsBonesInternal = [];
 
-    /// <summary>Offset from the pivot bone's world transform to the model origin, computed in T-pose.</summary>
-    public StrideMatrix ModelRootOffset { get; private set; } = StrideMatrix.Identity;
+    /// <summary>Parallel view of <see cref="physicsBonesInternal"/> backing the public API.</summary>
+    private readonly List<Entity> boneEntities = [];
 
-    /// <summary>Native model pointer (model_t*) for non-player entities. Used for model validation.</summary>
-    public IntPtr ModelPointer { get; private set; }
-
-    /// <summary>Model name for player entities. Used for model validation.</summary>
-    public string? ModelName { get; private set; }
-
-    /// <summary>Whether this controller belongs to a player entity.</summary>
-    public bool IsPlayer { get; private set; }
-
-    /// <summary>Whether the skeleton has been detached (entity is in ragdoll state).</summary>
-    public bool RagdollRigged { get; private set; }
-
-    // ── 内部数据（由 LoadSkeleton 构建）────────────────────
-    private readonly List<Entity> physicsBones = [];
-    private readonly List<int> boneIndices = [];
-    private readonly List<bool> isAddon = [];
     private readonly List<ConstraintComponentBase> regularConstraints = [];
     private readonly List<ConstraintComponentBase> addonConstraints = [];
 
-    // ── 备份（DetachSkeleton 时使用）──────────────────────
-    private List<Entity>? detachedBones;
-
-    public IReadOnlyList<Entity> PhysicsBones => physicsBones;
-
-    /// <summary>True when no physics skeleton is loaded (e.g. missing .gpd). All operations are no-ops.</summary>
-    public bool IsNullSkeleton => physicsBones.Count == 0;
-
-    // ── LoadSkeleton ──────────────────────────────────────
+    private PhysicsBoneData? pivotPhysicsBone;
+    private StrideMatrix modelRootOffset = StrideMatrix.Identity;
+    /// <summary>
+    /// Skeleton level default mask applied when <see cref="SetPose"/>/<see cref="GetPose"/> are called
+    /// without an explicit mask. Reserved for future use; nothing sets it yet.
+    /// </summary>
+    private bool[]? settingMasks = null;
+    private PhysicsMotionType motionType = PhysicsMotionType.Kinematic;
 
     /// <summary>
-    /// Builds the internal index from instantiated physics bone entities and computes
-    /// <see cref="PivotPhysicsBone"/> / <see cref="ModelRootOffset"/>.
-    /// Caller must have already added the bone entities as children of the root entity.
+    /// Motion type applied to the skeleton bones. Only <see cref="PhysicsMotionType.Kinematic"/> and
+    /// <see cref="PhysicsMotionType.Dynamic"/> are supported: static skeletons are expressed by the
+    /// prefab itself (worldspawn carries a <c>StaticComponent</c> and has no <see cref="PhysicsController"/>).
+    /// Setting this takes effect immediately when the skeleton is enabled.
     /// </summary>
-    public void LoadSkeleton(IEnumerable<Entity> physicsBoneEntities, IntPtr modelPointer, bool isPlayer)
+    public PhysicsMotionType MotionType
     {
-        IsPlayer = isPlayer;
-        ModelPointer = modelPointer;
-        ModelName = null;
-        BuildFromEntities(physicsBoneEntities);
+        get => motionType;
+        set
+        {
+            if (motionType == value)
+                return;
+
+            motionType = value;
+
+            if (IsEnabled)
+                ApplyMotionType();
+        }
     }
 
     /// <summary>
-    /// Builds the internal index from instantiated physics bone entities and computes
-    /// <see cref="PivotPhysicsBone"/> / <see cref="ModelRootOffset"/>.
-    /// Caller must have already added the bone entities as children of the root entity.
+    /// True while the physics bone entities are attached to the root entity (and therefore in the scene
+    /// and registered in the physics simulation).
     /// </summary>
-    public void LoadSkeleton(IEnumerable<Entity> physicsBoneEntities, string modelName, bool isPlayer)
-    {
-        IsPlayer = isPlayer;
-        ModelName = modelName;
-        ModelPointer = IntPtr.Zero;
-        BuildFromEntities(physicsBoneEntities);
-    }
+    public bool IsEnabled { get; private set; }
 
-    private void BuildFromEntities(IEnumerable<Entity> physicsBoneEntities)
+    /// <summary>
+    /// True when no physics skeleton is loaded (e.g. the model has no .gpd). Every operation is a no-op.
+    /// </summary>
+    public bool IsNullSkeleton => physicsBonesInternal.Count == 0;
+
+    /// <summary>The physics bone entities, in the order they were accepted by <see cref="LoadSkeleton"/>.</summary>
+    public IReadOnlyList<Entity> PhysicsBones => boneEntities;
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Takes ownership of a set of physics bone entities. Any previously loaded skeleton is detached
+    /// first. An empty collection produces a NullPhysicsSkeleton.
+    /// </summary>
+    /// <remarks>
+    /// The newly loaded skeleton is left <b>detached</b> (<see cref="IsEnabled"/> is false); call
+    /// <see cref="Enable"/> afterwards to attach it to the root entity and register its bodies.
+    /// </remarks>
+    public void LoadSkeleton(IEnumerable<Entity> physicsBoneEntities)
     {
-        // Clear previous state
-        physicsBones.Clear();
-        boneIndices.Clear();
-        isAddon.Clear();
+        DetachBones();
+
+        physicsBonesInternal.Clear();
+        boneEntities.Clear();
         regularConstraints.Clear();
         addonConstraints.Clear();
-        PivotPhysicsBone = null;
-        ModelRootOffset = StrideMatrix.Identity;
+        pivotPhysicsBone = null;
+        modelRootOffset = StrideMatrix.Identity;
+        IsEnabled = false;
 
-        var boneList = physicsBoneEntities.ToList();
-        if (boneList.Count == 0)
-        {
-            // NullPhysicsSkeleton
-            ApplyMotionType();
-            return;
-        }
+        var boneList = physicsBoneEntities as IList<Entity> ?? physicsBoneEntities.ToList();
 
-        // Collect bones and their BoneLink data
-        var addonBoneSet = new HashSet<Entity>();
-        foreach (var bone in boneList)
+        foreach (var entity in boneList)
         {
-            var link = bone.Get<BoneLink>();
-            if (link is null)
+            if (entity.Get<BoneLink>() is not { } link)
+                continue;
+            if (entity.Get<CollidableComponent>() is not { } collidable)
                 continue;
 
-            physicsBones.Add(bone);
-            boneIndices.Add(link.BoneIndex);
-            isAddon.Add(link.IsAddon);
-            if (link.IsAddon)
-                addonBoneSet.Add(bone);
+            physicsBonesInternal.Add(new PhysicsBoneData
+            {
+                Bone = entity,
+                Collidable = collidable,
+                Body = collidable as BodyComponent,
+                StudioBoneIndex = link.BoneIndex,
+                IsAddon = link.IsAddon,
+            });
+            boneEntities.Add(entity);
         }
 
-        // Collect constraints, split into regular / addon
-        foreach (var bone in boneList)
+        if (physicsBonesInternal.Count == 0)
+            return; // NullPhysicsSkeleton
+
+        CollectConstraints();
+
+        var pivot = physicsBonesInternal.MinBy(bone => bone.StudioBoneIndex)!;
+
+        pivotPhysicsBone = pivot;
+
+        // ModelRootOffset is expressed in the root entity's local space, i.e. it is the inverse of the
+        // pivot bone's T-pose transform relative to the model root:
+        //     modelRoot = pivotWorld * modelRootOffset,  modelRootOffset = Invert(pivotLocal)
+        // Deriving it from the bone's *local* matrix (instead of world matrices) keeps it valid no
+        // matter where the root entity happens to be when the skeleton is loaded, and it does not
+        // depend on the bones being attached yet - LoadSkeleton deliberately leaves them detached.
+        // UpdateLocalMatrix() is required because the TRS fields do not push into LocalMatrix.
+        pivot.Bone.Transform.UpdateLocalMatrix();
+        var pivotLocal = pivot.Bone.Transform.LocalMatrix;
+        StrideMatrix.Invert(ref pivotLocal, out modelRootOffset);
+    }
+
+    /// <summary>
+    /// Attaches the physics bone entities to the root entity. This single operation also brings them
+    /// into the scene and registers their bodies and constraints in the physics simulation.
+    /// Applies the current <see cref="MotionType"/>.
+    /// </summary>
+    public void Enable()
+    {
+        if (IsNullSkeleton || IsEnabled)
+            return;
+
+        foreach (var bone in boneEntities)
+            bone.Transform.Parent = Entity.Transform;
+
+        IsEnabled = true;
+        ApplyMotionType();
+    }
+
+    /// <summary>
+    /// Detaches the physics bone entities from the root entity, which also removes them from the scene
+    /// and unregisters their bodies and constraints from the physics simulation. Bone references are
+    /// kept, so <see cref="Enable"/> can restore the skeleton without reloading the prefab.
+    /// </summary>
+    public void Disable()
+    {
+        if (!IsEnabled)
+            return;
+
+        DetachBones();
+        IsEnabled = false;
+    }
+
+    // ── Pose ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Writes studio model bone world transforms into the physics skeleton.
+    /// </summary>
+    /// <param name="pose">
+    /// Bone world-space matrices (Matrix3x4) indexed by studio bone index.
+    /// Brush models only use <c>pose[0]</c> (the model origin world transform).
+    /// </param>
+    /// <param name="settingMask">
+    /// Optional per-studio-bone mask; bones whose entry is false are skipped.
+    /// When null, the controller level <c>settingMasks</c> is used instead.
+    /// </param>
+    /// <remarks>
+    /// Addon (jiggle) bones are never written: they stay dynamic so the simulation can drag them
+    /// along with their kinematic neighbours.
+    /// </remarks>
+    public void SetPose(ReadOnlySpan<Matrix3x4> pose, bool[]? settingMask = null)
+    {
+        if (!IsEnabled || IsNullSkeleton)
+            return;
+
+        var mask = settingMask ?? settingMasks;
+
+        foreach (var bone in physicsBonesInternal)
+        {
+            if (bone.IsAddon || bone.Body is null)
+                continue;
+
+            var boneIndex = bone.StudioBoneIndex;
+            if ((uint)boneIndex >= (uint)pose.Length)
+                continue;
+            if (mask is not null && boneIndex < mask.Length && !mask[boneIndex])
+                continue;
+
+            SetPhysicsBonePose(bone, pose[boneIndex].ToStrideMatrix());
+        }
+    }
+
+    /// <summary>
+    /// Reads bone world transforms out of the physics skeleton.
+    /// </summary>
+    /// <param name="pose">
+    /// Output array (Matrix3x4) indexed by studio bone index. <c>pose[0]</c> receives the model origin
+    /// world transform. Entries that map to no physics bone are left untouched.
+    /// </param>
+    /// <param name="settingMask">
+    /// Optional per-studio-bone mask; bones whose entry is false are skipped.
+    /// When null, the controller level <c>settingMasks</c> is used instead.
+    /// </param>
+    /// <remarks>
+    /// Values come from the physics poses (not from <c>Transform.WorldMatrix</c>), so they are always
+    /// up to date within the frame and include the simulated result of addon (jiggle) bones.
+    /// </remarks>
+    public void GetPose(Span<Matrix3x4> pose, bool[]? settingMask = null)
+    {
+        if (!IsEnabled || IsNullSkeleton)
+            return;
+
+        var mask = settingMask ?? settingMasks;
+
+        if (pose.Length > 0)
+            pose[0] = GetModelRootTransform().ToMatrix3x4();
+
+        foreach (var bone in physicsBonesInternal)
+        {
+            if (bone.Body is not { } body)
+                continue;
+
+            var boneIndex = bone.StudioBoneIndex;
+            if (boneIndex == 0 || (uint)boneIndex >= (uint)pose.Length)
+                continue;
+            if (mask is not null && boneIndex < mask.Length && !mask[boneIndex])
+                continue;
+
+            pose[boneIndex] = ComposeWorldMatrix(body.Position, body.Orientation).ToMatrix3x4();
+        }
+    }
+
+    /// <summary>
+    /// Computes the model root transform from the pivot physics bone and the T-pose offset captured by
+    /// <see cref="LoadSkeleton"/>. Used by dynamic (ragdoll) entities to drive the root entity transform.
+    /// </summary>
+    /// <remarks>
+    /// Always returns a usable transform: when no physics pose is available (null skeleton, disabled),
+    /// it falls back to the root entity's current world transform, which makes writing the result back
+    /// a no-op.
+    /// </remarks>
+    public StrideMatrix GetModelRootTransform()
+    {
+        if (!IsEnabled || pivotPhysicsBone is not { } pivot)
+        {
+            Entity.Transform.UpdateWorldMatrix();
+            return Entity.Transform.WorldMatrix;
+        }
+
+        var pivotWorld = GetBoneWorldMatrix(pivot);
+        StrideMatrix.Multiply(ref pivotWorld, ref modelRootOffset, out var rootWorld);
+        return rootWorld;
+    }
+
+    // ── Internals ─────────────────────────────────────────────────────────
+
+    private void DetachBones()
+    {
+        foreach (var bone in boneEntities)
+            bone.Transform.Parent = null;
+    }
+
+    /// <summary>
+    /// Splits the skeleton constraints into regular ones and ones touching an addon (jiggle) bone.
+    /// Constraints themselves are registered/unregistered by the <c>ConstraintProcessor</c> as the bone
+    /// entities enter and leave the entity manager; only their <c>Enabled</c> flag is managed here.
+    /// </summary>
+    private void CollectConstraints()
+    {
+        var addonBones = new HashSet<Entity>();
+        foreach (var bone in physicsBonesInternal)
+        {
+            if (bone.IsAddon)
+                addonBones.Add(bone.Bone);
+        }
+
+        foreach (var bone in boneEntities)
         {
             foreach (var component in bone.Components)
             {
                 if (component is not ConstraintComponentBase constraint)
                     continue;
 
-                bool connectsAddon = false;
+                var connectsAddon = false;
                 foreach (var body in constraint.Bodies)
                 {
-                    if (body is { Entity: { } bodyEntity } && addonBoneSet.Contains(bodyEntity))
+                    if (body is { Entity: { } bodyEntity } && addonBones.Contains(bodyEntity))
                     {
                         connectsAddon = true;
                         break;
@@ -139,276 +325,56 @@ public sealed class PhysicsController : EntityComponent
                     regularConstraints.Add(constraint);
             }
         }
-
-        // Compute PivotPhysicsBone: bone with smallest bone index (prefer index 0)
-        int pivotIndex = 0;
-        int minBoneIndex = int.MaxValue;
-        for (int i = 0; i < physicsBones.Count; i++)
-        {
-            if (boneIndices[i] < minBoneIndex)
-            {
-                minBoneIndex = boneIndices[i];
-                pivotIndex = i;
-            }
-        }
-        PivotPhysicsBone = physicsBones[pivotIndex];
-
-        // ModelRootOffset = Invert(Pivot.WorldMatrix) at T-pose
-        // The root entity should be at its initial transform; bone local transforms
-        // were set to T-pose values by the ContentManager.
-        Entity.Transform.UpdateWorldMatrix();
-        var pivotWorld = PivotPhysicsBone.Transform.WorldMatrix;
-        StrideMatrix.Invert(ref pivotWorld, out var offset);
-        ModelRootOffset = offset;
-
-        ApplyMotionType();
     }
 
-    // ── SetPose / GetPose ─────────────────────────────────
-
     /// <summary>
-    /// Syncs GoldSrc bone world transforms to physics bones via Teleport.
-    /// <paramref name="pose"/> contains bone world-space matrices indexed by animation bone index.
-    /// For brush models, only pose[0] (model origin) is used.
-    /// <paramref name="settingMask"/> can disable specific bones (e.g. jiggle bones).
+    /// Applies <see cref="MotionType"/> to the skeleton.
     /// </summary>
-    public void SetPose(ReadOnlySpan<Matrix3x4> pose, bool[]? settingMask = null)
+    /// <remarks>
+    /// In kinematic mode non-addon bones are kinematic and the constraints between them are disabled
+    /// (two kinematic bodies never produce motion). Addon bones stay dynamic in both modes and keep
+    /// their constraints enabled so the neighbouring kinematic bones can drag them around.
+    /// </remarks>
+    private void ApplyMotionType()
     {
         if (IsNullSkeleton)
             return;
 
-        for (int i = 0; i < physicsBones.Count; i++)
+        var kinematic = motionType == PhysicsMotionType.Kinematic;
+
+        foreach (var bone in physicsBonesInternal)
         {
-            int boneIdx = boneIndices[i];
-            if (boneIdx >= pose.Length)
-                continue;
-            if (settingMask is not null && boneIdx < settingMask.Length && !settingMask[boneIdx])
-                continue;
-
-            var strideMatrix = pose[boneIdx].ToStrideMatrix();
-            SetPhysicsBonePose(physicsBones[i], strideMatrix);
-        }
-    }
-
-    /// <summary>
-    /// Reads physics transforms back into <paramref name="pose"/>.
-    /// pose[0] is computed as the model origin from <see cref="PivotPhysicsBone"/> × <see cref="ModelRootOffset"/>.
-    /// Other entries are the world transforms of each physics bone, indexed by animation bone index.
-    /// </summary>
-    public void GetPose(Span<Matrix3x4> pose, bool[]? settingMask = null)
-    {
-        if (IsNullSkeleton)
-            return;
-
-        // pose[0] = model origin from pivot bone
-        if (pose.Length > 0 && PivotPhysicsBone is { } pivot)
-        {
-            if (settingMask is null || settingMask.Length == 0 || settingMask[0])
-            {
-                var pivotWorld = pivot.Transform.WorldMatrix;
-                var offset = ModelRootOffset;
-                StrideMatrix.Multiply(ref pivotWorld, ref offset, out var origin);
-                pose[0] = origin.ToMatrix3x4();
-            }
+            if (bone.Body is { } body)
+                body.Kinematic = !bone.IsAddon && kinematic;
         }
 
-        // Other bones
-        for (int i = 0; i < physicsBones.Count; i++)
-        {
-            int boneIdx = boneIndices[i];
-            if (boneIdx == 0 || boneIdx >= pose.Length)
-                continue;
-            if (settingMask is not null && boneIdx < settingMask.Length && !settingMask[boneIdx])
-                continue;
-
-            pose[boneIdx] = physicsBones[i].Transform.WorldMatrix.ToMatrix3x4();
-        }
+        foreach (var constraint in regularConstraints)
+            constraint.Enabled = !kinematic;
     }
 
     /// <summary>
     /// Sets a single physics bone's pose from a Stride world-space matrix.
-    /// Accounts for the body's <see cref="CollidableComponent.CenterOfMass"/> so the
-    /// entity ends up exactly at the requested position.
     /// </summary>
-    public void SetPhysicsBonePose(Entity physicsBone, StrideMatrix pose)
+    private static void SetPhysicsBonePose(PhysicsBoneData bone, StrideMatrix pose)
     {
-        pose.Decompose(out _, out StrideQuaternion rotation, out StrideVector3 translation);
-
-        if (physicsBone.Get<BodyComponent>() is { } body)
-        {
-            // BodyComponent.Teleport expects the center-of-mass world position.
-            // entityWorldPos = teleportPos - CenterOfMass * worldRot
-            // => teleportPos = entityWorldPos + CenterOfMass * worldRot
-            var com = body.CenterOfMass;
-            if (com != StrideVector3.Zero)
-            {
-                var comWorld = StrideVector3.Transform(com, rotation);
-                translation += comWorld;
-            }
-            body.Teleport(translation, rotation);
-        }
-        else if (physicsBone.Get<StaticComponent>() is { } staticBody)
-        {
-            staticBody.Teleport(translation, rotation);
-        }
-        else
-        {
-            // No physics component: set transform directly
-            physicsBone.Transform.Position = translation;
-            physicsBone.Transform.Rotation = rotation;
-        }
+        pose.Decompose(out StrideVector3 _, out StrideQuaternion rotation, out StrideVector3 translation);
+        bone.Body?.Teleport(translation, rotation);
     }
 
-    // ── Enable / Disable ──────────────────────────────────
-
-    /// <summary>Enables physics by applying the current <see cref="MotionType"/> to all bones and constraints.</summary>
-    public void Enable()
+    private static StrideMatrix GetBoneWorldMatrix(PhysicsBoneData bone)
     {
-        ApplyMotionType();
+        if (bone.Body is { } body)
+            return ComposeWorldMatrix(body.Position, body.Orientation);
+
+        // Static bones (worldspawn) have no physics pose to read; fall back to the entity transform.
+        bone.Bone.Transform.UpdateWorldMatrix();
+        return bone.Bone.Transform.WorldMatrix;
     }
 
-    /// <summary>
-    /// Disables physics: all bodies are set to kinematic (sleeping) and all constraints
-    /// are disabled. The bone entities remain in the scene for later reuse.
-    /// </summary>
-    public void Disable()
+    private static StrideMatrix ComposeWorldMatrix(StrideVector3 translation, StrideQuaternion rotation)
     {
-        foreach (var bone in physicsBones)
-        {
-            if (bone.Get<BodyComponent>() is { } body)
-                body.Kinematic = true;
-        }
-
-        foreach (var c in regularConstraints)
-            c.Enabled = false;
-        foreach (var c in addonConstraints)
-            c.Enabled = false;
-    }
-
-    private void ApplyMotionType()
-    {
-        for (int i = 0; i < physicsBones.Count; i++)
-        {
-            if (physicsBones[i].Get<BodyComponent>() is not { } body)
-                continue;
-
-            // addon bones are always dynamic; non-addon bones follow MotionType
-            if (isAddon[i])
-            {
-                body.Kinematic = false;
-            }
-            else
-            {
-                body.Kinematic = MotionType switch
-                {
-                    PhysicsMotionType.Kinematic => true,
-                    PhysicsMotionType.Dynamic => false,
-                    _ => true,
-                };
-            }
-        }
-
-        // Constraints
-        bool kinematicMode = MotionType == PhysicsMotionType.Kinematic;
-        foreach (var c in regularConstraints)
-            c.Enabled = !kinematicMode; // regular constraints only active in dynamic mode
-        foreach (var c in addonConstraints)
-            c.Enabled = true;            // addon constraints always active
-    }
-
-    // ── Detach / Reattach (ragdoll) ───────────────────────
-
-    /// <summary>
-    /// Detaches the physics skeleton from the root entity and switches to NullPhysicsSkeleton.
-    /// Used when the entity dies and a ragdoll temp entity takes over physics.
-    /// The bone entities are kept in memory for later reattachment.
-    /// </summary>
-    public void DetachSkeleton()
-    {
-        if (IsNullSkeleton || detachedBones is not null)
-            return;
-
-        detachedBones = [..physicsBones];
-
-        // Remove bones from parent (also removes from scene → physics stops)
-        foreach (var bone in physicsBones)
-            bone.Transform.Parent = null;
-
-        // Switch to NullPhysicsSkeleton state
-        physicsBones.Clear();
-        boneIndices.Clear();
-        isAddon.Clear();
-        regularConstraints.Clear();
-        addonConstraints.Clear();
-        PivotPhysicsBone = null;
-
-        RagdollRigged = true;
-    }
-
-    /// <summary>
-    /// Reattaches the previously detached physics skeleton and rebuilds the internal index.
-    /// Used when the entity respawns.
-    /// </summary>
-    public void ReattachSkeleton()
-    {
-        if (detachedBones is null || detachedBones.Count == 0)
-            return;
-
-        foreach (var bone in detachedBones)
-            bone.Transform.Parent = Entity.Transform;
-
-        // Rebuild internal index
-        if (IsPlayer)
-            LoadSkeleton(detachedBones, ModelName!, true);
-        else
-            LoadSkeleton(detachedBones, ModelPointer, false);
-
-        detachedBones = null;
-        RagdollRigged = false;
-    }
-
-    // ── Root transform from pivot (dynamic) ───────────────
-
-    /// <summary>
-    /// Computes the root entity's world transform from the pivot physics bone and
-    /// <see cref="ModelRootOffset"/>, then re-teleports all bones to fix up local
-    /// coordinates. Call this in LateUpdate for dynamic (ragdoll) entities.
-    /// </summary>
-    public void ApplyRootTransformFromPivot(Entity rootEntity)
-    {
-        if (PivotPhysicsBone is null || IsNullSkeleton)
-            return;
-
-        // rootWorld = pivotWorld * ModelRootOffset
-        var pivotWorld = PivotPhysicsBone.Transform.WorldMatrix;
-        var offset = ModelRootOffset;
-        StrideMatrix.Multiply(ref pivotWorld, ref offset, out var rootWorld);
-
-        rootEntity.Transform.WorldMatrix = rootWorld;
-
-        // Re-teleport all bones so their local transforms are correct relative to the new root.
-        // Teleport on the body is a no-op (same pose); only the entity local transform is updated.
-        foreach (var bone in physicsBones)
-        {
-            SetPhysicsBonePose(bone, bone.Transform.WorldMatrix);
-        }
-    }
-
-    // ── Model validation ──────────────────────────────────
-
-    /// <summary>Returns true if the current model pointer matches the controller's model.</summary>
-    public bool ValidateModel(IntPtr currentPointer)
-    {
-        if (IsPlayer)
-            return false;
-        return ModelPointer == currentPointer;
-    }
-
-    /// <summary>Returns true if the current model name matches the controller's model.</summary>
-    public bool ValidateModel(string currentName)
-    {
-        if (!IsPlayer)
-            return false;
-        return string.Equals(ModelName, currentName, StringComparison.OrdinalIgnoreCase);
+        var scale = StrideVector3.One;
+        StrideMatrix.Transformation(ref scale, ref rotation, ref translation, out var world);
+        return world;
     }
 }

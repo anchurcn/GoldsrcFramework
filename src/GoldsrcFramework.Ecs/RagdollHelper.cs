@@ -5,65 +5,58 @@ using Stride.Engine.Design;
 namespace GoldsrcFramework.Ecs;
 
 /// <summary>
-/// Helper for creating ragdoll physics from an existing entity with a PhysicsController.
-/// Creates an independent temp entity (Dynamic) by cloning the original's physics skeleton,
-/// then detaches the original's skeleton so it becomes a NullPhysicsSkeleton.
+/// Helper for creating a ragdoll from an entity that owns a <see cref="PhysicsController"/>.
+/// Clones the original entity's physics bones into an independent dynamic temp entity. The original
+/// entity's skeleton is left untouched; the caller is expected to <see cref="PhysicsController.Disable"/>
+/// it afterwards (see <see cref="HalfLifeBehavior"/>).
 /// </summary>
 public static class RagdollHelper
 {
     /// <summary>
-    /// Creates a ragdoll temp entity for the given entity.
-    /// Clones the original's physics bones, creates a Dynamic PhysicsController,
-    /// initializes the pose, adds the entity to the scene, and detaches the original's skeleton.
+    /// Creates a ragdoll temp entity for the given entity and adds it to the same root scene.
     /// </summary>
-    /// <param name="originalEntity">The entity that died.</param>
-    /// <param name="initialPose">The current animation pose to initialize the ragdoll with.</param>
-    public static void CreateRagdollFor(Entity originalEntity, ReadOnlySpan<Matrix3x4> initialPose)
+    /// <param name="originalEntity">The entity whose physics skeleton is cloned.</param>
+    /// <param name="modelName">Optional model name, only used to name the temp entity.</param>
+    /// <param name="initialPose">The current animation pose used to initialize the ragdoll.</param>
+    /// <returns>The ragdoll entity, or null when it could not be created.</returns>
+    public static Entity? CreateRagdollFor(Entity originalEntity, string? modelName, ReadOnlySpan<Matrix3x4> initialPose)
     {
-        var physController = originalEntity.Get<PhysicsController>();
-        if (physController is null || physController.IsNullSkeleton || physController.RagdollRigged)
-            return;
+        var originPhysics = originalEntity.Get<PhysicsController>();
+        if (originPhysics is null || originPhysics.IsNullSkeleton || !originPhysics.IsEnabled)
+            return null;
 
-        // 1. Clone physics bones (deep clone includes components, children)
-        var clonedBones = new List<Entity>(physController.PhysicsBones.Count);
-        foreach (var bone in physController.PhysicsBones)
-        {
-            var cloned = EntityCloner.Clone(bone);
-            clonedBones.Add(cloned);
-        }
+        var rootScene = GetRootScene(originalEntity);
+        if (rootScene is null)
+            return null;
 
-        // 2. Create temp ragdoll entity
-        int entindex = originalEntity.Get<Components.ClEntityComponent>()?.Index ?? -1;
-        string modelName = physController.IsPlayer ? physController.ModelName ?? "unknown" : "model";
-        var ragdollEntity = new Entity($"Ragdoll@{entindex}(\"{modelName}\")");
+        // 1. Clone the physics bones (deep clone: components, constraints and children included).
+        var clonedBones = new List<Entity>(originPhysics.PhysicsBones.Count);
+        foreach (var bone in originPhysics.PhysicsBones)
+            clonedBones.Add(EntityCloner.Clone(bone));
 
-        foreach (var bone in clonedBones)
-            bone.Transform.Parent = ragdollEntity.Transform;
+        // 2. Create the temp entity.
+        var entindex = originalEntity.Get<Components.ClEntityComponent>()?.Index ?? -1;
+        var ragdollEntity = modelName is null
+            ? new Entity($"Ragdoll@{entindex}")
+            : new Entity($"Ragdoll@{entindex}(\"{modelName}\")");
 
-        // 3. Create Dynamic PhysicsController
-        var ragdollPhys = new PhysicsController
-        {
-            MotionType = PhysicsMotionType.Dynamic
-        };
-        ragdollEntity.Components.Add(ragdollPhys);
+        var ragdollPhysics = new PhysicsController { MotionType = PhysicsMotionType.Dynamic };
+        ragdollEntity.Components.Add(ragdollPhysics);
 
-        if (physController.IsPlayer)
-            ragdollPhys.LoadSkeleton(clonedBones, physController.ModelName!, true);
-        else
-            ragdollPhys.LoadSkeleton(clonedBones, physController.ModelPointer, false);
+        // 3. Bring it into the scene first so the bodies land in the same simulation.
+        rootScene.Entities.Add(ragdollEntity);
 
-        // 4. Initialize pose from current animation
-        ragdollPhys.SetPose(initialPose);
+        // 4. Load and attach the cloned skeleton, then initialize its pose.
+        //    Enable() must come before SetPose so the bodies exist in the simulation and Teleport
+        //    actually writes into them.
+        ragdollPhysics.LoadSkeleton(clonedBones);
+        ragdollPhysics.Enable();
+        ragdollPhysics.SetPose(initialPose);
 
-        // 5. Add lightweight behavior for LateUpdate root transform extraction
+        // 5. Lightweight behavior that keeps the entity transform in sync with the pivot bone.
         ragdollEntity.Components.Add(new RagdollBehavior());
 
-        // 6. Add to scene (emit as effect)
-        var rootScene = GetRootScene(originalEntity);
-        rootScene?.Entities.Add(ragdollEntity);
-
-        // 7. Detach original entity's skeleton
-        physController.DetachSkeleton();
+        return ragdollEntity;
     }
 
     private static Scene? GetRootScene(Entity entity)
@@ -71,8 +64,10 @@ public static class RagdollHelper
         var scene = entity.Scene;
         if (scene is null)
             return null;
+
         while (scene.Parent is not null)
             scene = scene.Parent;
+
         return scene;
     }
 }
