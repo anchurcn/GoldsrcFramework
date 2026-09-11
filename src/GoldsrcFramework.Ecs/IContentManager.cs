@@ -32,7 +32,17 @@ public interface IContentManager
     int[] GetStudioBoneParents(string key);
 
     /// <summary>
-    /// Pre-caches all brush model physics prefabs during map load.
+    /// Pre-caches the physics prefabs of every brush model of the current map.
     /// </summary>
-    void PreloadBrushModels(object? nativeMapData);
+    /// <remarks>
+    /// The native model list is read by the implementation itself, so no native data is passed
+    /// through this interface. Only prefab templates are built here; no entity is instantiated.
+    /// </remarks>
+    void PreloadBrushModels();
+
+    /// <summary>
+    /// Drops every resource that is scoped to the current map. Must be called on map change, before
+    /// the scene is rebuilt for the new map.
+    /// </summary>
+    void NewMap();
 }

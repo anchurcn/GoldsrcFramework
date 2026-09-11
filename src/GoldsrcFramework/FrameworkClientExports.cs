@@ -1,4 +1,6 @@
+using GoldsrcFramework.Content;
 using GoldsrcFramework.Ecs;
+using GoldsrcFramework.Graphics;
 using GoldsrcFramework.LinearMath;
 using GoldsrcFramework.Rendering;
 using NativeInterop;
@@ -46,8 +48,11 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
     public virtual void HUD_Init()
     {
         LegacyClientInterop.HUD_Init();
-            var game = new GoldsrcClientGame();
-            clientGame = game;
+
+        var game = new GoldsrcClientGame();
+        game.SceneManagement.ContentManager = new GoldsrcContentManager();
+        clientGame = game;
+        RegisterDebugDrawCvar();
     }
 
     public virtual int HUD_VidInit()
@@ -149,10 +154,11 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         var result = LegacyClientInterop.HUD_AddEntity(type, ent, (sbyte*)modelname);
 
         // Mark this entity as visible for the ClientSceneManagementSystem.
-        // Only normal entities (ET_NORMAL) and players are tracked.
+        // Only normal entities (ET_NORMAL) and players are tracked. The engine calls this for brush
+        // model entities too, so doors, platforms and func_wall come through here as well.
         if (type == 0 || type == 1) // ET_NORMAL = 0, ET_PLAYER = 1
         {
-            clientGame?.SceneManagement.MarkEntityVisible(ent->index);
+            clientGame?.SceneManagement.MarkEntityVisible(ent, type == 1);
         }
 
         return result;
@@ -169,8 +175,11 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
     }
 
     public virtual void HUD_DrawTransparentTriangles()
-    { 
+    {
         LegacyClientInterop.HUD_DrawTransparentTriangles();
+
+        if (IsDebugDrawEnabled() && clientGame?.SceneSystem.PhysicsDebug is { } debug)
+            TriApiLineDraw.DrawLineVertices(debug.Commands.LineVertices);
     }
 
     public virtual void HUD_StudioEvent(mstudioevent_t* @event, cl_entity_t* entity)
@@ -303,8 +312,11 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
     {
         CurrentLevelName = levelName;
 
-        // Clear all per-map physics entities from the previous map,
+        // Drop the previous map's physics resources and entities, then warm the new map's brush
+        // prefabs so the first visible brush entity does not pay for triangulation.
         clientGame?.Reset();
+        clientGame?.SceneManagement.ContentManager?.PreloadBrushModels();
+
         if (NewMapLoaded is null)
             return;
 
@@ -377,6 +389,67 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         }
 
         return length > 0;
+    }
+
+    /// <summary>
+    /// Registers the <c>gsf_debugdraw</c> console variable (default "1") if it is
+    /// not already registered. Idempotent across re-init. Reading the value is done
+    /// per-frame via <see cref="IsDebugDrawEnabled"/> so a stale cached pointer is
+    /// never used.
+    /// </summary>
+    private static void RegisterDebugDrawCvar()
+    {
+        ClientEngineFuncs* engine = EngineApi.PClient;
+        if (engine == null || engine->RegisterVariable == null || engine->GetCvarPointer == null)
+            return;
+
+        Span<byte> name = stackalloc byte[32];
+        WriteAscii("gsf_debugdraw", name);
+
+        fixed (byte* namePointer = name)
+        {
+            if (engine->GetCvarPointer((NChar*)namePointer) != null)
+                return; // already registered (e.g. on re-init)
+
+            Span<byte> value = stackalloc byte[8];
+            WriteAscii("1", value);
+            fixed (byte* valuePointer = value)
+                engine->RegisterVariable((NChar*)namePointer, (NChar*)valuePointer, 0);
+        }
+    }
+
+    /// <summary>
+    /// Returns true when the <c>gsf_debugdraw</c> cvar is non-zero. Looks the cvar
+    /// up by name each call; cheap and never caches a pointer.
+    /// </summary>
+    private static bool IsDebugDrawEnabled()
+    {
+        ClientEngineFuncs* engine = EngineApi.PClient;
+        if (engine == null || engine->GetCvarPointer == null)
+            return false;
+
+        Span<byte> name = stackalloc byte[32];
+        WriteAscii("gsf_debugdraw", name);
+
+        fixed (byte* namePointer = name)
+        {
+            cvar_t* cvar = engine->GetCvarPointer((NChar*)namePointer);
+            return cvar != null && cvar->value != 0f;
+        }
+    }
+
+    /// <summary>
+    /// Writes <paramref name="value"/> as null-terminated ASCII into
+    /// <paramref name="buffer"/>. Throws if the buffer is too small.
+    /// </summary>
+    private static void WriteAscii(string value, Span<byte> buffer)
+    {
+        buffer.Clear();
+        int written = Encoding.ASCII.GetBytes(value, buffer);
+        if (written >= buffer.Length)
+            throw new ArgumentException("The native string buffer is too small.", nameof(value));
+
+        buffer[written] = 0;
     }
 
     /// <summary>

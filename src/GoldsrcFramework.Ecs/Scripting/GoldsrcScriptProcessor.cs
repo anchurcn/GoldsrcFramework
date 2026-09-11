@@ -1,4 +1,5 @@
 using Stride.Engine;
+using Stride.Rendering;
 
 namespace GoldsrcFramework.Ecs;
 
@@ -10,7 +11,10 @@ internal sealed class GoldsrcScriptProcessor : EntityProcessor<ScriptComponentBa
     {
         Order = -100_000;
     }
-
+    public override void Draw(RenderContext context)
+    {
+        base.Draw(context);
+    }
     protected override void OnSystemAdd()
     {
         scriptSystem = Services.GetService<GoldsrcScriptSystem>()

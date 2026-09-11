@@ -1,4 +1,5 @@
 using System.Reflection;
+using GoldsrcFramework.Ecs.Diagnostics;
 using Stride.BepuPhysics;
 using Stride.Core;
 using Stride.Core.Mathematics;
@@ -69,6 +70,10 @@ public sealed class GoldsrcClientGame : IDisposable
 
     public LateUpdateScriptSystem LateUpdateSystem { get; }
 
+    /// <summary>The physics debug draw processor; its <see cref="PhysicsDebugDrawProcessor.Commands"/>
+    /// are flushed by the host at HUD_DrawNormalTriangles.</summary>
+    public PhysicsDebugDrawProcessor PhysicsDebug => SceneSystem.PhysicsDebug;
+
     private readonly GoldsrcTransformSyncSystem transformSync;
 
     public GameTime Time { get; }
@@ -94,10 +99,19 @@ public sealed class GoldsrcClientGame : IDisposable
     }
 
     /// <summary>
-    /// Clears all entities from the root scene. Called on map change / reset.
+    /// Clears everything scoped to the current map: map-scoped content resources, the scene
+    /// management bookkeeping and every entity in the root scene. Called on map change / reset.
     /// </summary>
+    /// <remarks>
+    /// The content manager is invalidated first so the next frame cannot rebuild worldspawn from the
+    /// prefabs of the previous map. Removing the entities runs
+    /// <see cref="IEnterExitCallable.OnExit"/> on them, which disables their physics skeletons.
+    /// </remarks>
     public void Reset()
     {
+        SceneManagement.ContentManager?.NewMap();
+        SceneManagement.ResetMapState();
+
         var entities = RootScene.Entities.ToArray();
         foreach (var entity in entities)
             RootScene.Entities.Remove(entity);

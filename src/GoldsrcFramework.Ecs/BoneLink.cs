@@ -1,3 +1,4 @@
+using Stride.Core;
 using Stride.Engine;
 
 namespace GoldsrcFramework.Ecs;
@@ -8,6 +9,12 @@ namespace GoldsrcFramework.Ecs;
 /// <see cref="PhysicsController.LoadSkeleton"/> reads this component once to build its internal
 /// index; afterwards it is no longer accessed.
 /// </summary>
+/// <remarks>
+/// It still carries <see cref="DataContractAttribute"/> because it lives inside a physics
+/// <see cref="Prefab"/>: <c>Prefab.Instantiate()</c> deep-clones the bone entities through Stride's
+/// serialization, which refuses to copy a component type without a serializer.
+/// </remarks>
+[DataContract]
 public sealed class BoneLink : EntityComponent
 {
     /// <summary>
