@@ -27,6 +27,9 @@ namespace GoldsrcFramework.Content;
 /// Model handles are read through <c>hudGetModelByIndex</c>. All native data is consumed inside the
 /// unsafe triangulation and never escapes it: results are managed vertex/index arrays.
 /// </para>
+/// The currently supported content types are:
+/// - Brush model physics skeleton prefab. Its name is the model name, e.g. Get<Prefab>("*3").
+/// - Studio model physics skeleton prefab. Its name is the model name with its extension replaced by ".gpd", e.g. Get<Prefab>("models/player/gordon.gpd").
 /// </remarks>
 public sealed unsafe class GoldsrcContentManager : IContentManager
 {
