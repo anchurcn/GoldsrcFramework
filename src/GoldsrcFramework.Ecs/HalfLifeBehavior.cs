@@ -1,4 +1,5 @@
 using GoldsrcFramework.LinearMath;
+using NativeInterop;
 using Stride.Engine;
 using Stride.Games;
 
@@ -39,12 +40,17 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
     /// <summary>The model key used for loading the physics prefab. Set externally each frame.</summary>
     public string? ModelKey { get; set; }
 
-    private IntPtr modelPointer;
-    private string modelName = string.Empty;
+    private Components.ClEntityComponent? clEntity;
+    private int modelIndex;
+    private NCharPtr modelNamePtr;
     private bool skeletonLoaded;
+
+    private const int MaxModelNameLength = 64; // MAX_MODEL_NAME
 
     public void OnEnter()
     {
+        clEntity = Entity.Get<Components.ClEntityComponent>();
+
         if (PhysicsController is null)
         {
             PhysicsController = new PhysicsController();
@@ -113,8 +119,12 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
     /// <summary>
     /// Compares the current model identity against the last loaded one and reloads the skeleton when
     /// it changed. The first call always loads.
+    /// <para>
+    /// Non-player entities are identified by their native <c>modelindex</c>; players are identified
+    /// by the native model name string, because player models resolve by name rather than index.
+    /// </para>
     /// </summary>
-    private void EnsureSkeletonLoaded()
+    private unsafe void EnsureSkeletonLoaded()
     {
         if (ContentManager is null || ModelKey is null)
             return;
@@ -122,15 +132,17 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
         bool modelChanged;
         if (IsPlayer)
         {
-            var currentName = Entity.Get<PlayerInfoComponent>()?.ModelName ?? string.Empty;
-            modelChanged = !string.Equals(modelName, currentName, StringComparison.OrdinalIgnoreCase);
-            modelName = currentName;
+            var currentName = GetCurrentModelNamePointer();
+            modelChanged = !ModelNameEquals(currentName, modelNamePtr);
+            modelNamePtr = currentName;
         }
         else
         {
-            var currentPointer = GetCurrentModelPointer();
-            modelChanged = modelPointer != currentPointer;
-            modelPointer = currentPointer;
+            int currentIndex = clEntity is not null && clEntity.HasNativeEntity
+                ? clEntity.NativeEntity->curstate.modelindex
+                : -1;
+            modelChanged = modelIndex != currentIndex;
+            modelIndex = currentIndex;
         }
 
         if (skeletonLoaded && !modelChanged)
@@ -140,6 +152,29 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
         ReloadSkeleton();
     }
 
+    /// <summary>
+    /// Pointer to the current native model name (a NUL-terminated ASCII string in <c>model_t.name</c>),
+    /// or <see cref="NCharPtr.Null"/> when no model is bound.
+    /// </summary>
+    private unsafe NCharPtr GetCurrentModelNamePointer()
+    {
+        if (clEntity is not { HasNativeEntity: true })
+            return NCharPtr.Null;
+
+        return clEntity.NativeEntity->model is null ? NCharPtr.Null : clEntity.NativeEntity->model->name.GetNCharPtr();
+    }
+
+    /// <summary>
+    /// Compares two native model name strings ignoring case, without allocating a managed string.
+    /// </summary>
+    private static bool ModelNameEquals(NCharPtr current, NCharPtr last)
+    {
+        if (current.IsNull || last.IsNull)
+            return current.IsNull && last.IsNull;
+
+        return 
+            current.AsByteSpan(MaxModelNameLength).SequenceEqual(last.AsByteSpan(MaxModelNameLength));
+    }
     private void ReloadSkeleton()
     {
         var physics = PhysicsController!;
@@ -160,21 +195,6 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
 
         // No physics data for this model: NullPhysicsSkeleton, rendering still works.
         physics.LoadSkeleton([], []);
-    }
-
-    private IntPtr GetCurrentModelPointer()
-    {
-        // Native model pointer from cl_entity_t.model
-        var clEntity = Entity.Get<Components.ClEntityComponent>();
-        if (clEntity is not null && clEntity.HasNativeEntity)
-        {
-            unsafe
-            {
-                return (IntPtr)clEntity.NativeEntity->model;
-            }
-        }
-
-        return IntPtr.Zero;
     }
 
     /// <summary>
