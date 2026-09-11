@@ -154,7 +154,17 @@ public sealed unsafe class ClientSceneManagementSystem : SceneEntityLifecycleSys
         visibleState.TryGetValue(entindex, out var visible);
 
         var entity = new Entity(DescribeEntity(entindex, visible.NativeEntity));
-        entity.Components.Add(new GoldsrcTransformLinkComponent());
+
+        if (visible.NativeEntity is not null)
+        {
+            entity.Components.Add(new GoldsrcTransformLinkComponent(
+                new ClEntityTransformBinding(visible.NativeEntity),
+                TransformAuthority.Goldsrc));
+        }
+        else
+        {
+            entity.Components.Add(new GoldsrcTransformLinkComponent());
+        }
 
         var behavior = new HalfLifeBehavior
         {

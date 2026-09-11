@@ -113,6 +113,36 @@ internal sealed class BspWorldGeometry
     /// renderer uses, so it is preserved rather than "fixed". Malformed BSP data (out of range
     /// indices, degenerate triangles) is dropped instead of trusted.
     /// </remarks>
+    /// 
+    /*
+     * 
+     
+            if (!IsReady)
+            return null;
+        if (model == null || model->type != modtype_t.mod_brush)
+            return null;
+
+        const int MODEL_QBSP2 = 1 << 28;
+
+        var surfaces = model->surfaces;
+        var surfEdges = model->surfedges;
+        if (surfaces == null || surfEdges == null)
+            return null;
+
+        // xash3d uses a union for edges: edges16 (unsigned short v[2]) for standard BSP,
+        // edges32 (unsigned int v[2]) for QBSP2. Both share the same offset for v[0]/v[1].
+        bool use32 = (model->flags & MODEL_QBSP2) != 0;
+        var edges16 = model->edges_union.edges16;
+        var edges32 = model->edges_union.edges32;
+        if ((!use32 && edges16 == null) || (use32 && edges32 == null))
+            return null;
+
+        int firstSurface = model->firstmodelsurface;
+        int numSurfaces = model->nummodelsurfaces;
+        int numSurfEdges = model->numsurfedges;
+
+        if (numSurfaces <= 0 || firstSurface < 0)
+    */
     public unsafe int[]? Triangulate(model_t* model)
     {
         if (!IsReady)

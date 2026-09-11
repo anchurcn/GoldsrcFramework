@@ -1,6 +1,7 @@
 using System;
 using GoldsrcFramework.Ecs.Diagnostics;
 using GoldsrcFramework.Engine.Native;
+using Silk.NET.OpenGL;
 using Stride.Core.Mathematics;
 
 namespace GoldsrcFramework.Graphics;
@@ -26,7 +27,12 @@ internal static unsafe class TriApiLineDraw
     /// count (a0,b0, a1,b1, ...). Color is taken from each segment's first vertex;
     /// the two vertices of a segment are assumed to share a color.
     /// </summary>
-    public static void DrawLineVertices(ReadOnlySpan<DebugVertex> vertices)
+    /// <param name="depthTest">
+    /// When true, leaves GL depth testing enabled for the draw (lines are occluded by
+    /// world geometry). When false, depth testing is disabled so the lines are always
+    /// drawn on top. Mirrors the <c>phys_dtest</c> cvar in the GoldSrc phys debugger.
+    /// </param>
+    public static void DrawLineVertices(ReadOnlySpan<DebugVertex> vertices, bool depthTest)
     {
         if (vertices.IsEmpty)
             return;
@@ -41,6 +47,18 @@ internal static unsafe class TriApiLineDraw
         if (tri->Begin == null || tri->End == null || tri->Color4f == null || tri->Vertex3f == null)
             return;
 
+        // Match the GoldSrc phys debugger's GL state block so the overlay is never
+        // modulated by the engine's current texture/blend state. Depth test is only
+        // forced off when requested (depthTest == false).
+        GL? gl = OpenGLInfo.GetApi();
+        gl?.Disable(EnableCap.Texture2D);
+        gl?.Disable(EnableCap.Blend);
+        if (!depthTest)
+            gl?.Disable(EnableCap.DepthTest);
+
+        if (tri->Brightness != null)
+            tri->Brightness(1.0f);
+
         tri->Begin((int)TriPrimitive.Lines);
         for (int i = 0; i + 1 < vertices.Length; i += 2)
         {
@@ -52,5 +70,10 @@ internal static unsafe class TriApiLineDraw
             tri->Vertex3f(b.Position.X, b.Position.Y, b.Position.Z);
         }
         tri->End();
+
+        gl?.Enable(EnableCap.Texture2D);
+        gl?.Enable(EnableCap.Blend);
+        if (!depthTest)
+            gl?.Enable(EnableCap.DepthTest);
     }
 }

@@ -1,10 +1,13 @@
-using GoldsrcFramework.Ecs;
 using GoldsrcFramework.Engine.Native;
 using Stride.Core.Mathematics;
 
-namespace GoldsrcFramework.Physics;
+namespace GoldsrcFramework.Ecs;
 
-internal sealed unsafe class ClEntityTransformBinding : IGoldsrcTransformBinding
+/// <summary>
+/// Binds a <see cref="cl_entity_t"/> to <see cref="GoldsrcTransformLinkComponent"/>: reads
+/// origin/angles from the native engine each frame and writes them back when Stride has authority.
+/// </summary>
+public sealed unsafe class ClEntityTransformBinding : IGoldsrcTransformBinding
 {
     private cl_entity_t* clEntity;
 

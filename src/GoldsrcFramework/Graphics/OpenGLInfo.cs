@@ -2,6 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Extensions.Logging;
+using Silk.NET.OpenGL;
 
 namespace GoldsrcFramework.Graphics;
 
@@ -47,6 +48,18 @@ public static unsafe class OpenGLInfo
 
     [DllImport("opengl32.dll", EntryPoint = "wglGetCurrentDC", CallingConvention = CallingConvention.Winapi)]
     private static extern IntPtr wglGetCurrentDC();
+
+    [DllImport("opengl32.dll", EntryPoint = "wglGetProcAddress", CallingConvention = CallingConvention.Winapi)]
+    private static extern IntPtr wglGetProcAddress(string procName);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Ansi, EntryPoint = "GetModuleHandleA", CallingConvention = CallingConvention.Winapi)]
+    private static extern IntPtr GetModuleHandleA(string lpModuleName);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Ansi, EntryPoint = "GetProcAddress", CallingConvention = CallingConvention.Winapi)]
+    private static extern IntPtr GetProcAddress(IntPtr hModule, string procName);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Ansi, EntryPoint = "LoadLibraryA", CallingConvention = CallingConvention.Winapi)]
+    private static extern IntPtr LoadLibraryA(string lpFileName);
 
     #endregion
 
@@ -232,6 +245,53 @@ public static unsafe class OpenGLInfo
         {
             return IntPtr.Zero;
         }
+    }
+
+    /// <summary>
+    /// 返回绑定到当前 OpenGL 上下文的 Silk.NET <see cref="GL"/> 实例；若当前没有
+    /// 上下文则返回 <c>null</c>。
+    /// </summary>
+    /// <remarks>
+    /// 解析函数指针时在 <c>wglGetProcAddress</c> 之外回退到 <c>opengl32.dll</c>，
+    /// 这样 GL 1.x 的核心函数（如 <c>glDisable</c>/<c>glEnable</c>）也能正确解析。
+    /// 返回的实例会按上下文句柄缓存，上下文切换时会重新解析。
+    /// </remarks>
+    private static GL? _cachedGl;
+    private static IntPtr _cachedContext;
+
+    public static GL? GetApi()
+    {
+        IntPtr context = GetCurrentContext();
+        if (context == IntPtr.Zero)
+            return null;
+
+        if (_cachedGl != null && _cachedContext == context)
+            return _cachedGl;
+
+        _cachedContext = context;
+        try
+        {
+            _cachedGl = GL.GetApi(ResolveProc);
+        }
+        catch
+        {
+            _cachedGl = null;
+        }
+
+        return _cachedGl;
+    }
+
+    private static IntPtr ResolveProc(string name)
+    {
+        IntPtr proc = wglGetProcAddress(name);
+        if (proc != IntPtr.Zero && proc != (IntPtr)1 && proc != (IntPtr)2 && proc != (IntPtr)3 && proc != new IntPtr(-1))
+            return proc;
+
+        IntPtr module = GetModuleHandleA("opengl32.dll");
+        if (module == IntPtr.Zero)
+            module = LoadLibraryA("opengl32.dll");
+
+        return module == IntPtr.Zero ? IntPtr.Zero : GetProcAddress(module, name);
     }
 
     #endregion

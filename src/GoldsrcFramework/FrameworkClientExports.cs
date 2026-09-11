@@ -53,6 +53,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         game.SceneManagement.ContentManager = new GoldsrcContentManager();
         clientGame = game;
         RegisterDebugDrawCvar();
+        RegisterPhysicsDepthTestCvar();
     }
 
     public virtual int HUD_VidInit()
@@ -179,7 +180,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         LegacyClientInterop.HUD_DrawTransparentTriangles();
 
         if (IsDebugDrawEnabled() && clientGame?.SceneSystem.PhysicsDebug is { } debug)
-            TriApiLineDraw.DrawLineVertices(debug.Commands.LineVertices);
+            TriApiLineDraw.DrawLineVertices(debug.Commands.LineVertices, IsPhysicsDepthTestEnabled());
     }
 
     public virtual void HUD_StudioEvent(mstudioevent_t* @event, cl_entity_t* entity)
@@ -435,6 +436,56 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         {
             cvar_t* cvar = engine->GetCvarPointer((NChar*)namePointer);
             return cvar != null && cvar->value != 0f;
+        }
+    }
+
+    /// <summary>
+    /// Registers the <c>gsf_physdtest</c> console variable (default "1") if it is
+    /// not already registered. Idempotent across re-init. A non-zero value keeps GL
+    /// depth testing enabled while drawing physics debug lines (lines get occluded
+    /// by world geometry); zero forces depth testing off so the lines always draw
+    /// on top. Mirrors the <c>phys_dtest</c> flag from the GoldSrc phys debugger.
+    /// </summary>
+    private static void RegisterPhysicsDepthTestCvar()
+    {
+        ClientEngineFuncs* engine = EngineApi.PClient;
+        if (engine == null || engine->RegisterVariable == null || engine->GetCvarPointer == null)
+            return;
+
+        Span<byte> name = stackalloc byte[32];
+        WriteAscii("gsf_physdtest", name);
+
+        fixed (byte* namePointer = name)
+        {
+            if (engine->GetCvarPointer((NChar*)namePointer) != null)
+                return; // already registered (e.g. on re-init)
+
+            Span<byte> value = stackalloc byte[8];
+            WriteAscii("1", value);
+            fixed (byte* valuePointer = value)
+                engine->RegisterVariable((NChar*)namePointer, (NChar*)valuePointer, 0);
+        }
+    }
+
+    /// <summary>
+    /// Returns true when depth testing should remain enabled for physics debug draw
+    /// (i.e. the <c>gsf_physdtest</c> cvar is non-zero). Looks the cvar up by name
+    /// each call; cheap and never caches a pointer. Returns true when the cvar is
+    /// missing so the default behavior is depth testing on.
+    /// </summary>
+    private static bool IsPhysicsDepthTestEnabled()
+    {
+        ClientEngineFuncs* engine = EngineApi.PClient;
+        if (engine == null || engine->GetCvarPointer == null)
+            return true;
+
+        Span<byte> name = stackalloc byte[32];
+        WriteAscii("gsf_physdtest", name);
+
+        fixed (byte* namePointer = name)
+        {
+            cvar_t* cvar = engine->GetCvarPointer((NChar*)namePointer);
+            return cvar == null || cvar->value != 0f;
         }
     }
 
