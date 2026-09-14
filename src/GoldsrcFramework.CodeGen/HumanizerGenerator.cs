@@ -19,14 +19,19 @@ internal sealed class HumanizerGenerator
 
     readonly RawAbiGenerator _generator;
     readonly HumanizerRules _rules;
+    readonly CppCompilation _compilation;
 
     /// <summary>Every symbol the humanizer emitted, with the rule that produced it.</summary>
     public HumanizerSymbolCatalog Catalog { get; } = new();
 
-    public HumanizerGenerator(RawAbiGenerator generator)
+    /// <summary>Macro enum members that could not be emitted, with the reason.</summary>
+    public List<string> MacroEnumProblems { get; } = [];
+
+    public HumanizerGenerator(RawAbiGenerator generator, CppCompilation compilation)
     {
         _generator = generator;
         _rules = generator.Rules;
+        _compilation = compilation;
     }
 
     /// <summary>
@@ -62,6 +67,8 @@ internal sealed class HumanizerGenerator
             }
         }
 
+        EmitMacroEnums(files, fileMap);
+
         var outputs = new List<(string RelativePath, string Content)>();
         foreach (var file in files.OrderBy(x => x.Key))
         {
@@ -81,6 +88,160 @@ internal sealed class HumanizerGenerator
         CppTypedef => "Typedef",
         _ => "Struct",
     };
+
+    /// <summary>
+    /// Collapses old-style C macro families (<c>#define ET_PLAYER 1</c>) into C# enums, so a
+    /// declaration such as <c>HUD_AddEntity(int type, ...)</c> can be documented and called
+    /// with <c>EntityType.Player</c> through a [paramTypes] rule.
+    ///
+    /// The grouping is driven purely by the [macroEnums] patterns: parsing sees headers only
+    /// (no call sites), so the prefix that ties a macro family together is a fact only the
+    /// rules file knows. Macros that a rule matches but that cannot be resolved to an integer,
+    /// or that would emit a duplicate name, are reported and skipped - a partly wrong enum is
+    /// worse than a smaller correct one.
+    /// </summary>
+    void EmitMacroEnums(
+        Dictionary<string, (StringBuilder Builder, HashSet<string> Emitted)> files,
+        List<(string RawType, string HumanizedType, string RelativePath, string Reason, string SourceHeader)> fileMap)
+    {
+        // First pass: group the macros by target enum, in rules-file order so the emitted
+        // declarations (and therefore the generated files) are deterministic.
+        var groups = new Dictionary<string, MacroEnumGroup>(StringComparer.Ordinal);
+        foreach (var macro in _compilation.Macros.OrderBy(m => m.Name, StringComparer.Ordinal))
+        {
+            if (macro.Parameters is { Count: > 0 }) continue; // function-like macro: not a value
+            var rule = _rules.MatchMacroEnum(macro.Name);
+            if (rule?.MacroEnum is null) continue;
+
+            var options = rule.MacroEnum;
+            if (!groups.TryGetValue(options.TypeName, out var group))
+                groups[options.TypeName] = group = new MacroEnumGroup(options, rule.Location);
+
+            var memberName = MemberName(options, macro.Name);
+            if (string.IsNullOrEmpty(memberName))
+            {
+                MacroEnumProblems.Add($"{rule.Location}: macro \"{macro.Name}\" becomes empty after stripping \"{options.StripPrefix}\"; skipped.");
+                continue;
+            }
+
+            if (!group.Members.TryAdd(memberName, macro))
+            {
+                var existing = group.Members[memberName];
+                var conflicting = !string.Equals(existing.Name, macro.Name, StringComparison.Ordinal)
+                    ? $" (from macros \"{existing.Name}\" and \"{macro.Name}\")"
+                    : string.Empty;
+                MacroEnumProblems.Add($"{rule.Location}: [{options.TypeName}] member \"{memberName}\" is declared twice{conflicting}; \"{macro.Name}\" skipped.");
+                continue;
+            }
+
+            group.Order.Add(memberName);
+        }
+
+        var evaluator = new MacroValueEvaluator(_compilation.Macros);
+        foreach (var group in groups.Values.OrderBy(g => g.Options.Order).ThenBy(g => g.Options.TypeName, StringComparer.Ordinal))
+        {
+            var options = group.Options;
+            var members = new List<(string MemberName, string Literal)>();
+            foreach (var memberName in group.Order)
+            {
+                var macro = group.Members[memberName];
+                var literal = evaluator.TryEvaluate(macro, out var reason);
+                if (literal is null)
+                {
+                    MacroEnumProblems.Add($"{group.Source}: macro \"{macro.Name}\" ({macro.Value}) skipped from [{options.TypeName}]: {reason}.");
+                    continue;
+                }
+
+                members.Add((memberName, literal));
+            }
+
+            if (members.Count == 0)
+            {
+                MacroEnumProblems.Add($"{group.Source}: [{options.TypeName}] has no resolvable macro; enum not emitted.");
+                continue;
+            }
+
+            var relativePath = ResolveMacroEnumPath(options);
+            var file = GetOrCreateHumanizerFile(files, relativePath);
+            if (!file.Emitted.Add(options.TypeName)) continue;
+
+            foreach (var (memberName, _) in members)
+                Catalog.Add("MacroEnumMember", group.Members[memberName].Name, group.Members[memberName].Name, memberName, group.Source, relativePath);
+
+            EmitMacroEnum(file.Builder, group, members);
+            fileMap.Add((options.TypeName, options.TypeName, relativePath, "macro-enum", GroupSourceHeader(group)));
+            Catalog.Add("MacroEnum", options.TypeName, options.TypeName, options.TypeName, group.Source, relativePath);
+        }
+    }
+
+    /// <summary>One emitted macro enum: its options plus the macros that feed it, in rule order.</summary>
+    sealed class MacroEnumGroup
+    {
+        public MacroEnumGroup(MacroEnumOptions options, string source)
+        {
+            Options = options;
+            Source = source;
+        }
+
+        public MacroEnumOptions Options { get; }
+
+        /// <summary>Where the grouping rule lives, used as the symbol source.</summary>
+        public string Source { get; }
+
+        // Keys are member names, so the table says exactly what will be emitted; the macro
+        // each name came from is kept next to it.
+        public Dictionary<string, CppMacro> Members { get; } = new(StringComparer.Ordinal);
+
+        /// <summary>Member names in emission order.</summary>
+        public List<string> Order { get; } = [];
+    }
+
+    /// <summary>Member name for a macro: the macro name without the group's prefix, kept a valid C# identifier.</summary>
+    static string MemberName(MacroEnumOptions options, string macroName)
+    {
+        var name = HumanizerRules.ExpandTemplate("{strip:" + (options.StripPrefix ?? string.Empty) + "}", macroName);
+        if (name == macroName && options.StripPrefix is not null && macroName == options.StripPrefix) return string.Empty;
+
+        // A prefix that leaves a leading digit ("BREAK_2" with strip "BREAK_") would emit an
+        // enum member that does not compile, so underscore it.
+        return name.Length > 0 && name[0] is >= '0' and <= '9' ? "_" + name : name;
+    }
+
+    string ResolveMacroEnumPath(MacroEnumOptions options)
+    {
+        if (!string.IsNullOrWhiteSpace(options.File)) return options.File.Replace('\\', '/');
+        var template = _rules.Default("file") ?? "{header}/{name}.cs";
+        return template
+            .Replace("{header}", "MacroEnums", StringComparison.Ordinal)
+            .Replace("{name}", CppAstHelpers.SafeFileName(options.TypeName), StringComparison.Ordinal)
+            .Replace('\\', '/');
+    }
+
+    static string GroupSourceHeader(MacroEnumGroup group) =>
+        group.Members.Values.Select(m => m.SourceFile).FirstOrDefault(f => !string.IsNullOrWhiteSpace(f)) ?? string.Empty;
+
+    void EmitMacroEnum(StringBuilder sb, MacroEnumGroup group, List<(string MemberName, string Literal)> members)
+    {
+        var options = group.Options;
+        var sourceHeader = GroupSourceHeader(group);
+        var origin = string.IsNullOrWhiteSpace(sourceHeader)
+            ? $"Macros collapsed into an enum by [{options.TypeName}]."
+            : $"Macros collapsed into an enum by [{options.TypeName}] from {Path.GetFileName(sourceHeader)}.";
+        sb.Append("/// <summary>").AppendLine(XmlEscape(origin)).AppendLine("/// </summary>");
+        sb.AppendLine("/// <remarks>");
+        if (options.Note is not null) sb.Append("/// ").AppendLine(XmlEscape(options.Note));
+        foreach (var (memberName, _) in members)
+        {
+            var macro = group.Members[memberName];
+            sb.Append("/// Macro: ").AppendLine(XmlEscape($"#define {macro.Name} {macro.Value}"));
+            foreach (var comment in _generator.GetCommentLines(macro)) sb.Append("/// ").AppendLine(XmlEscape(comment));
+        }
+        sb.AppendLine("/// </remarks>");
+        sb.Append("public enum ").Append(options.TypeName).Append(" : ").AppendLine(options.UnderlyingType).AppendLine("{");
+        foreach (var (memberName, literal) in members)
+            sb.Append("    ").Append(memberName).Append(" = ").Append(literal).AppendLine(",");
+        sb.AppendLine("}\n");
+    }
 
     static string HumanizerFilesManifestPath(string nativeDir) => Path.Combine(nativeDir, "Generated", "HlsdkNative.humanizer.files.txt");
 

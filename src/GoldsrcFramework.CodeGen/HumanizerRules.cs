@@ -37,6 +37,83 @@ internal enum HumanizerSection
 
     /// <summary>Emission strategy override for a type.</summary>
     Emit,
+
+    /// <summary>
+    /// Group of C macros collapsed into a C# enum ("macro enum"). The pattern selects the
+    /// macros by name (usually with a wildcard such as <c>ET_*</c>) and the value holds the
+    /// inline options of the enum (target name, file, underlying type, prefix to strip).
+    /// </summary>
+    MacroEnums,
+}
+
+/// <summary>
+/// Inline options accepted by a <see cref="HumanizerSection.MacroEnums"/> rule value, e.g.
+/// <c>ET_* = EntityType | file=Entity/EntityType.cs | underlying=int | strip=ET_</c>.
+/// </summary>
+internal sealed class MacroEnumOptions
+{
+    /// <summary>Name of the emitted enum type (required).</summary>
+    public required string TypeName { get; init; }
+
+    /// <summary>Underlying C# integer type ("int" by default).</summary>
+    public string UnderlyingType { get; init; } = "int";
+
+    /// <summary>Prefix removed from every member name ("ET_NORMAL" -> "NORMAL").</summary>
+    public string? StripPrefix { get; init; }
+
+    /// <summary>Optional explicit target file, relative to the Native directory.</summary>
+    public string? File { get; init; }
+
+    /// <summary>Optional documented origin of the macro group, used in remarks.</summary>
+    public string? Note { get; init; }
+
+    /// <summary>Ordinal of the rule that declared these options (stable emission order).</summary>
+    public int Order { get; init; }
+
+    /// <summary>Parses the inline option list; unrecognized entries are reported as problems.</summary>
+    public static MacroEnumOptions Parse(string value, int order, string location, List<string> problems)
+    {
+        string? typeName = null, file = null, strip = null, underlying = null, note = null;
+        foreach (var part in value.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var separator = part.IndexOf('=');
+            if (separator < 0)
+            {
+                if (typeName is not null)
+                {
+                    problems.Add($"{location}: duplicate enum name \"{part}\" in [macroEnums] (already \"{typeName}\")");
+                    continue;
+                }
+
+                typeName = part;
+                continue;
+            }
+
+            var key = part[..separator].Trim();
+            var optionValue = part[(separator + 1)..].Trim();
+            switch (key.ToLowerInvariant())
+            {
+                case "file": file = optionValue; break;
+                case "strip": strip = optionValue; break;
+                case "underlying": underlying = optionValue; break;
+                case "note": note = optionValue; break;
+                default: problems.Add($"{location}: unknown [macroEnums] option \"{key}\" (expected enum name, file=, underlying=, strip=, note=)"); break;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(typeName))
+            problems.Add($"{location}: [macroEnums] rule needs an enum name, e.g. \"ET_* = EntityType | strip=ET_\"");
+
+        return new MacroEnumOptions
+        {
+            TypeName = typeName ?? string.Empty,
+            UnderlyingType = string.IsNullOrWhiteSpace(underlying) ? "int" : underlying,
+            StripPrefix = string.IsNullOrEmpty(strip) ? null : strip,
+            File = string.IsNullOrEmpty(file) ? null : file,
+            Note = string.IsNullOrEmpty(note) ? null : note,
+            Order = order,
+        };
+    }
 }
 
 /// <summary>Emission strategies selectable from the <see cref="HumanizerSection.Emit"/> section.</summary>
@@ -63,6 +140,12 @@ internal sealed class HumanizerRule
 
     /// <summary>Optional "if &lt;raw shape&gt;" guard (only used by <see cref="HumanizerSection.FieldTypes"/>).</summary>
     public string? Condition { get; init; }
+
+    /// <summary>
+    /// Parsed inline options, only present for <see cref="HumanizerSection.MacroEnums"/>.
+    /// Written back by <see cref="HumanizerRules.Load"/> once the row is created.
+    /// </summary>
+    public MacroEnumOptions? MacroEnum { get; internal set; }
 
     /// <summary>
     /// True when the rule's comment carries the "unused-ok" marker: the rule is known not to be
@@ -187,6 +270,9 @@ internal sealed class HumanizerRules
                 Line = lineNumber,
                 Specificity = pattern.Count(c => c != '*' && c != '?'),
                 AllowUnused = comment?.Contains("unused-ok", StringComparison.OrdinalIgnoreCase) == true,
+                MacroEnum = section == HumanizerSection.MacroEnums
+                    ? MacroEnumOptions.Parse(value, rules._all.Count, $"humanizer.rules:{lineNumber}", rules._problems)
+                    : null,
             });
         }
 
@@ -222,10 +308,36 @@ internal sealed class HumanizerRules
 
         foreach (var (section, list) in _patterns)
             list.Sort((a, b) => b.Specificity != a.Specificity ? b.Specificity - a.Specificity : a.Line - b.Line);
+
+        // Two rules that resolve to the same enum type must agree on its shape (file,
+        // underlying type, prefix): the members are emitted in one declaration, so a
+        // mismatch silently produces a mixed enum otherwise.
+        foreach (var group in _all.Where(r => r.MacroEnum is not null).GroupBy(r => r.MacroEnum!.TypeName, StringComparer.Ordinal))
+        {
+            var first = group.First();
+            foreach (var rule in group.Skip(1))
+            {
+                if (rule.MacroEnum!.File == first.MacroEnum!.File
+                    && rule.MacroEnum.UnderlyingType == first.MacroEnum.UnderlyingType
+                    && rule.MacroEnum.StripPrefix == first.MacroEnum.StripPrefix) continue;
+                _problems.Add($"{rule.Location}: [macroEnums] \"{rule.Pattern}\" targets enum \"{group.Key}\" with different options than {first.Location}" +
+                              $" (file=\"{first.MacroEnum.File}\" underlying=\"{first.MacroEnum.UnderlyingType}\" strip=\"{first.MacroEnum.StripPrefix}\")");
+            }
+        }
     }
 
     /// <summary>Rules of one section in file order.</summary>
     public IEnumerable<HumanizerRule> RulesOf(HumanizerSection section) => _all.Where(r => r.Section == section);
+
+    /// <summary>[macroEnums] rules in file order, with their parsed inline options.</summary>
+    public IEnumerable<HumanizerRule> MacroEnumRules => RulesOf(HumanizerSection.MacroEnums);
+
+    /// <summary>
+    /// Matches a macro name against the [macroEnums] section. Only that section is consulted:
+    /// the enum a macro belongs to is a genuine C-level fact, so an unmatched macro must not
+    /// silently fall back to a broader rule.
+    /// </summary>
+    public HumanizerRule? MatchMacroEnum(string macroName) => Match(HumanizerSection.MacroEnums, macroName);
 
     /// <summary>Finds the rule matching the first candidate key that has one, or null.</summary>
     public HumanizerRule? Match(HumanizerSection section, params string?[] keys)
@@ -290,6 +402,7 @@ internal sealed class HumanizerRules
         HumanizerSection.Parameters => "params",
         HumanizerSection.ParameterTypes => "paramTypes",
         HumanizerSection.Emit => "emit",
+        HumanizerSection.MacroEnums => "macroEnums",
         _ => section.ToString(),
     };
 
@@ -303,7 +416,6 @@ internal sealed class HumanizerRules
                 return true;
             }
         }
-
         section = HumanizerSection.Types;
         return false;
     }

@@ -36,6 +36,9 @@ internal sealed class RawAbiGenerator
 
     public IReadOnlyCollection<int> RequiredInlineArraySizes => _inlineArraySizes;
 
+    /// <summary>Macros collected from the parsed translation unit (user headers only).</summary>
+    public IReadOnlyList<CppMacro> Macros => _compilation.Macros;
+
     public int GeneratedTypeCount => _ordered.Count;
 
     public RawAbiGenerator(CppCompilation compilation, HumanizerRules rules, IReadOnlyList<string> rootStructs, IReadOnlyList<string> managedNativeApiRootTypes)

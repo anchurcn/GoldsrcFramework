@@ -16,6 +16,7 @@
 #    pattern = value                 a rule; "#" starts a comment
 #    pattern = value if <shape>      [fieldTypes] only: apply only when the raw
 #                                    C shape matches (e.g. "if float[3]")
+#    pattern = value | key=value     [macroEnums] only: inline options, see below
 #
 #  Patterns use '*' (any characters) and '?' (one character) wildcards.
 #  Values may use placeholders: {name} the symbol itself, {strip:PREFIX} the symbol
@@ -39,6 +40,7 @@
 #    [params]        <rawType>.<field>.<paramName|#index>       -> new param name
 #    [paramTypes]    <rawType>.<field>.<paramName|#index>       -> new C# type
 #    [emit]          <rawType>                                  -> struct|skip|union-anim-value
+#    [macroEnums]    <MACRO(or wildcard)>                       -> enum declaration
 #
 #  Function pointer parameters are also addressable by the typedef name, e.g.
 #  pfnEngSrc_pfnSPR_Load_t.szPicName, which is handy when the same signature is
@@ -310,6 +312,37 @@ entvars_t.size = Vector3 if float[3]
 usercmd_t.viewangles = Vector3 if float[3]
 usercmd_t.impact_position = Vector3 if float[3]
 
+# --- types from [macroEnums] -------------------------------------------------
+# A field may only take an enum that is exactly as wide as the C field, or the humanized
+# struct no longer matches the ABI layout. The "if <shape>" guard records the width the
+# mapping was verified against, so a header that changes the width drops the mapping
+# instead of silently producing a mismatched struct.
+#
+# Deliberately absent, because the C field is narrower than the int-backed enum:
+#   entity_state_t.solid   (short)         -> SolidType
+#   entity_state_t.eflags  is byte backed, see the [macroEnums] rule
+#   usercmd_t.buttons      (unsigned short) -> InputButtons
+entvars_t.movetype = MoveType if int
+entvars_t.solid = SolidType if int
+entvars_t.deadflag = DeadState if int
+entvars_t.flags = EntityFlags if int
+entvars_t.effects = EntityEffects if int
+clientdata_t.flags = EntityFlags if int
+clientdata_t.deadflag = DeadState if int
+entity_state_t.movetype = MoveType if int
+entity_state_t.effects = EntityEffects if int
+entity_state_t.eflags = EntityStateFlags if byte
+playermove_t.movetype = MoveType if int
+playermove_t.flags = EntityFlags if int
+playermove_t.effects = EntityEffects if int
+playermove_t.deadflag = DeadState if int
+physent_t.movetype = MoveType if int
+physent_t.solid = SolidType if int
+screenfade_t.fadeFlags = ScreenFadeFlags if int
+SCREENINFO.iFlags = ScreenInfoFlags if int
+mstudiotexture_t.flags = StudioTextureFlags if int
+ENTITYTABLE.flags = EntityTableFlags if int
+
 
 # ---------------------------------------------------------------------------
 [enumMembers]
@@ -341,6 +374,20 @@ usercmd_t.impact_position = Vector3 if float[3]
 # type, e.g. an enum instead of int, or a struct pointer instead of void*.
 # Example:
 # DLL_FUNCTIONS.pfnKeyValue.pKVD = ref KeyValueData
+#
+# Entity type is an int in the C ABI; the macro enum declared in [macroEnums]
+# makes the callback signature self-documenting.
+cldll_func_t.pAddEntity.type = EntityType
+# cldll_func_t.pAddEntity.#0 = EntityType
+
+# The server engine table documents these parameters with a macro family, so the enum
+# makes the callback signatures self-documenting too. The names come from the C
+# declarations; --list-symbols=enginefuncs_t prints them with their current types.
+enginefuncs_t.pfnMessageBegin.msg_dest = MessageDestination
+enginefuncs_t.pfnEmitSound.channel = SoundChannel
+enginefuncs_t.pfnEmitSound.pitch = Pitch
+enginefuncs_t.pfnEmitAmbientSound.pitch = Pitch
+enginefuncs_t.pfnWalkMove.iMode = WalkMoveMode
 
 
 # ---------------------------------------------------------------------------
@@ -353,3 +400,99 @@ usercmd_t.impact_position = Vector3 if float[3]
 # The decision lives here so that adding another special layout is a one-line
 # change in this file plus a named strategy in HumanizerEmitStrategies.
 mstudioanimvalue_t = union-anim-value
+
+
+# ---------------------------------------------------------------------------
+[macroEnums]
+# ---------------------------------------------------------------------------
+# Collapse a family of old-style C macros into a C# enum. Older C code encodes
+# small closed sets as "#define ET_PLAYER 1"; the modern equivalent is an enum,
+# and once it exists a [paramTypes] rule can turn "int type" into "EntityType type".
+#
+# Each rule matches macro *names* (plain wildcards, no member paths here) and its
+# value is a list of inline options separated by "|":
+#     <EnumName>        name of the emitted enum (required)
+#     strip=PREFIX      prefix removed from the member names (ET_NORMAL -> NORMAL)
+#     file=PATH         target file, relative to the Native directory
+#                       (default: MacroEnums/<EnumName>.cs)
+#     underlying=TYPE   C# underlying integer type (default: int)
+#     note=TEXT         free-form remark documented on the enum
+#
+# Several rules may feed the same enum (one per header or prefix); they must agree
+# on strip/file/underlying, which is validated at load time.
+#
+# Value resolution understands the subset of C constant expressions the headers use for
+# flag families: integer literals (decimal, 0x, 0b, octal, with u/U/l/L suffixes),
+# references to other macros, parentheses, "<<" and "|", and the unary "-", "+" and "~".
+# So "FL_FLY (1 << 0)", "BOUNCE_GLASS BREAK_GLASS" and
+# "DMG_GIB_CORPSE (DMG_CRUSH | DMG_FALL | ...)" all resolve. Anything else - a cast, a
+# floating point value, an arithmetic or logical operator, a function-like macro, a token
+# that cannot be resolved - is reported per macro and skipped; the enum is still emitted
+# with the members that could be resolved. A macro defined twice with different values is
+# reported and likewise skipped.
+#
+# Every family below shares one file so the set stays easy to browse; an enum that wants
+# its own file only has to say file=<path>.
+#
+# Example - an API taking "int type" with call sites like HUD_AddEntity(ET_PLAYER, ..):
+# ET_* = EntityType | strip=ET_ | note=what the enum means
+#
+# ...paired with a [paramTypes] rule such as:
+# cldll_func_t.pAddEntity.#0 = EntityType
+#
+# NOTE: a macro only reaches this section when it is visible in the parsed translation
+# unit. Everything below comes from headers the parse set already includes (common/,
+# engine/, cl_dll/, dlls/, pm_shared/). A macro that only lives in a header nothing in the
+# parse set reaches (for example utils/common/bspfile.h) is invisible until that header is
+# listed in "abiHeaders" in codegen.json; the run reports such a rule as matching no symbol.
+
+# --- entity state and appearance -------------------------------------------
+ET_*            = EntityType         | strip=ET_          | file=EngineEnums.cs | note=Entity type handed to cldll_func_t.pAddEntity (HUD_AddEntity).
+FL_*            = EntityFlags        | strip=FL_          | file=EngineEnums.cs | note=entvars_t.flags bits. FL_DORMANT uses bit 31, so it is emitted as unchecked((int)0x80000000).
+EFLAG_*         = EntityStateFlags   | strip=EFLAG_       | file=EngineEnums.cs | underlying=byte | note=entity_state_t.eflags bits. The field is a byte in the ABI, so the enum is byte backed to keep the layout.
+EF_*            = EntityEffects      | strip=EF_          | file=EngineEnums.cs | note=cl_entity_t.curstate.effects bits.
+
+# --- movement, solidity and damage state -----------------------------------
+MOVETYPE_*      = MoveType           | strip=MOVETYPE_    | file=EngineEnums.cs | note=entvars_t.movetype. Values 1 and 2 are commented out in const.h.
+WALKMOVE_*      = WalkMoveMode       | strip=WALKMOVE_    | file=EngineEnums.cs | note=Mode argument of the entity walkmove API.
+SOLID_*         = SolidType          | strip=SOLID_       | file=EngineEnums.cs | note=entvars_t.solid.
+DEAD_*          = DeadState          | strip=DEAD_        | file=EngineEnums.cs | note=entvars_t.deadflag.
+DAMAGE_*        = DamageMode         | strip=DAMAGE_      | file=EngineEnums.cs | note=entvars_t.takedamage.
+DMG_*           = DamageType         | strip=DMG_         | file=EngineEnums.cs | note=Damage type bits taken by the damage API. The composite members (DMG_GIB_CORPSE, DMG_SHOWNHUD) combine several bits.
+# A different family that shares the DMG_ prefix: slot indices into the client health HUD's
+# damage image array. Listed before DMG_* so the longer pattern wins.
+DMG_IMAGE_*     = DamageImage        | strip=DMG_IMAGE_   | file=EngineEnums.cs | note=Damage indicator slot indices of the client health HUD (cl_dll/health.h). DMG_IMAGE_LIFE is a duration in seconds rather than a slot, and shares its value with DMG_IMAGE_COLD.
+
+# --- temporary entity messages ---------------------------------------------
+# TE_* is the broadest pattern here: it also matches TE_EXPLFLAG_*, TEFIRE_FLAG_* and
+# TE_BOUNCE_*. The matcher prefers the longest literal pattern, so those three keep their own
+# enums and only the remaining members land in TempEntityType.
+TE_EXPLFLAG_*   = ExplosionFlags     | strip=TE_EXPLFLAG_ | file=EngineEnums.cs | note=Flags of the TE_EXPLOSION message.
+TEFIRE_FLAG_*   = FireFieldFlags     | strip=TEFIRE_FLAG_ | file=EngineEnums.cs | note=Flags of the TE_FIREFIELD message.
+TE_BOUNCE_*     = BounceSound        | strip=TE_BOUNCE_   | file=EngineEnums.cs | note=Sound selected by the TE_BREAKMODEL message.
+TE_*            = TempEntityType     | strip=TE_          | file=EngineEnums.cs | note=Message id of a temporary entity effect (TE_* in const.h).
+
+# --- world contents and surface materials ----------------------------------
+CONTENTS_*      = Contents           | strip=CONTENTS_    | file=EngineEnums.cs | note=Contents of a leaf or point. The tab separated rows in const.h (CONTENTS_ORIGIN and friends) do not survive parsing, so this enum has fewer members than the header.
+CONTENT_*       = ContentType        | strip=CONTENT_     | file=EngineEnums.cs | note=The second contents family. Its values overlap CONTENTS_* but the names differ, so the two are separate enums.
+BREAK_*         = BreakMaterial      | strip=BREAK_       | file=EngineEnums.cs | note=Material of a breakable surface.
+BOUNCE_*        = BounceMaterial     | strip=BOUNCE_      | file=EngineEnums.cs | note=Bounce material. Several members alias the BREAK_* values.
+SF_TRAIN_*      = TrainSpawnFlags    | strip=SF_TRAIN_    | file=EngineEnums.cs | note=Spawnflags of func_train.
+
+# --- sound and messages ----------------------------------------------------
+CHAN_*          = SoundChannel       | strip=CHAN_        | file=EngineEnums.cs | note=Channel passed to the sound API.
+PITCH_*         = Pitch              | strip=PITCH_       | file=EngineEnums.cs | note=Default pitch values.
+MSG_*           = MessageDestination | strip=MSG_         | file=EngineEnums.cs | note=Destination of a server message.
+
+# --- input and HUD ---------------------------------------------------------
+IN_*            = InputButtons       | strip=IN_          | file=EngineEnums.cs | note=usercmd_t button bits (common/in_buttons.h).
+HIDEHUD_*       = HideHudFlags       | strip=HIDEHUD_     | file=EngineEnums.cs | note=HUD elements hidden by the client (dlls/cdll_dll.h).
+
+# --- engine headers --------------------------------------------------------
+SCRINFO_*       = ScreenInfoFlags    | strip=SCRINFO_     | file=EngineEnums.cs | note=SCREENINFO.iFlags bits (engine/cdll_int.h).
+FFADE_*         = ScreenFadeFlags    | strip=FFADE_       | file=EngineEnums.cs | note=screenfade_t.fadeFlags bits (engine/shake.h).
+BEAM_F*         = BeamFlags          | strip=BEAM_F       | file=EngineEnums.cs | note=Beam draw flags (engine/customentity.h). The prefix has no trailing underscore.
+FENTTABLE_*     = EntityTableFlags   | strip=FENTTABLE_   | file=EngineEnums.cs | note=ENTITYTABLE.flags bits (engine/eiface.h). The top bits need unchecked((int)0x...).
+STUDIO_NF_*     = StudioTextureFlags | strip=STUDIO_NF_   | file=EngineEnums.cs | note=mstudiotexture_t.flags bits (engine/studio.h).
+STUDIO_HAS_*    = StudioHasFlags     | strip=STUDIO_HAS_  | file=EngineEnums.cs | note=studiohdr_t feature bits (engine/studio.h).
+STUDIO_LOOPING  = StudioLooping      | strip=STUDIO_      | file=EngineEnums.cs | note=Sequence flag marking a looping animation (engine/studio.h).

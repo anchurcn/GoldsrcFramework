@@ -75,9 +75,14 @@ internal static class Program
         {
             (output, gen.Generate())
         };
-        var humanizer = new HumanizerGenerator(gen);
+        var humanizer = new HumanizerGenerator(gen, compilation);
         foreach (var (relativePath, content) in humanizer.PlanHumanizerFiles())
             outputs.Add((Path.Combine(nativeDir, CppAstHelpers.NormalizeRelativePath(relativePath)), content));
+
+        // Structural rule problems (and anything the macro-enum pass could not resolve) make
+        // the generated code wrong rather than merely ugly, so they fail the run.
+        foreach (var problem in humanizer.MacroEnumProblems) Console.Error.WriteLine($"Warning (macroEnums): {problem}");
+        if (rules.Problems.Count > 0) return 1;
 
         ReportRules(rules);
 
