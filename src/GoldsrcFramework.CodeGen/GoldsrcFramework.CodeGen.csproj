@@ -3,29 +3,14 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
   </PropertyGroup>
-  <PropertyGroup>
-    <StartupObject>GoldsrcFramework.CodeGen.HlsdkNativeGenerator</StartupObject>
-  </PropertyGroup>
 
 	<PropertyGroup>
 		<!-- Workaround for issue https://github.com/microsoft/ClangSharp/issues/129 -->
 		<RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' AND '$(PackAsTool)' != 'true'">$(NETCoreSdkRuntimeIdentifier)</RuntimeIdentifier>
 	</PropertyGroup>
 
-	<ItemGroup>
-	  <PackageReference Include="CppAst" Version="0.25.0" />
-	  <PackageReference Include="CppAst.CodeGen" Version="0.28.2" />
-	</ItemGroup>
-
-
-
   <ItemGroup>
-    <None Update="CustomTypeMapping.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="EngineStructureTemplate.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+	  <PackageReference Include="CppAst" Version="0.25.0" />
   </ItemGroup>
 
 </Project>

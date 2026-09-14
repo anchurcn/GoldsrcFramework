@@ -1,505 +1,189 @@
-﻿using CppAst;
-using CppAst.CodeGen.Common;
-using CppAst.CodeGen.CSharp;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
-using Zio;
-using Zio.FileSystems;
+using CppAst;
 
-namespace GoldsrcFramework.CodeGen
+namespace GoldsrcFramework.CodeGen;
+
+/// <summary>
+/// Entry point: loads codegen.json, parses the HLSDK headers with the toolchain
+/// located on this machine, runs the raw ABI + humanizer generators, and writes,
+/// verifies or previews the output depending on the selected mode.
+///
+/// Usage: GoldsrcFramework.CodeGen [--config=&lt;path&gt;] [--hlsdk=&lt;path&gt;] [--out=&lt;path&gt;]
+///                                 [--rules=&lt;path&gt;] [--list-symbols[=&lt;filter&gt;]] [--dry-run | --check]
+///   --config=       Path to a codegen.json (default: the one next to the generator sources).
+///   --hlsdk=        Path to the Half-Life SDK checkout (overrides the config).
+///   --out=          Main output file path (overrides the config).
+///   --rules=        Path to humanizer.rules (overrides the config).
+///   --list-symbols  Print every symbol the humanizer can adjust, then exit.
+///   --dry-run       Parse and generate, but only report which files would change.
+///   --check         Parse and generate, compare with the files on disk, exit 1 if out of date.
+/// </summary>
+internal static class Program
 {
-    class FuncInfo
+    static int Main(string[] args)
     {
-        public string FuncDecl { get; set; }
-        public string ReturnTypeName { get; set; }
-        public string FuncName { get; set; }
-        public List<(string Type,string Name)> Parameter { get; set; }
+        var dryRun = HasFlag(args, "--dry-run");
+        var check = HasFlag(args, "--check");
+        if (dryRun && check)
+        {
+            Console.Error.WriteLine("Options --dry-run and --check are mutually exclusive.");
+            return 1;
+        }
 
+        var repo = FindRepoRoot();
+        var configPath = OptionValue(args, "--config=") ?? Path.Combine(repo, "src", "GoldsrcFramework.CodeGen", "codegen.json");
+        var config = File.Exists(configPath) ? CodeGenConfig.Load(configPath) : new CodeGenConfig();
+        if (!File.Exists(configPath)) Console.Error.WriteLine($"Warning: config file not found ({configPath}); using built-in defaults.");
+
+        var hlsdk = OptionValue(args, "--hlsdk=") ?? CodeGenConfig.ResolvePath(repo, repo, config.Hlsdk);
+        var output = OptionValue(args, "--out=") ?? CodeGenConfig.ResolvePath(repo, repo, config.Output);
+        var rulesPath = OptionValue(args, "--rules=") ?? CodeGenConfig.ResolvePath(repo, repo, config.HumanizerRules);
+
+        if (!Directory.Exists(hlsdk))
+        {
+            Console.Error.WriteLine($"HLSDK directory not found: {hlsdk}");
+            Console.Error.WriteLine("Pass the path to a Half-Life SDK checkout via --hlsdk=<path> or the \"hlsdk\" entry in codegen.json.");
+            return 1;
+        }
+
+        var rules = HumanizerRules.Load(rulesPath);
+        foreach (var problem in rules.Problems) Console.Error.WriteLine($"Warning: {problem}");
+        if (!File.Exists(rulesPath)) Console.Error.WriteLine("Pass the rules file path via --rules=<path> or the \"humanizerRules\" entry in codegen.json.");
+
+        var options = ToolchainLocator.CreateOptions(hlsdk, config).ConfigureForWindowsMsvc();
+        var clientProject = VcxProjectInfo.Load(Path.Combine(hlsdk, config.VcxProject), config.VcxConfiguration, config.VcxPlatform);
+        foreach (var includeDir in clientProject.IncludeDirectories) AddIfExists(options.IncludeFolders, includeDir);
+        foreach (var define in clientProject.Defines) if (!options.Defines.Contains(define)) options.Defines.Add(define);
+
+        var abiHeaders = config.AbiHeaders.Select(h => CodeGenConfig.ResolvePath(repo, hlsdk, h));
+        var files = clientProject.CompileFiles
+            .Where(f => Path.GetFileName(f).Equals("cdll_int.cpp", StringComparison.OrdinalIgnoreCase))
+            .Concat(clientProject.HeaderFiles.Where(IsClientAbiHeader))
+            .Concat(abiHeaders)
+            .Where(File.Exists)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var compilation = CppParser.ParseFiles(files, options);
+        foreach (var message in compilation.Diagnostics.Messages) Console.WriteLine(message);
+        if (compilation.HasErrors) return 1;
+
+        var gen = new RawAbiGenerator(compilation, rules, config.RootStructs, config.ManagedNativeApiRootTypes);
+
+        var nativeDir = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(output)!, ".."));
+        var engineDir = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(output)!, "..", ".."));
+
+        var outputs = new List<(string Path, string Content)>
+        {
+            (output, gen.Generate())
+        };
+        var humanizer = new HumanizerGenerator(gen);
+        foreach (var (relativePath, content) in humanizer.PlanHumanizerFiles())
+            outputs.Add((Path.Combine(nativeDir, CppAstHelpers.NormalizeRelativePath(relativePath)), content));
+
+        ReportRules(rules);
+
+        var symbolFilter = OptionValue(args, "--list-symbols=");
+        if (HasFlag(args, "--list-symbols") || symbolFilter is not null)
+        {
+            PrintSymbols(humanizer.Catalog, symbolFilter);
+            return 0;
+        }
+
+        outputs.Add((Path.Combine(engineDir, "InlineArrayUnmanaged.Generated.cs"), RawAbiGenerator.CreateInlineArrayDefinitions(engineDir, gen.RequiredInlineArraySizes)));
+        outputs.Add((Path.ChangeExtension(output, ".manifest.txt"), gen.CreateManifest(output, hlsdk)));
+
+        if (dryRun || check)
+        {
+            var outOfDate = 0;
+            foreach (var (path, content) in outputs)
+            {
+                var expected = OutputWriter.NormalizeNewLines(content);
+                if (File.Exists(path) && File.ReadAllText(path) == expected) continue;
+                outOfDate++;
+                Console.WriteLine(File.Exists(path) ? $"Out of date: {path}" : $"Missing: {path}");
+            }
+            Console.WriteLine(outOfDate == 0
+                ? $"Generated code is up to date ({outputs.Count} files)."
+                : $"{outOfDate} of {outputs.Count} generated files are missing or out of date.");
+            if (dryRun) return 0;
+            Console.WriteLine(outOfDate == 0 ? "Check passed." : "Check failed: run the generator to refresh the generated code.");
+            return outOfDate == 0 ? 0 : 1;
+        }
+
+        HumanizerGenerator.DeletePreviousHumanizerFiles(nativeDir);
+        foreach (var (path, content) in outputs) OutputWriter.WriteGeneratedFile(path, content);
+
+        Console.WriteLine($"Generated {output}");
+        Console.WriteLine($"Manifest {Path.ChangeExtension(output, ".manifest.txt")}");
+        Console.WriteLine($"Types: {gen.GeneratedTypeCount}");
+
+        return 0;
     }
-    // 实现一个会忽略已经入队过的项的队列
-    public class TodoList<T> : Queue<T>
-    {
-        private HashSet<T> _set = new HashSet<T>();
-        public IEnumerable<T> GetHistory() => _set;
-        public new void Enqueue(T item)
-        {
-            if (!_set.Contains(item))
-            {
-                base.Enqueue(item);
-                _set.Add(item);
-            }
-        }
-        public new T Dequeue()
-        {
-            var item = base.Dequeue();
-            return item;
-        }
-    }
-    class NamingConverter : ICSharpConverterPlugin
-    {
-        public void Register(CSharpConverter converter, CSharpConverterPipeline pipeline)
-        {
-            pipeline.GetCSharpNameResolvers.Add(GetName);
-        }
 
-        private string GetName(CSharpConverter converter, CppElement element, CSharpElement context)
-        {
-            // Process with previous converter first.
-            // IF Starts with __Anonymous then we find name from typedef <anoymousType> <actualName>.
-            var name = element switch { CppTypedef t => t.Name, CppClass c => c.Name, CppEnum e => e.Name, _ => element.ToString() };
-            if (name.StartsWith("__Anonymous"))
-            {
-                var typedef = converter.CurrentCppCompilation.Typedefs
-                    .FirstOrDefault(x=>x.ElementType == element);
-                if (typedef != null)
-                {
-                    name = typedef.Name;
-                }
-            }
-            return name;
-
-        }
-    }
-    class TypedefForwardingConverter : ICSharpConverterPlugin
-    {
-        public void Register(CSharpConverter converter, CSharpConverterPipeline pipeline)
-        {
-            pipeline.TypedefConverters.Add(TypedefForwarding);
-        }
-        public CSharpElement TypedefForwarding(CSharpConverter converter, CppTypedef cppTypedef, CSharpElement context)
-        {
-            //throw new NotImplementedException();
-            //return DefaultTypeConverter.GetCSharpType(converter, cppTypedef.ElementType, context, false);
-            return converter.ConvertType(cppTypedef.ElementType, context);
-        }
-    }
-    class DiscardConverter : ICSharpConverterPlugin
-    {
-        TodoList<CppElement> _todo = new TodoList<CppElement>();
-        void AddNestedTypeFor(CppElement e)
-        {
-            var nestedTypes = e switch
-            {
-                CppFunction f => f.Children().Cast<CppParameter>().Select(x => x.Type).Append(f.ReturnType),
-                CppClass c => c.Fields.Select(x => x.Type),
-                CppTypedef d => new[] { d.ElementType },
-                CppFunctionType ft => ft.Parameters.Select(x => x.Type).Append(ft.ReturnType),
-                CppArrayType a => new[] { a.ElementType },
-                CppPointerType p => new[] { p.ElementType },
-                CppPrimitiveType i => new CppType[] { },
-                CppQualifiedType q => new[] { q.ElementType },
-                CppEnum cppEnum => new CppType[] {} ,
-                _ => throw new NotImplementedException()
-            };
-            foreach (var i in nestedTypes)
-            {
-                _todo.Enqueue(i);
-            }
-        }
-        public void Register(CSharpConverter converter, CSharpConverterPipeline pipeline)
-        {
-            pipeline.ConvertBegin.Add(FilterFunction);
-        }
-        public void FilterFunction(CSharpConverter converter)
-        {
-            return;
-            var cppComp = converter.CurrentCppCompilation;
-            var exportsFuncs = cppComp.Functions.Where(x => x.SourceFile.Contains("Exports.h")).ToList();
-            foreach (var i in exportsFuncs)
-            {
-                _todo.Enqueue(i);
-            }
-            var eng1 = cppComp.Classes.Where(x => x.Name == "cl_enginefuncs_ss").ToList();
-            _todo.Enqueue(eng1.First());
-            var toBeProcessedElements = new List<CppElement>();
-            while (_todo.TryDequeue(out var ele))
-            {
-                toBeProcessedElements.Add(ele);
-                AddNestedTypeFor(ele);
-            }
-
-            var structs = toBeProcessedElements.Where(x=>x is CppClass).Cast<CppClass>()
-                .Where(x=>x.Name.Contains("triangleapi")).ToList();
-
-            var allElements = converter.CurrentCppCompilation.Children().OfType<CppElement>().Where(x=>x is not null);
-            foreach (var i in allElements)
-            {
-                if (!toBeProcessedElements.Contains(i))
-                {
-                    converter.Discard(i);
-                }
-            }
-        }
-    }
-    class Program
-    {
-        #region demo
-        static string demoCppCode = @"
-typedef unsigned char byte;
-typedef byte BYTEA;
-typedef int (*pfnUserMsgHook)(const char *pszName, int iSize, void *pbuf);
-typedef struct{
-    byte a;
-    byte b;
-    BYTEA c;
-} color_t;
-struct {
-    int a;
-    int b;
-    pfnUserMsgHook pfnHook;
-    void (*ptr)(int arg0, int arg1, void (*arg2)(int arg3));
-
-    union
-    {
-        int c;
-        int d;
-    } e;
-} outer;
-            ";
-        #endregion
-        public static List<string> GetEngineDefHeaders()
-        {
-            var list = new List<string>() { "common", "engine" };
-
-            return includeList.Where(x => list.Any(l => x.Contains(l)))
-                .SelectMany(x => Directory.GetFiles(x, "*.h", SearchOption.AllDirectories))
-                .Where(x => !x.EndsWith("anorms.h"))
-                .ToList();
-        }
-        static void Code()
-        {
-            var options = new CSharpConverterOptions();
-
-            var csCompilation = CSharpConverter.Convert(demoCppCode, options);
-
-            Debug.Assert(csCompilation.HasErrors == false);
-            var fs = new MemoryFileSystem();
-            var codeWriter = new CodeWriter(new CodeWriterOptions(fs));
-            csCompilation.DumpTo(codeWriter);
-
-            var text = fs.ReadAllText(options.DefaultOutputFilePath);
-            Console.WriteLine(text);
-        }
-        static List<string> _assignList = @"Initialize,
-			HUD_Init,
-			HUD_VidInit,
-			HUD_Redraw,
-			HUD_UpdateClientData,
-			HUD_Reset,
-			HUD_PlayerMove,
-			HUD_PlayerMoveInit,
-			HUD_PlayerMoveTexture,
-			IN_ActivateMouse,
-			IN_DeactivateMouse,
-			IN_MouseEvent,
-			IN_ClearStates,
-			IN_Accumulate,
-			CL_CreateMove,
-			CL_IsThirdPerson,
-			CL_CameraOffset,
-			KB_Find,
-			CAM_Think,
-			V_CalcRefdef,
-			HUD_AddEntity,
-			HUD_CreateEntities,
-			HUD_DrawNormalTriangles,
-			HUD_DrawTransparentTriangles,
-			HUD_StudioEvent,
-			HUD_PostRunCmd,
-			HUD_Shutdown,
-			HUD_TxferLocalOverrides,
-			HUD_ProcessPlayerState,
-			HUD_TxferPredictionData,
-			Demo_ReadBuffer,
-			HUD_ConnectionlessPacket,
-			HUD_GetHullBounds,
-			HUD_Frame,
-			HUD_Key_Event,
-			HUD_TempEntUpdate,
-			HUD_GetUserEntity,
-			HUD_VoiceStatus,
-			HUD_DirectorMessage,
-			HUD_GetStudioModelInterface,
-			HUD_ChatInputPosition".Split(",").Select(x=>x.Trim()).ToList();
-
-        static string _repoDir = "../../../../..";
-        static string _hlsdkDir = "D:\\_Project\\GoldsrcFramework\\external\\halflife-updated"; //Path.Combine(_repoDir, "external/halflife-updated");
-        static string includes = @"..\..\dlls;..\..\cl_dll;..\..\cl_dll\particleman;..\..\public;..\..\common;..\..\pm_shared;..\..\engine;..\..\utils\vgui\include;..\..\game_shared;..\..\external;..\..\LearnOpenGL\includes;";
-        static IEnumerable<string> includeList = includes.Split(';', StringSplitOptions.RemoveEmptyEntries).Select(x => Path.Combine(_hlsdkDir, "projects/vs2019", x))!;
-        static List<FuncInfo> _funcDeclList;
-
-        static void Main(string[] args)
-        {
-            //Code();
-            // ClientDllExports
-            var outputContent = @"using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-
-namespace GoldsrcFramework
-{
     /// <summary>
-    /// Client dll implement this abstract class for client game logic.
+    /// Reports rule hygiene: rules that never matched anything are either typos or stale
+    /// entries, and both are invisible without this check.
     /// </summary>
-    public abstract class ClientFuncs
+    static void ReportRules(HumanizerRules rules)
     {
-        [[ClientFuncs]]
+        Console.WriteLine($"Humanizer rules: {rules.AllRules.Count} loaded from {rules.SourcePath}, {rules.AllRules.Count(r => r.HitCount > 0)} matched");
+        var unused = rules.UnusedRules.ToList();
+        if (unused.Count == 0) return;
+
+        Console.Error.WriteLine($"Warning: {unused.Count} humanizer rule(s) matched no symbol - fix the path or delete the rule:");
+        foreach (var rule in unused.OrderBy(r => r.Line))
+            Console.Error.WriteLine($"  {rule.Location}  [{HumanizerRules.SectionName(rule.Section)}]  {rule.Pattern}");
     }
 
-    internal unsafe static class ClientDllExportsInternal
+    static void PrintSymbols(HumanizerSymbolCatalog catalog, string? filter)
     {
-        [StructLayout(LayoutKind.Sequential)]
-        private struct clfuncs
+        foreach (var symbol in catalog.Symbols
+            .Where(s => filter is null || s.Path.Contains(filter, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(s => s.Kind, StringComparer.Ordinal).ThenBy(s => s.Path, StringComparer.Ordinal))
         {
-            [[clfuncs]]
+            var name = symbol.EmittedName == symbol.RawName ? symbol.RawName : $"{symbol.RawName} => {symbol.EmittedName}";
+            Console.WriteLine($"{symbol.Kind,-14} {symbol.Path,-60} {name}");
         }
-
-        static ClientFuncs s_client = null!;
-        [UnmanagedCallersOnly]
-        static void F(clfuncs* pv)
-        {
-            s_client = null!;
-
-            clfuncs v = new clfuncs()
-            {
-                [[ClFuncsAssignment]]
-            };
-
-            *pv = v;
-        }
-
-        [[ClientDllExportsInternal]]
     }
-}
-";
 
-            // Parse
-            var options = new CSharpConverterOptions();
-            options.IncludeFolders.AddRange(includeList);
-            var msvcVersion = "14.44.35207"; // 或从注册表获取最新版本
-            var windowsKitVersion = "10.0.22621.0"; // 或从注册表获取
-
-            //options.SystemIncludeFolders.Add(Path.Combine(vsPath, "VC", "Tools", "MSVC", msvcVersion, "include"));
-
-            options.SystemIncludeFolders.Add($@"C:\Program Files (x86)\Windows Kits\10\Include\{windowsKitVersion}\ucrt");
-            options.SystemIncludeFolders.Add($@"C:\Program Files (x86)\Windows Kits\10\Include\{windowsKitVersion}\shared");
-            options.SystemIncludeFolders.Add($@"C:\Program Files (x86)\Windows Kits\10\Include\{windowsKitVersion}\um");
-            //options.SystemIncludeFolders.Add(@"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.38.33130\include");
-            //C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.29.30133\include\vcruntime.h
-            options.SystemIncludeFolders.Add(@"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.29.30133\include");
-            //options.SystemIncludeFolders.Add(@"C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt");
-            options.ParseSystemIncludes = true;
-            options.ParseTokenAttributes = true;
-            options.AdditionalArguments.Add("-std=c++17");
-            options.Defines.Add("WIN32");
-            options.Defines.Add("_CRT_SECURE_NO_WARNINGS");
-            options.Defines.Add("_DEBUG");
-            options.Defines.Add("_WINDOWS");
-            options.Defines.Add("CLIENT_DLL");
-            options.Defines.Add("CLIENT_WEAPONS");
-            options.Defines.Add("HL_DLL");
-            options.Defines.Add("_WINDLL");
-            options.ParseMacros = true;
-            options.AutoSquashTypedef = false;
-            options.ConfigureForWindowsMsvc(CppTargetCpu.X86, CppVisualStudioVersion.VS2019);
-
-            #region Conversion config
-            options.MappingRules.Add(x => x.Map<CppClass>("byte").Type("byte"));
-            #endregion
-
-            options.Plugins.Add(new DiscardConverter());
-            options.Plugins.Add(new TypedefForwardingConverter());
-            options.Plugins.Add(new NamingConverter());
-            //var csc = CSharpConverter.Convert(new List<string>() {
-            //    Path.Combine(_hlsdkDir,"common/Platform.h"),
-            //    Path.Combine(_hlsdkDir,"cl_dll/cdll_int.cpp"),
-            //    Path.Combine(_hlsdkDir,"cl_dll/Exports.h"),
-            //    // APIProxy.h
-            //    Path.Combine(_hlsdkDir,"engine/APIProxy.h"),
-            //    Path.Combine(_hlsdkDir,"common/triangleapi.h"),
-            //    Path.Combine(_hlsdkDir,"common/r_efx.h"),
-            //    Path.Combine(_hlsdkDir, "common/com_model.h"),
-            //}.Concat(GetEngineDefHeaders()).ToList(), options);
-            var csc = CSharpConverter.Convert(demoCppCode, options);
-
-
-            var fs = new MemoryFileSystem();
-            var codeWriter = new CodeWriter(new CodeWriterOptions(fs));
-            csc.DumpTo(codeWriter);
-
-            var text = fs.ReadAllText(options.DefaultOutputFilePath);
-            File.WriteAllText("goldsrc_engine_def_output.cs", text);
-            Console.WriteLine(text);
-
-            var compilation = CppParser.ParseFiles(new List<string>() {
-                Path.Combine(_hlsdkDir,"common/Platform.h"),
-                Path.Combine(_hlsdkDir,"cl_dll/cdll_int.cpp"),
-                Path.Combine(_hlsdkDir,"cl_dll/Exports.h"),
-                Path.Combine(_hlsdkDir,"engine/APIProxy.h"),
-            }, options);
-
-            if (compilation.HasErrors)
-            {
-                foreach (var i in compilation.Diagnostics.Messages)
-                {
-                    Console.WriteLine(i);
-                }
-                return;
-            }
-            var exportsFuncs = compilation.Functions.Where(x => x.SourceFile.Contains("Exports.h")).ToList();
-
-            // ClientFuncs
-            var clientFuncs = string.Empty;
-            var funcDeclList = new List<FuncInfo>();
-
-            //exportsFuncs.First().
-            foreach (var i in exportsFuncs)
-            {
-                var retType = GetCSharpTypeName(i.ReturnType);
-                var funcName = i.Name;
-                var argDeclarations = i.Parameters.Select(x => $"{GetCSharpTypeName(x.Type)} {x.Name}");
-
-                var funcInfo = new FuncInfo()
-                {
-                    FuncDecl = $"{retType} {funcName} ({string.Join(",", argDeclarations)})",
-                    ReturnTypeName = retType,
-                    Parameter = i.Parameters.Select(x => (GetCSharpTypeName(x.Type), x.Name)).ToList(),
-                    FuncName = funcName
-                };
-                funcDeclList.Add(funcInfo);
-                string line = $"public abstract {funcDeclList.Last().FuncDecl};";
-
-                clientFuncs += line + Environment.NewLine;
-            }
-            _funcDeclList = funcDeclList;
-            outputContent = outputContent.Replace("[[ClientFuncs]]", clientFuncs);
-
-            // [[clfuncs]]
-            var clFuncs = string.Empty;
-            foreach (var item in _assignList)
-            {
-                var i = exportsFuncs.Single(x => x.Name == item);
-                var retType = GetCSharpTypeName(i.ReturnType);
-                var funcName = i.Name;
-                var genericParamList = i.Parameters.Select(x => GetCSharpTypeName(x.Type)).ToList();
-                genericParamList.Add(GetCSharpTypeName(i.ReturnType));
-                string line = $"public delegate* unmanaged[Cdecl] <{string.Join(",", genericParamList)}> {funcName};";
-
-                clFuncs += line + Environment.NewLine;
-            }
-            outputContent = outputContent.Replace("[[clfuncs]]", clFuncs);
-
-            // [[ClFuncsAssignment]]
-            var assignment = string.Empty;
-            foreach (var i in _assignList)
-            {
-                assignment += $"{i} = &{i}{Environment.NewLine}";
-            }
-            outputContent = outputContent.Replace("[[ClFuncsAssignment]]", assignment);
-
-            // [[ClientDllExportsInternal]]
-            var exportsDecl = string.Empty;
-            foreach (var i in funcDeclList)
-            {
-                var content = "[UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]" + Environment.NewLine
-                              + $"static {i.FuncDecl}"
-                              + "{" + Environment.NewLine
-                              + $"{(i.ReturnTypeName == "void" ? "" : "return")} s_client.{i.FuncName}({string.Join(",", i.Parameter.Select(x => x.Name))});" + Environment.NewLine
-                              + "}" + Environment.NewLine;
-
-                exportsDecl += content;
-            }
-            outputContent = outputContent.Replace("[[ClientDllExportsInternal]]", exportsDecl);
-
-            GenerateLegacyClientExports();
-            GenerateLegacyClientDll();
-        }
-
-        static void GenerateLegacyClientExports()
-        {
-            var outputContent = @"using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace GoldsrcFramework.Demo
-{
-    internal class LegacyClientFuncs : ClientFuncs
+    /// <summary>
+    /// Walks up from the executable location to find the repository root.
+    /// Prefers the directory containing .git (works even when solution files live
+    /// in a subdirectory); falls back to the directory containing the solution file.
+    /// </summary>
+    static string FindRepoRoot()
     {
-        [[LegacyClientFuncs]]
-    }
-}
-";
-
-            var exportsDecl = string.Empty;
-            foreach (var i in _funcDeclList)
-            {
-                var content = $"public override {i.FuncDecl}" + Environment.NewLine
-                              + "{" + Environment.NewLine
-                              + $"{(i.ReturnTypeName == "void" ? "" : "return")} LegacyClientInterop.{i.FuncName}({string.Join(",", i.Parameter.Select(x => x.Name))});" + Environment.NewLine
-                              + "}" + Environment.NewLine;
-
-                exportsDecl += content;
-            }
-
-            outputContent = outputContent.Replace("[[LegacyClientFuncs]]", exportsDecl);
-        }
-
-        static void GenerateLegacyClientDll()
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        DirectoryInfo? solutionDir = null;
+        while (dir is not null)
         {
-            var outputContent = @"using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
+            if (Directory.Exists(Path.Combine(dir.FullName, ".git"))) return dir.FullName;
+            solutionDir ??= File.Exists(Path.Combine(dir.FullName, "GoldsrcFramework.sln")) ? dir : null;
+            dir = dir.Parent!;
+        }
+        if (solutionDir is not null) return solutionDir.FullName;
+        // Legacy fallback for unusual output locations.
+        return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../.."));
+    }
 
-namespace GoldsrcFramework.Demo
-{
-    internal static class LegacyClientInterop
+    static string? OptionValue(string[] args, string prefix) => args
+        .FirstOrDefault(a => a.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))?[prefix.Length..];
+
+    static bool HasFlag(string[] args, string flag) => args.Contains(flag, StringComparer.OrdinalIgnoreCase);
+
+    static void AddIfExists(ICollection<string> list, string? path)
     {
-        const string LegacyClientDll = ""client.dll"";
-
-        [[LegacyClientDll]]
+        if (!string.IsNullOrWhiteSpace(path) && Directory.Exists(path)) list.Add(path);
     }
-}
-";
 
-            var exportsDecl = string.Empty;
-            foreach (var i in _funcDeclList)
-            {
-                var content = "[DllImport(LegacyClientDll)]" + Environment.NewLine
-                            + $"internal extern static {i.FuncDecl};" + Environment.NewLine;
-
-                exportsDecl += content;
-            }
-
-            outputContent = outputContent.Replace("[[LegacyClientDll]]", exportsDecl);
-        }
-
-        static string GetCSharpTypeName(CppType type) 
-        {
-            var result = string.Empty;
-            if (type.TypeKind == CppTypeKind.Pointer)
-            {
-                result = "void*";
-            }
-            else if (type.SizeOf == 0)
-            {
-                result = "void";
-            }
-            else
-            {
-                result = type.SizeOf switch
-                {
-                    1 => "byte",
-                    2 => "short",
-                    4 => "int",
-                    8 => "long",
-                    _ => throw new Exception()
-                };
-            }
-            return result;
-        }
+    static bool IsClientAbiHeader(string path)
+    {
+        var normalized = path.Replace('\\', '/');
+        return normalized.Contains("/common/", StringComparison.OrdinalIgnoreCase)
+            || normalized.Contains("/engine/", StringComparison.OrdinalIgnoreCase)
+            || normalized.Contains("/pm_shared/", StringComparison.OrdinalIgnoreCase)
+            || normalized.Contains("/public/", StringComparison.OrdinalIgnoreCase)
+            || normalized.EndsWith("/cl_dll/cl_dll.h", StringComparison.OrdinalIgnoreCase)
+            || normalized.EndsWith("/cl_dll/kbutton.h", StringComparison.OrdinalIgnoreCase)
+            || normalized.EndsWith("/cl_dll/Exports.h", StringComparison.OrdinalIgnoreCase);
     }
 }

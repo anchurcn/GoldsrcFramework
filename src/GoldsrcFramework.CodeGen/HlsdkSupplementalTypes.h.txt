@@ -25,3 +25,10 @@ struct delta_s
 struct surfcache_s
 {
 };
+
+// xash3d-only forward declarations
+struct grasshdr_s
+{
+};
+
+// xash3d-only struct cl_entity_s not needed here (already in cl_entity.h)

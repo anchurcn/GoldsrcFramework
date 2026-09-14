@@ -1,0 +1,98 @@
+{
+  // GoldsrcFramework CodeGen configuration.
+  // Paths are relative to the repository root unless they start with "$repo/"
+  // (redundant, but explicit) or are absolute. "hlsdk"-relative entries (vcxProject,
+  // abiHeaders without the $repo/ prefix, includeDirs) resolve against "hlsdk".
+  // Command line arguments (--hlsdk=, --out=) override the values here.
+
+  // Path to the Half-Life SDK checkout.
+  "hlsdk": "external/hlsdk",
+
+  // The VS C++ project read for include directories, defines and the ABI header list.
+  "vcxProject": "projects/vs2019/hl_cdll.vcxproj",
+  "vcxConfiguration": "Release",
+  "vcxPlatform": "Win32",
+
+  // Main output file (the humanized layer is written next to its parent directory).
+  "output": "src/GoldsrcFramework.Engine/Native/Generated/HlsdkNative.generated.cs",
+
+  // Unified humanizer rules: every manual adjustment of generated symbols (type/field/
+  // enum member/parameter renames, file placement, field types, emission strategy).
+  "humanizerRules": "src/GoldsrcFramework.CodeGen/humanizer.rules",
+
+  // Raw ABI roots: the engine/client function table types the type graph starts from.
+  "rootStructs": [
+    "cldll_func_t",
+    "cl_enginefunc_t",
+    "enginefuncs_t",
+    "DLL_FUNCTIONS",
+    "NEW_DLL_FUNCTIONS",
+    "globalvars_t",
+    "entvars_t"
+  ],
+
+  // Additional roots exposed through the managed native API (studio/model formats).
+  "managedNativeApiRootTypes": [
+    "studiohdr_t",
+    "mstudiobonecontroller_t",
+    "mstudiobone_t",
+    "mstudioseqdesc_t",
+    "mstudioseqgroup_t",
+    "mstudiobodyparts_t",
+    "mstudioattachment_t",
+    "mstudiobbox_t",
+    "mstudiotexture_t",
+    "mstudiomodel_t",
+    "mstudiomesh_t",
+    "mstudiopivot_t",
+    "mstudioanim_t",
+    "mstudioanimvalue_t",
+    "server_studio_api_t",
+    "sv_blending_interface_t"
+  ],
+
+  // Headers explicitly added to the parse set (HLSDK-relative, or $repo-relative).
+  "abiHeaders": [
+    "cl_dll/cl_dll.h",
+    "engine/cdll_int.h",
+    "engine/APIProxy.h",
+    "cl_dll/kbutton.h",
+    "engine/eiface.h",
+    "cl_dll/Exports.h",
+    "$repo/src/GoldsrcFramework.CodeGen/HlsdkSupplementalTypes.h.txt"
+  ],
+
+  // Base include directories (HLSDK-relative).
+  "includeDirs": [
+    "dlls",
+    "cl_dll",
+    "cl_dll/particleman",
+    "public",
+    "common",
+    "pm_shared",
+    "engine",
+    "utils/vgui/include",
+    "game_shared",
+    "external"
+  ],
+
+  // Preprocessor defines for parsing.
+  "defines": [
+    "WIN32",
+    "_WINDOWS",
+    "CLIENT_DLL",
+    "CLIENT_WEAPONS",
+    "HL_DLL",
+    "_WINDLL",
+    "_CRT_SECURE_NO_WARNINGS",
+    "__PRFCHWINTRIN_H",
+    "DLLEXPORT=",
+    "EXPORT="
+  ],
+
+  // Extra clang arguments passed to the C++ parser.
+  "parserArguments": [
+    "-std=c++17",
+    "-fms-extensions"
+  ]
+}

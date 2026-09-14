@@ -1,0 +1,355 @@
+# ============================================================================
+#  Unified humanizer rules
+# ============================================================================
+#
+#  Every manual adjustment applied to the generated humanized layer lives in this
+#  one file. The generator itself contains no per-symbol special cases: if the
+#  generated name, file, or type is not what you want, add a rule here.
+#
+#  Also used for the raw ABI layer: [typeAliases] applies to both layers, because
+#  the ABI layer must agree with the humanized layer on every field type.
+#
+#  ---------------------------------------------------------------------------
+#  Syntax
+#  ---------------------------------------------------------------------------
+#    [section]                       start a section (see below)
+#    pattern = value                 a rule; "#" starts a comment
+#    pattern = value if <shape>      [fieldTypes] only: apply only when the raw
+#                                    C shape matches (e.g. "if float[3]")
+#
+#  Patterns use '*' (any characters) and '?' (one character) wildcards.
+#  Values may use placeholders: {name} the symbol itself, {strip:PREFIX} the symbol
+#  without a leading PREFIX, {rstrip:SUFFIX} the symbol without a trailing SUFFIX.
+#
+#  Matching order:
+#    1. exact (wildcard-free) patterns, tried against each candidate path in the
+#       order listed below;
+#    2. wildcard patterns, most literal characters first, ties by file order.
+#
+#  Keys are canonicalized on the *raw* (C) type name, which is stable: renaming a
+#  humanized type never invalidates the rules of its members. Matching a humanized
+#  type name is still accepted as a convenience.
+#
+#  Symbol paths:
+#    [types]         <rawType>                                  -> new type name
+#    [files]         <rawType>                                  -> target file
+#    [fields]        <rawType>.<field>                          -> new field name
+#    [fieldTypes]    <rawType>.<field>                          -> new C# type
+#    [enumMembers]   <rawType>.<MEMBER>                         -> new member name
+#    [params]        <rawType>.<field>.<paramName|#index>       -> new param name
+#    [paramTypes]    <rawType>.<field>.<paramName|#index>       -> new C# type
+#    [emit]          <rawType>                                  -> struct|skip|union-anim-value
+#
+#  Function pointer parameters are also addressable by the typedef name, e.g.
+#  pfnEngSrc_pfnSPR_Load_t.szPicName, which is handy when the same signature is
+#  shared by several tables.
+#
+#  After every run the generator reports rules that matched nothing (typos or stale
+#  entries) and writes the full symbol catalog to
+#  src/GoldsrcFramework.Engine/Native/Generated/HlsdkNative.humanizer.symbols.md
+#
+#  Add "unused-ok" to a rule's trailing comment when the rule is intentionally not
+#  reached yet (for example a mapping kept for xash3d-only headers). Such rules are
+#  left out of the unmatched report, so that report only points at real mistakes.
+# ============================================================================
+
+
+# ---------------------------------------------------------------------------
+[defaults]
+# ---------------------------------------------------------------------------
+# Output shape of the humanized layer.
+namespace = GoldsrcFramework.Engine.Native
+usings = System, System.Runtime.InteropServices, GoldsrcFramework.LinearMath, NativeInterop
+# {header} = source header folder, {name} = humanized type name.
+# Types listed in [files] bypass this template.
+file = {header}/{name}.cs
+
+
+# ---------------------------------------------------------------------------
+[typeAliases]
+# ---------------------------------------------------------------------------
+# C type -> C# type, applied in both the raw ABI and the humanized layer.
+# A typedef listed here is not emitted as its own struct; it is substituted inline.
+# Entries the current header set never reaches are marked below. The generator lists
+# every unmatched entry after each run, which is how dead mappings are spotted.
+Vector = Vector3
+int = int
+char = NChar
+byte = byte
+bool = Bool1Byte          # unused-ok: not reached by the current header set
+int32 = int
+uint32 = uint
+CRC32_t = uint
+uint64 = ulong
+size_t = nuint            # unused-ok: not reached by the current header set
+
+# xash3d vec mapping, only relevant for translation units that include xash3d headers
+vec3_t = Vector3          # unused-ok: not reached by the current header set
+vec_t = float             # unused-ok: not reached by the current header set
+
+
+# ---------------------------------------------------------------------------
+[types]
+# ---------------------------------------------------------------------------
+# Raw declared symbol -> name used in the humanized layer.
+# Function tables. The *_s entries are the structs behind the *_t typedefs: a symbol is
+# emitted under its typedef spelling, so the *_s rows are fallback spellings the current
+# header set does not reach.
+cl_enginefuncs_s = ClientEngineFuncs
+cl_enginefunc_t = ClientEngineFuncs
+cldll_func_t = ClientExportFuncs
+enginefuncs_s = ServerEngineFuncs   # unused-ok: emitted under the enginefuncs_t spelling
+enginefuncs_t = ServerEngineFuncs
+DLL_FUNCTIONS = ServerExportFuncs
+NEW_DLL_FUNCTIONS = ServerNewExportFuncs
+
+
+# ---------------------------------------------------------------------------
+[files]
+# ---------------------------------------------------------------------------
+# Target file relative to src/GoldsrcFramework.Engine/Native/.
+# Root-level ABI function tables (see [types] for why the *_s spellings are fallbacks)
+cl_enginefuncs_s = ClientEngineFuncs.cs   # unused-ok: emitted under the cl_enginefunc_t spelling
+cl_enginefunc_t = ClientEngineFuncs.cs
+cldll_func_t = ClientExportFuncs.cs
+enginefuncs_s = ServerEngineFuncs.cs      # unused-ok: emitted under the enginefuncs_t spelling
+enginefuncs_t = ServerEngineFuncs.cs
+DLL_FUNCTIONS = ServerExportFuncs.cs
+NEW_DLL_FUNCTIONS = ServerNewExportFuncs.cs
+
+# EngineTypes.cs replacement wave. The old hand-written definitions live under
+# GoldsrcFramework.Engine.Native.Deprecation, so generated Humanizer types are now formal.
+ref_params_t = Client/RefParams.cs
+usercmd_t = Input/UserCmd.cs
+clientdata_t = Client/ClientData.cs
+entity_state_t = Entity/EntityState.cs
+entvars_t = Entity/EntVars.cs
+edict_t = Entity/Edict.cs
+cl_entity_t = Client/ClientEntity.cs
+pmtrace_t = PlayerMove/PlayerMoveTrace.cs
+physent_t = PlayerMove/PhysEnt.cs
+movevars_t = PlayerMove/MoveVars.cs
+model_t = Model/Model.cs
+msurface_t = Model/Surface.cs
+texture_t = Model/Texture.cs
+screenfade_t = Client/ScreenFade.cs
+client_textmessage_t = Text/ClientTextMessage.cs
+sequenceEntry_s = Text/SequenceEntry.cs
+sentenceEntry_s = Text/SentenceEntry.cs
+KeyValueData = Entity/KeyValueData.cs
+SAVERESTOREDATA = SaveRestore/SaveRestoreData.cs
+TYPEDESCRIPTION = SaveRestore/TypeDescription.cs
+resource_t = Resource/Resource.cs
+
+# Primitive typedef wrappers / handles
+qboolean = Core/EngineHandles.cs
+HSPRITE = Core/EngineHandles.cs
+string_t = Core/EngineHandles.cs
+
+# StudioTypes.cs is still hand-written in GoldsrcFramework.Engine.Native. Enable
+# these after moving it to Deprecation or replacing it fully.
+# mstudioevent_t = Studio/StudioEvent.cs
+# r_studio_interface_t = Studio/StudioApi.cs
+# engine_studio_api_t = Studio/StudioApi.cs
+
+
+# ---------------------------------------------------------------------------
+[fields]
+# ---------------------------------------------------------------------------
+# <rawType>.<field> -> field name in the humanized struct.
+#
+# Client export function table: names from external/hlsdk/cl_dll/cdll_int.cpp cldll_func_t initializer.
+cldll_func_t.pInitFunc = Initialize
+cldll_func_t.pHudInitFunc = HUD_Init
+cldll_func_t.pHudVidInitFunc = HUD_VidInit
+cldll_func_t.pHudRedrawFunc = HUD_Redraw
+cldll_func_t.pHudUpdateClientDataFunc = HUD_UpdateClientData
+cldll_func_t.pHudResetFunc = HUD_Reset
+cldll_func_t.pClientMove = HUD_PlayerMove
+cldll_func_t.pClientMoveInit = HUD_PlayerMoveInit
+cldll_func_t.pClientTextureType = HUD_PlayerMoveTexture
+cldll_func_t.pIN_ActivateMouse = IN_ActivateMouse
+cldll_func_t.pIN_DeactivateMouse = IN_DeactivateMouse
+cldll_func_t.pIN_MouseEvent = IN_MouseEvent
+cldll_func_t.pIN_ClearStates = IN_ClearStates
+cldll_func_t.pIN_Accumulate = IN_Accumulate
+cldll_func_t.pCL_CreateMove = CL_CreateMove
+cldll_func_t.pCL_IsThirdPerson = CL_IsThirdPerson
+cldll_func_t.pCL_GetCameraOffsets = CL_CameraOffset
+cldll_func_t.pFindKey = KB_Find
+cldll_func_t.pCamThink = CAM_Think
+cldll_func_t.pCalcRefdef = V_CalcRefdef
+cldll_func_t.pAddEntity = HUD_AddEntity
+cldll_func_t.pCreateEntities = HUD_CreateEntities
+cldll_func_t.pDrawNormalTriangles = HUD_DrawNormalTriangles
+cldll_func_t.pDrawTransparentTriangles = HUD_DrawTransparentTriangles
+cldll_func_t.pStudioEvent = HUD_StudioEvent
+cldll_func_t.pPostRunCmd = HUD_PostRunCmd
+cldll_func_t.pShutdown = HUD_Shutdown
+cldll_func_t.pTxferLocalOverrides = HUD_TxferLocalOverrides
+cldll_func_t.pProcessPlayerState = HUD_ProcessPlayerState
+cldll_func_t.pTxferPredictionData = HUD_TxferPredictionData
+cldll_func_t.pReadDemoBuffer = Demo_ReadBuffer
+cldll_func_t.pConnectionlessPacket = HUD_ConnectionlessPacket
+cldll_func_t.pGetHullBounds = HUD_GetHullBounds
+cldll_func_t.pHudFrame = HUD_Frame
+cldll_func_t.pKeyEvent = HUD_Key_Event
+cldll_func_t.pTempEntUpdate = HUD_TempEntUpdate
+cldll_func_t.pGetUserEntity = HUD_GetUserEntity
+cldll_func_t.pVoiceStatus = HUD_VoiceStatus
+cldll_func_t.pDirectorMessage = HUD_DirectorMessage
+cldll_func_t.pStudioInterface = HUD_GetStudioModelInterface
+cldll_func_t.pChatInputPosition = HUD_ChatInputPosition
+# pGetPlayerTeam / pClientFactory are in APIProxy.h but not present in the HLSDK cdll_int.cpp initializer used above.
+cldll_func_t.pGetPlayerTeam = HUD_GetPlayerTeam
+cldll_func_t.pClientFactory = ClientFactory
+
+# Server export function table: names from external/hlsdk/dlls/cbase.cpp gFunctionTable initializer.
+DLL_FUNCTIONS.pfnGameInit = GameDLLInit
+DLL_FUNCTIONS.pfnSpawn = DispatchSpawn
+DLL_FUNCTIONS.pfnThink = DispatchThink
+DLL_FUNCTIONS.pfnUse = DispatchUse
+DLL_FUNCTIONS.pfnTouch = DispatchTouch
+DLL_FUNCTIONS.pfnBlocked = DispatchBlocked
+DLL_FUNCTIONS.pfnKeyValue = DispatchKeyValue
+DLL_FUNCTIONS.pfnSave = DispatchSave
+DLL_FUNCTIONS.pfnRestore = DispatchRestore
+DLL_FUNCTIONS.pfnSetAbsBox = DispatchObjectCollsionBox
+DLL_FUNCTIONS.pfnSaveWriteFields = SaveWriteFields
+DLL_FUNCTIONS.pfnSaveReadFields = SaveReadFields
+DLL_FUNCTIONS.pfnSaveGlobalState = SaveGlobalState
+DLL_FUNCTIONS.pfnRestoreGlobalState = RestoreGlobalState
+DLL_FUNCTIONS.pfnResetGlobalState = ResetGlobalState
+DLL_FUNCTIONS.pfnClientConnect = ClientConnect
+DLL_FUNCTIONS.pfnClientDisconnect = ClientDisconnect
+DLL_FUNCTIONS.pfnClientKill = ClientKill
+DLL_FUNCTIONS.pfnClientPutInServer = ClientPutInServer
+DLL_FUNCTIONS.pfnClientCommand = ClientCommand
+DLL_FUNCTIONS.pfnClientUserInfoChanged = ClientUserInfoChanged
+DLL_FUNCTIONS.pfnServerActivate = ServerActivate
+DLL_FUNCTIONS.pfnServerDeactivate = ServerDeactivate
+DLL_FUNCTIONS.pfnPlayerPreThink = PlayerPreThink
+DLL_FUNCTIONS.pfnPlayerPostThink = PlayerPostThink
+DLL_FUNCTIONS.pfnStartFrame = StartFrame
+DLL_FUNCTIONS.pfnParmsNewLevel = ParmsNewLevel
+DLL_FUNCTIONS.pfnParmsChangeLevel = ParmsChangeLevel
+DLL_FUNCTIONS.pfnGetGameDescription = GetGameDescription
+DLL_FUNCTIONS.pfnPlayerCustomization = PlayerCustomization
+DLL_FUNCTIONS.pfnSpectatorConnect = SpectatorConnect
+DLL_FUNCTIONS.pfnSpectatorDisconnect = SpectatorDisconnect
+DLL_FUNCTIONS.pfnSpectatorThink = SpectatorThink
+DLL_FUNCTIONS.pfnSys_Error = Sys_Error
+DLL_FUNCTIONS.pfnPM_Move = PM_Move
+DLL_FUNCTIONS.pfnPM_Init = PM_Init
+DLL_FUNCTIONS.pfnPM_FindTextureType = PM_FindTextureType
+DLL_FUNCTIONS.pfnSetupVisibility = SetupVisibility
+DLL_FUNCTIONS.pfnUpdateClientData = UpdateClientData
+DLL_FUNCTIONS.pfnAddToFullPack = AddToFullPack
+DLL_FUNCTIONS.pfnCreateBaseline = CreateBaseline
+DLL_FUNCTIONS.pfnRegisterEncoders = RegisterEncoders
+DLL_FUNCTIONS.pfnGetWeaponData = GetWeaponData
+DLL_FUNCTIONS.pfnCmdStart = CmdStart
+DLL_FUNCTIONS.pfnCmdEnd = CmdEnd
+DLL_FUNCTIONS.pfnConnectionlessPacket = ConnectionlessPacket
+DLL_FUNCTIONS.pfnGetHullBounds = GetHullBounds
+DLL_FUNCTIONS.pfnCreateInstancedBaselines = CreateInstancedBaselines
+DLL_FUNCTIONS.pfnInconsistentFile = InconsistentFile
+DLL_FUNCTIONS.pfnAllowLagCompensation = AllowLagCompensation
+
+# New server export function table: names from external/hlsdk/dlls/cbase.cpp gNewDLLFunctions initializer.
+NEW_DLL_FUNCTIONS.pfnOnFreeEntPrivateData = OnFreeEntPrivateData
+NEW_DLL_FUNCTIONS.pfnGameShutdown = GameDLLShutdown
+
+# Bulk conventions shared by every table, kept as explicit rules so that the naming
+# scheme is visible instead of hidden in the generator.
+# The "pfn" prefix only marks a C function pointer; the callback is known by its plain
+# name (pfnSPR_Load -> SPR_Load). Add further prefix conventions here as glob rules -
+# the generator reports rules that never match, so dead conventions cannot pile up.
+*.pfn* = {strip:pfn}
+
+
+# ---------------------------------------------------------------------------
+[fieldTypes]
+# ---------------------------------------------------------------------------
+# <rawType>.<field> -> C# type, optionally guarded by "if <raw shape>".
+# The guard keeps hand-tuned layout changes honest: "Vector3" is only substituted
+# while the field really is a float[3] in the ABI.
+ref_params_t.vieworg = Vector3 if float[3]
+ref_params_t.viewangles = Vector3 if float[3]
+ref_params_t.forward = Vector3 if float[3]
+ref_params_t.right = Vector3 if float[3]
+ref_params_t.up = Vector3 if float[3]
+clientdata_t.origin = Vector3 if float[3]
+clientdata_t.velocity = Vector3 if float[3]
+# clientdata_t has no viewangles field - this entry was dead and was removed by the
+# unused-rule report kept by the generator.
+entity_state_t.origin = Vector3 if float[3]
+entity_state_t.angles = Vector3 if float[3]
+entity_state_t.velocity = Vector3 if float[3]
+entity_state_t.mins = Vector3 if float[3]
+entity_state_t.maxs = Vector3 if float[3]
+entity_state_t.startpos = Vector3 if float[3]
+entity_state_t.endpos = Vector3 if float[3]
+entvars_t.origin = Vector3 if float[3]
+entvars_t.oldorigin = Vector3 if float[3]
+entvars_t.velocity = Vector3 if float[3]
+entvars_t.basevelocity = Vector3 if float[3]
+entvars_t.clbasevelocity = Vector3 if float[3]
+entvars_t.movedir = Vector3 if float[3]
+entvars_t.angles = Vector3 if float[3]
+entvars_t.avelocity = Vector3 if float[3]
+entvars_t.punchangle = Vector3 if float[3]
+entvars_t.v_angle = Vector3 if float[3]
+entvars_t.endpos = Vector3 if float[3]
+entvars_t.startpos = Vector3 if float[3]
+entvars_t.absmin = Vector3 if float[3]
+entvars_t.absmax = Vector3 if float[3]
+entvars_t.mins = Vector3 if float[3]
+entvars_t.maxs = Vector3 if float[3]
+entvars_t.size = Vector3 if float[3]
+usercmd_t.viewangles = Vector3 if float[3]
+usercmd_t.impact_position = Vector3 if float[3]
+
+
+# ---------------------------------------------------------------------------
+[enumMembers]
+# ---------------------------------------------------------------------------
+# <rawType>.<MEMBER> -> member name. The raw member name is matched as written in
+# the C header (case sensitive). Example:
+# ALERT_TYPE.at_notice = Notice
+# ALERT_TYPE.at_error = Error
+
+
+# ---------------------------------------------------------------------------
+[params]
+# ---------------------------------------------------------------------------
+# <rawType>.<field>.<paramName|#index> -> parameter name.
+# C# does not accept parameter names inside a delegate*<...> type, so a renamed
+# parameter shows up in the generated XML documentation of the field (an extra
+# "Parameters: ..." line) rather than in the signature itself.
+# Use it to name unnamed parameters ("#0", "#1") or to clarify cryptic C names.
+# Example:
+# cldll_func_t.pIN_MouseEvent.#0 = mouseCode
+# cldll_func_t.pHudRedrawFunc.time = time
+
+
+# ---------------------------------------------------------------------------
+[paramTypes]
+# ---------------------------------------------------------------------------
+# <rawType>.<field>.<paramName|#index> -> parameter C# type.
+# Use this when a callback parameter should be a friendlier type than the raw ABI
+# type, e.g. an enum instead of int, or a struct pointer instead of void*.
+# Example:
+# DLL_FUNCTIONS.pfnKeyValue.pKVD = ref KeyValueData
+
+
+# ---------------------------------------------------------------------------
+[emit]
+# ---------------------------------------------------------------------------
+# <rawType> -> emission strategy used by the humanized layer.
+#   struct            default: emit a plain struct
+#   skip              do not emit in the humanized layer (use the raw ABI type)
+#   union-anim-value  hand-tuned anonymous-union layout (studio anim values)
+# The decision lives here so that adding another special layout is a one-line
+# change in this file plus a named strategy in HumanizerEmitStrategies.
+mstudioanimvalue_t = union-anim-value
