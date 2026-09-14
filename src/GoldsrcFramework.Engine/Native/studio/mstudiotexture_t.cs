@@ -22,7 +22,7 @@ public unsafe struct mstudiotexture_t
     /// <remarks>
     /// Original: int flags;
     /// </remarks>
-    public int flags;
+    public StudioTextureFlags flags;
     /// <remarks>
     /// Original: int width;
     /// </remarks>

@@ -1549,7 +1549,7 @@ public unsafe struct mstudioanim_t
 public unsafe struct mstudioanimvalue_t
 {
     // Original: struct { byte valid; byte total; } num;
-    public __Anonymous24457708 num;
+    public __Anonymous_studio_243 num;
     // Original: short value;
     public short value;
 }
@@ -3589,7 +3589,7 @@ public unsafe struct cache_user_t
 
 // Original: struct { byte valid; byte total; } num;
 [StructLayout(LayoutKind.Sequential)]
-public unsafe struct __Anonymous24457708
+public unsafe struct __Anonymous_studio_243
 {
     // Original: byte valid;
     public byte valid;
@@ -4144,19 +4144,13 @@ public unsafe struct mtexinfo_t
     public int flags;
 }
 
-// Original: struct msurface_s { int visframe; // should be drawn when node is crossed int dlightframe; // last frame the surface was checked by an animated light int dlightbits;	 // dynamically generated. Indicates if the surface illumination // is ...
+// Original: struct msurface_s { int visframe; // should be drawn when node is crossed mplane_t* plane; // pointer to shared plane int flags;		 // see SURF_ #defines int firstedge; // look up in model->surfedges[], negative numbers int numedges;  // ...
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct msurface_t
 {
     // should be drawn when node is crossed
     // Original: int visframe; // should be drawn when node is crossed
     public int visframe;
-    // last frame the surface was checked by an animated light
-    // Original: int dlightframe; // last frame the surface was checked by an animated light
-    public int dlightframe;
-    // dynamically generated. Indicates if the surface illumination
-    // Original: int dlightbits;	 // dynamically generated. Indicates if the surface illumination
-    public int dlightbits;
     // pointer to shared plane
     // Original: mplane_t* plane; // pointer to shared plane
     public mplane_t* plane;
@@ -4169,23 +4163,42 @@ public unsafe struct msurface_t
     // are backwards edges
     // Original: int numedges;  // are backwards edges
     public int numedges;
-    // surface generation data
-    // Original: struct surfcache_s* cachespots[MIPLEVELS];
-    public InlineArray4<surfcache_s_ptr> cachespots;
-    // smallest s/t position on the surface.
-    // Original: short texturemins[2]; // smallest s/t position on the surface.
+    // Original: short texturemins[2];
     public InlineArray2<short> texturemins;
-    // ?? s/t texture size, 1..256 for all non-sky surfaces
-    // Original: short extents[2];	  // ?? s/t texture size, 1..256 for all non-sky surfaces
+    // Original: short extents[2];
     public InlineArray2<short> extents;
+    // gl lightmap coordinates
+    // Original: int light_s, light_t; // gl lightmap coordinates
+    public int light_s;
+    // gl lightmap coordinates
+    // Original: int light_s, light_t; // gl lightmap coordinates
+    public int light_t;
+    // multiple if warped
+    // Original: void* polys; // multiple if warped
+    public void* polys;
+    // Original: struct msurface_s* texturechain;
+    public msurface_t* texturechain;
     // Original: mtexinfo_t* texinfo;
     public mtexinfo_t* texinfo;
-    // index into d_lightstylevalue[] for animated lights
-    // Original: byte styles[MAXLIGHTMAPS]; // index into d_lightstylevalue[] for animated lights
+    // last frame the surface was checked by an animated light
+    // Original: int dlightframe; // last frame the surface was checked by an animated light
+    public int dlightframe;
+    // dynamically generated. Indicates if the surface illumination
+    // Original: int dlightbits;	 // dynamically generated. Indicates if the surface illumination
+    public int dlightbits;
+    // is modified by an animated light.
+    // Original: int lightmaptexturenum;
+    public int lightmaptexturenum;
+    // Original: byte styles[MAXLIGHTMAPS];
     public InlineArray4<byte> styles;
-    // no one surface can be effected by more than 4
-    // animated lights.
-    // Original: color24* samples;
+    // values currently used in lightmap
+    // Original: int cached_light[MAXLIGHTMAPS]; // values currently used in lightmap
+    public InlineArray4<int> cached_light;
+    // pointer to surface extradata (was cached_dlight)
+    // Original: void* info;				// pointer to surface extradata (was cached_dlight)
+    public void* info;
+    // note: this is the actual lightmap data for this surface
+    // Original: color24* samples; // note: this is the actual lightmap data for this surface
     public color24* samples;
     // Original: decal_t* pdecals;
     public decal_t* pdecals;
@@ -4595,14 +4608,6 @@ public unsafe struct plane_t
     public float dist;
 }
 
-// Source: external/hlsdk/common/com_model.h only uses struct surfcache_s*.
-// Public HLSDK does not expose layout.
-// Original: struct surfcache_s { };
-[StructLayout(LayoutKind.Sequential)]
-public unsafe struct surfcache_s
-{
-}
-
 // JAY: Compress this as much as possible
 // Original: struct decal_s { decal_t* pnext;		  // linked list for each surface msurface_t* psurface; // Surface id for persistence / unlinking short dx;			  // Offsets into surface texture (in texture coordinates, so we don't need floats) short dy;...
 [StructLayout(LayoutKind.Sequential)]
@@ -4666,9 +4671,6 @@ public enum resourcetype_t
 
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct mnode_t_ptr { public mnode_t* Value; }
-
-[StructLayout(LayoutKind.Sequential)]
-public unsafe struct surfcache_s_ptr { public surfcache_s* Value; }
 
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct _SDL_iconv_t { }

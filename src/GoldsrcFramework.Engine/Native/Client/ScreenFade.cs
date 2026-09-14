@@ -74,6 +74,6 @@ public unsafe struct screenfade_t
     /// <remarks>
     /// Original: int fadeFlags;						 // Fading flags
     /// </remarks>
-    public int fadeFlags;
+    public ScreenFadeFlags fadeFlags;
 }
 

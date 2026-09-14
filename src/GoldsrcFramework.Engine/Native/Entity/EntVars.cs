@@ -188,11 +188,11 @@ public unsafe struct entvars_t
     /// <remarks>
     /// Original: int movetype;
     /// </remarks>
-    public int movetype;
+    public MoveType movetype;
     /// <remarks>
     /// Original: int solid;
     /// </remarks>
-    public int solid;
+    public SolidType solid;
     /// <remarks>
     /// Original: int skin;
     /// </remarks>
@@ -207,7 +207,7 @@ public unsafe struct entvars_t
     /// <remarks>
     /// Original: int effects;
     /// </remarks>
-    public int effects;
+    public EntityEffects effects;
     /// <summary>
     /// % of "normal" gravity
     /// </summary>
@@ -320,7 +320,7 @@ public unsafe struct entvars_t
     /// <remarks>
     /// Original: int deadflag;
     /// </remarks>
-    public int deadflag;
+    public DeadState deadflag;
     /// <summary>
     /// eye position
     /// </summary>
@@ -373,7 +373,7 @@ public unsafe struct entvars_t
     /// <remarks>
     /// Original: int flags;
     /// </remarks>
-    public int flags;
+    public EntityFlags flags;
     /// <summary>
     /// lowbyte topcolor, highbyte bottomcolor
     /// </summary>

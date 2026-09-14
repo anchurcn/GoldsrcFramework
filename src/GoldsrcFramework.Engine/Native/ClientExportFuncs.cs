@@ -119,7 +119,7 @@ public unsafe struct ClientExportFuncs
     /// Original: HUD_ADDENTITY_FUNC pAddEntity;
     /// Alias: typedef int (*HUD_ADDENTITY_FUNC)(int type, struct cl_entity_s* ent, const char* modelname);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<int, cl_entity_t*, NChar*, int> HUD_AddEntity;
+    public delegate* unmanaged[Cdecl]<EntityType, cl_entity_t*, NChar*, int> HUD_AddEntity;
     /// <remarks>
     /// Original: HUD_CREATEENTITIES_FUNC pCreateEntities;
     /// Alias: typedef void (*HUD_CREATEENTITIES_FUNC)(void);

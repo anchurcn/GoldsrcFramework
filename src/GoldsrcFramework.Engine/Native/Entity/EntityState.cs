@@ -75,7 +75,7 @@ public unsafe struct entity_state_t
     /// <remarks>
     /// Original: int effects;
     /// </remarks>
-    public int effects;
+    public EntityEffects effects;
     /// <remarks>
     /// Original: float scale;
     /// </remarks>
@@ -83,7 +83,7 @@ public unsafe struct entity_state_t
     /// <remarks>
     /// Original: byte eflags;
     /// </remarks>
-    public byte eflags;
+    public EntityStateFlags eflags;
     /// <summary>
     /// Render information
     /// </summary>
@@ -106,7 +106,7 @@ public unsafe struct entity_state_t
     /// <remarks>
     /// Original: int movetype;
     /// </remarks>
-    public int movetype;
+    public MoveType movetype;
     /// <remarks>
     /// Original: float animtime;
     /// </remarks>

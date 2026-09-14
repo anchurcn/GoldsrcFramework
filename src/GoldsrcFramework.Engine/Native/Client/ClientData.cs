@@ -31,7 +31,7 @@ public unsafe struct clientdata_t
     /// <remarks>
     /// Original: int flags;
     /// </remarks>
-    public int flags;
+    public EntityFlags flags;
     /// <remarks>
     /// Original: int waterlevel;
     /// </remarks>
@@ -122,7 +122,7 @@ public unsafe struct clientdata_t
     /// <remarks>
     /// Original: int deadflag;
     /// </remarks>
-    public int deadflag;
+    public DeadState deadflag;
     /// <remarks>
     /// Original: char physinfo[MAX_PHYSINFO_STRING];
     /// </remarks>

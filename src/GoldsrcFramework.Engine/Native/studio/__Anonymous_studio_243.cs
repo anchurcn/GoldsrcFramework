@@ -10,7 +10,7 @@ namespace GoldsrcFramework.Engine.Native;
 /// Original: struct { byte valid; byte total; } num;
 /// </remarks>
 [StructLayout(LayoutKind.Sequential)]
-public unsafe struct __Anonymous24457708
+public unsafe struct __Anonymous_studio_243
 {
     /// <remarks>
     /// Original: byte valid;

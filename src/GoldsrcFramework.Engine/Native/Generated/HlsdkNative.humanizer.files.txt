@@ -51,6 +51,7 @@ eiface/FORCE_TYPE.cs
 eiface/LEVELLIST.cs
 eiface/PRINT_TYPE.cs
 eiface/TraceResult.cs
+EngineEnums.cs
 Entity/Edict.cs
 Entity/EntityState.cs
 Entity/EntVars.cs
@@ -59,7 +60,6 @@ entity_state/local_state_t.cs
 event_api/event_api_t.cs
 event_args/event_args_t.cs
 HlsdkSupplementalTypes/delta_s.cs
-HlsdkSupplementalTypes/surfcache_s.cs
 Input/UserCmd.cs
 ivoicetweak/IVoiceTweak.cs
 ivoicetweak/VoiceTweakControl.cs
@@ -107,7 +107,7 @@ studio/mstudioseqdesc_t.cs
 studio/mstudioseqgroup_t.cs
 studio/mstudiotexture_t.cs
 studio/studiohdr_t.cs
-studio/__Anonymous24457708.cs
+studio/__Anonymous_studio_243.cs
 studio_event/mstudioevent_t.cs
 Text/ClientTextMessage.cs
 Text/SentenceEntry.cs

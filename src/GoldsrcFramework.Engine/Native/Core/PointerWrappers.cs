@@ -9,6 +9,3 @@ namespace GoldsrcFramework.Engine.Native;
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct mnode_t_ptr { public mnode_t* Value; }
 
-[StructLayout(LayoutKind.Sequential)]
-public unsafe struct surfcache_s_ptr { public surfcache_s* Value; }
-

@@ -81,7 +81,7 @@ public unsafe struct physent_t
     /// <remarks>
     /// Original: int solid;		// Triggers and func_door type WATER brushes are SOLID_NOT
     /// </remarks>
-    public int solid;
+    public SolidType solid;
     /// <summary>
     /// BSP Contents for such things like fun_door water brushes.
     /// </summary>
@@ -118,7 +118,7 @@ public unsafe struct physent_t
     /// <remarks>
     /// Original: int movetype;
     /// </remarks>
-    public int movetype;
+    public MoveType movetype;
     /// <remarks>
     /// Original: int takedamage;
     /// </remarks>

@@ -164,14 +164,14 @@ public unsafe struct playermove_t
     /// <remarks>
     /// Original: int effects; // MUZZLE FLASH, e.g.
     /// </remarks>
-    public int effects;
+    public EntityEffects effects;
     /// <summary>
     /// FL_ONGROUND, FL_DUCKING, etc.
     /// </summary>
     /// <remarks>
     /// Original: int flags;	   // FL_ONGROUND, FL_DUCKING, etc.
     /// </remarks>
-    public int flags;
+    public EntityFlags flags;
     /// <summary>
     /// 0 = regular player hull, 1 = ducked player hull, 2 = point hull
     /// </summary>
@@ -214,7 +214,7 @@ public unsafe struct playermove_t
     /// <remarks>
     /// Original: int deadflag;
     /// </remarks>
-    public int deadflag;
+    public DeadState deadflag;
     /// <summary>
     /// Should we use spectator physics model?
     /// </summary>
@@ -228,7 +228,7 @@ public unsafe struct playermove_t
     /// <remarks>
     /// Original: int movetype;  // Our movement type, NOCLIP, WALK, FLY
     /// </remarks>
-    public int movetype;
+    public MoveType movetype;
     /// <remarks>
     /// Original: int onground;
     /// </remarks>

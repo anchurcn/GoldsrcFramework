@@ -112,7 +112,7 @@ public unsafe interface IClientExportFuncs
     /// <summary>
     /// Add entity to render list
     /// </summary>
-    int HUD_AddEntity(int type, cl_entity_t* ent, NChar* modelname);
+    int HUD_AddEntity(EntityType type, cl_entity_t* ent, NChar* modelname);
 
     /// <summary>
     /// Create entities

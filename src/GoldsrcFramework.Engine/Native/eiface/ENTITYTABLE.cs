@@ -48,7 +48,7 @@ public unsafe struct ENTITYTABLE
     /// <remarks>
     /// Original: int flags;			// This could be a short -- bit mask of transitions that this entity is in the PVS of
     /// </remarks>
-    public int flags;
+    public EntityTableFlags flags;
     /// <summary>
     /// entity class name
     /// </summary>

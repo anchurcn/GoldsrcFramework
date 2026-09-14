@@ -7,7 +7,7 @@ using NativeInterop;
 namespace GoldsrcFramework.Engine.Native;
 
 /// <remarks>
-/// Original: struct msurface_s { int visframe; // should be drawn when node is crossed int dlightframe; // last frame the surface was checked by an animated light int dlightbits;	 // dynamically generated. Indicates if the surface illumination // is ...
+/// Original: struct msurface_s { int visframe; // should be drawn when node is crossed mplane_t* plane; // pointer to shared plane int flags;		 // see SURF_ #defines int firstedge; // look up in model-&gt;surfedges[], negative numbers int numedges;  // ...
 /// </remarks>
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct msurface_t
@@ -19,20 +19,6 @@ public unsafe struct msurface_t
     /// Original: int visframe; // should be drawn when node is crossed
     /// </remarks>
     public int visframe;
-    /// <summary>
-    /// last frame the surface was checked by an animated light
-    /// </summary>
-    /// <remarks>
-    /// Original: int dlightframe; // last frame the surface was checked by an animated light
-    /// </remarks>
-    public int dlightframe;
-    /// <summary>
-    /// dynamically generated. Indicates if the surface illumination
-    /// </summary>
-    /// <remarks>
-    /// Original: int dlightbits;	 // dynamically generated. Indicates if the surface illumination
-    /// </remarks>
-    public int dlightbits;
     /// <summary>
     /// pointer to shared plane
     /// </summary>
@@ -61,44 +47,87 @@ public unsafe struct msurface_t
     /// Original: int numedges;  // are backwards edges
     /// </remarks>
     public int numedges;
-    /// <summary>
-    /// surface generation data
-    /// </summary>
     /// <remarks>
-    /// Original: struct surfcache_s* cachespots[MIPLEVELS];
-    /// </remarks>
-    public InlineArray4<surfcache_s_ptr> cachespots;
-    /// <summary>
-    /// smallest s/t position on the surface.
-    /// </summary>
-    /// <remarks>
-    /// Original: short texturemins[2]; // smallest s/t position on the surface.
+    /// Original: short texturemins[2];
     /// </remarks>
     public InlineArray2<short> texturemins;
-    /// <summary>
-    /// ?? s/t texture size, 1..256 for all non-sky surfaces
-    /// </summary>
     /// <remarks>
-    /// Original: short extents[2];	  // ?? s/t texture size, 1..256 for all non-sky surfaces
+    /// Original: short extents[2];
     /// </remarks>
     public InlineArray2<short> extents;
+    /// <summary>
+    /// gl lightmap coordinates
+    /// </summary>
+    /// <remarks>
+    /// Original: int light_s, light_t; // gl lightmap coordinates
+    /// </remarks>
+    public int light_s;
+    /// <summary>
+    /// gl lightmap coordinates
+    /// </summary>
+    /// <remarks>
+    /// Original: int light_s, light_t; // gl lightmap coordinates
+    /// </remarks>
+    public int light_t;
+    /// <summary>
+    /// multiple if warped
+    /// </summary>
+    /// <remarks>
+    /// Original: void* polys; // multiple if warped
+    /// </remarks>
+    public void* polys;
+    /// <remarks>
+    /// Original: struct msurface_s* texturechain;
+    /// </remarks>
+    public msurface_t* texturechain;
     /// <remarks>
     /// Original: mtexinfo_t* texinfo;
     /// </remarks>
     public mtexinfo_t* texinfo;
     /// <summary>
-    /// index into d_lightstylevalue[] for animated lights
+    /// last frame the surface was checked by an animated light
     /// </summary>
     /// <remarks>
-    /// Original: byte styles[MAXLIGHTMAPS]; // index into d_lightstylevalue[] for animated lights
+    /// Original: int dlightframe; // last frame the surface was checked by an animated light
+    /// </remarks>
+    public int dlightframe;
+    /// <summary>
+    /// dynamically generated. Indicates if the surface illumination
+    /// </summary>
+    /// <remarks>
+    /// Original: int dlightbits;	 // dynamically generated. Indicates if the surface illumination
+    /// </remarks>
+    public int dlightbits;
+    /// <summary>
+    /// is modified by an animated light.
+    /// </summary>
+    /// <remarks>
+    /// Original: int lightmaptexturenum;
+    /// </remarks>
+    public int lightmaptexturenum;
+    /// <remarks>
+    /// Original: byte styles[MAXLIGHTMAPS];
     /// </remarks>
     public InlineArray4<byte> styles;
     /// <summary>
-    /// no one surface can be effected by more than 4
-    /// animated lights.
+    /// values currently used in lightmap
     /// </summary>
     /// <remarks>
-    /// Original: color24* samples;
+    /// Original: int cached_light[MAXLIGHTMAPS]; // values currently used in lightmap
+    /// </remarks>
+    public InlineArray4<int> cached_light;
+    /// <summary>
+    /// pointer to surface extradata (was cached_dlight)
+    /// </summary>
+    /// <remarks>
+    /// Original: void* info;				// pointer to surface extradata (was cached_dlight)
+    /// </remarks>
+    public void* info;
+    /// <summary>
+    /// note: this is the actual lightmap data for this surface
+    /// </summary>
+    /// <remarks>
+    /// Original: color24* samples; // note: this is the actual lightmap data for this surface
     /// </remarks>
     public color24* samples;
     /// <remarks>

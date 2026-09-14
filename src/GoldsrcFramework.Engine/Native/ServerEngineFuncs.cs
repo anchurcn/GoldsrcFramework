@@ -126,7 +126,7 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: int (*pfnWalkMove)(edict_t* ent, float yaw, float dist, int iMode);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<edict_t*, float, float, int, int> WalkMove;
+    public delegate* unmanaged[Cdecl]<edict_t*, float, float, WalkMoveMode, int> WalkMove;
     /// <remarks>
     /// Original: void (*pfnSetOrigin)(edict_t* e, const float* rgflOrigin);
     /// </remarks>
@@ -137,11 +137,11 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: void (*pfnEmitSound)(edict_t* entity, int channel, const char* sample, /*int*/ float volume, float attenuation, int fFlags, int pitch);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<edict_t*, int, NChar*, float, float, int, int, void> EmitSound;
+    public delegate* unmanaged[Cdecl]<edict_t*, SoundChannel, NChar*, float, float, int, Pitch, void> EmitSound;
     /// <remarks>
     /// Original: void (*pfnEmitAmbientSound)(edict_t* entity, float* pos, const char* samp, float vol, float attenuation, int fFlags, int pitch);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<edict_t*, float*, NChar*, float, float, int, int, void> EmitAmbientSound;
+    public delegate* unmanaged[Cdecl]<edict_t*, float*, NChar*, float, float, int, Pitch, void> EmitAmbientSound;
     /// <remarks>
     /// Original: void (*pfnTraceLine)(const float* v1, const float* v2, int fNoMonsters, edict_t* pentToSkip, TraceResult* ptr);
     /// </remarks>
@@ -205,7 +205,7 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: void (*pfnMessageBegin)(int msg_dest, int msg_type, const float* pOrigin, edict_t* ed);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<int, int, float*, edict_t*, void> MessageBegin;
+    public delegate* unmanaged[Cdecl]<MessageDestination, int, float*, edict_t*, void> MessageBegin;
     /// <remarks>
     /// Original: void (*pfnMessageEnd)();
     /// </remarks>

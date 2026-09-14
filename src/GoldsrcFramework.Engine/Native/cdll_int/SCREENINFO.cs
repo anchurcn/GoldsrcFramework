@@ -27,7 +27,7 @@ public unsafe struct SCREENINFO
     /// <remarks>
     /// Original: int iFlags;
     /// </remarks>
-    public int iFlags;
+    public ScreenInfoFlags iFlags;
     /// <remarks>
     /// Original: int iCharHeight;
     /// </remarks>
