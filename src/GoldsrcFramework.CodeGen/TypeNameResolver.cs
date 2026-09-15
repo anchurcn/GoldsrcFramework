@@ -82,12 +82,25 @@ internal sealed class TypeNameResolver
         {
             if (CppAstHelpers.IsFunctionPointer(p.ElementType))
                 return Resolve(p.ElementType, field, humanized);
+
+            // A pointer type may carry its own [typeAliases] entry, keyed by its C spelling
+            // ("char* = NCharPtr"). Without one, the element type name is used with a "*".
+            if (Substitution(CppAstHelpers.RawShape(p)) is { } pointerAlias)
+                return pointerAlias;
+
             return Resolve(p.ElementType, field, humanized) + "*";
         }
 
-        // Handle array type
+        // Handle array type. In a parameter position a C array has already decayed to a pointer,
+        // so the element's pointer alias applies here as well ("char x[16]" is a char*). Field
+        // arrays never reach this branch: the field emitters turn them into InlineArrayN<T>.
         if (type is CppArrayType a)
+        {
+            if (Substitution(CppAstHelpers.RawShape(a.ElementType) + "*") is { } decayedAlias)
+                return decayedAlias;
+
             return Resolve(a.ElementType, field, humanized) + "*";
+        }
 
         // Handle function type - recursively resolve parameters and return type
         if (type is CppFunctionType fn)

@@ -72,11 +72,17 @@ file = {header}/{name}.cs
 # ---------------------------------------------------------------------------
 # C type -> C# type, applied in both the raw ABI and the humanized layer.
 # A typedef listed here is not emitted as its own struct; it is substituted inline.
+# Keys are the type name as written in C; a pointer type may also be keyed by its full
+# C spelling ("char*"), which the resolver tries before falling back to "<element>*".
 # Entries the current header set never reaches are marked below. The generator lists
 # every unmatched entry after each run, which is how dead mappings are spotted.
 Vector = Vector3
 int = int
 char = NChar
+# NCharPtr is a pointer-sized blittable wrapper that makes "this is a native C string"
+# explicit instead of an ambiguous byte*/NChar*. It is layout-identical to char*, so the
+# substitution is ABI neutral; "char**" falls out of this as "NCharPtr*".
+char* = NCharPtr
 byte = byte
 bool = Bool1Byte          # unused-ok: not reached by the current header set
 int32 = int
