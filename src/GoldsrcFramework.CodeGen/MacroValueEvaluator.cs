@@ -53,6 +53,19 @@ internal sealed class MacroValueEvaluator
         return value is null ? null : CSharpLiteral(value.Value);
     }
 
+    /// <summary>
+    /// Tries to resolve a macro to its integer value, for callers that need the number rather
+    /// than its C# literal form (for example deciding whether an enum's values are all single
+    /// bits). Same subset, and the same reasons on failure, as
+    /// <see cref="TryEvaluate(CppMacro, out string)"/>.
+    /// </summary>
+    public bool TryEvaluateValue(CppMacro macro, out long value, out string reason)
+    {
+        var resolved = TryEvaluateTokens(macro.Tokens, macro, 0, out reason);
+        value = resolved ?? 0;
+        return resolved is not null;
+    }
+
     long? TryEvaluateTokens(List<CppToken> tokens, CppMacro macro, int depth, out string reason)
     {
         reason = string.Empty;

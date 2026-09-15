@@ -52,7 +52,7 @@ public unsafe interface IClientExportFuncs
     /// <summary>
     /// Get texture type for player movement
     /// </summary>
-    NChar HUD_PlayerMoveTexture(NChar* name);
+    NChar HUD_PlayerMoveTexture(NCharPtr name);
 
     /// <summary>
     /// Activate mouse input
@@ -97,7 +97,7 @@ public unsafe interface IClientExportFuncs
     /// <summary>
     /// Find key button
     /// </summary>
-    kbutton_t* KB_Find(NChar* name);
+    kbutton_t* KB_Find(NCharPtr name);
 
     /// <summary>
     /// Camera think function
@@ -112,7 +112,7 @@ public unsafe interface IClientExportFuncs
     /// <summary>
     /// Add entity to render list
     /// </summary>
-    int HUD_AddEntity(EntityType type, cl_entity_t* ent, NChar* modelname);
+    int HUD_AddEntity(EntityType type, cl_entity_t* ent, NCharPtr modelname);
 
     /// <summary>
     /// Create entities
@@ -167,7 +167,7 @@ public unsafe interface IClientExportFuncs
     /// <summary>
     /// Handle connectionless packet
     /// </summary>
-    int HUD_ConnectionlessPacket(netadr_t* net_from, NChar* args, NChar* response_buffer, int* response_buffer_size);
+    int HUD_ConnectionlessPacket(netadr_t* net_from, NCharPtr args, NCharPtr response_buffer, int* response_buffer_size);
 
     /// <summary>
     /// Get hull bounds
@@ -182,7 +182,7 @@ public unsafe interface IClientExportFuncs
     /// <summary>
     /// Handle key events
     /// </summary>
-    int HUD_Key_Event(int eventcode, int keynum, NChar* pszCurrentBinding);
+    int HUD_Key_Event(int eventcode, int keynum, NCharPtr pszCurrentBinding);
 
     /// <summary>
     /// Update temporary entities

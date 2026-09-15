@@ -32,42 +32,42 @@ public unsafe struct sequenceCommandLine_s
     /// <remarks>
     /// Original: char* speakerName;						// Targetname of speaking entity
     /// </remarks>
-    public NChar* speakerName;
+    public NCharPtr speakerName;
     /// <summary>
     /// Targetname of entity being spoken to
     /// </summary>
     /// <remarks>
     /// Original: char* listenerName;						// Targetname of entity being spoken to
     /// </remarks>
-    public NChar* listenerName;
+    public NCharPtr listenerName;
     /// <summary>
     /// Name of sound file to play
     /// </summary>
     /// <remarks>
     /// Original: char* soundFileName;					// Name of sound file to play
     /// </remarks>
-    public NChar* soundFileName;
+    public NCharPtr soundFileName;
     /// <summary>
     /// Name of sentences.txt to play
     /// </summary>
     /// <remarks>
     /// Original: char* sentenceName;						// Name of sentences.txt to play
     /// </remarks>
-    public NChar* sentenceName;
+    public NCharPtr sentenceName;
     /// <summary>
     /// List of targetnames to fire
     /// </summary>
     /// <remarks>
     /// Original: char* fireTargetNames;					// List of targetnames to fire
     /// </remarks>
-    public NChar* fireTargetNames;
+    public NCharPtr fireTargetNames;
     /// <summary>
     /// List of targetnames to remove
     /// </summary>
     /// <remarks>
     /// Original: char* killTargetNames;					// List of targetnames to remove
     /// </remarks>
-    public NChar* killTargetNames;
+    public NCharPtr killTargetNames;
     /// <summary>
     /// Seconds 'till next command
     /// </summary>

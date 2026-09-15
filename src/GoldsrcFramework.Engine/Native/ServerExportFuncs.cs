@@ -58,11 +58,11 @@ public unsafe struct ServerExportFuncs
     /// <remarks>
     /// Original: void (*pfnSaveWriteFields)(SAVERESTOREDATA*, const char*, void*, TYPEDESCRIPTION*, int);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<SAVERESTOREDATA*, NChar*, void*, TYPEDESCRIPTION*, int, void> SaveWriteFields;
+    public delegate* unmanaged[Cdecl]<SAVERESTOREDATA*, NCharPtr, void*, TYPEDESCRIPTION*, int, void> SaveWriteFields;
     /// <remarks>
     /// Original: void (*pfnSaveReadFields)(SAVERESTOREDATA*, const char*, void*, TYPEDESCRIPTION*, int);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<SAVERESTOREDATA*, NChar*, void*, TYPEDESCRIPTION*, int, void> SaveReadFields;
+    public delegate* unmanaged[Cdecl]<SAVERESTOREDATA*, NCharPtr, void*, TYPEDESCRIPTION*, int, void> SaveReadFields;
     /// <remarks>
     /// Original: void (*pfnSaveGlobalState)(SAVERESTOREDATA*);
     /// </remarks>
@@ -78,7 +78,7 @@ public unsafe struct ServerExportFuncs
     /// <remarks>
     /// Original: qboolean (*pfnClientConnect)(edict_t* pEntity, const char* pszName, const char* pszAddress, char szRejectReason[128]);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<edict_t*, NChar*, NChar*, NChar*, qboolean> ClientConnect;
+    public delegate* unmanaged[Cdecl]<edict_t*, NCharPtr, NCharPtr, NCharPtr, qboolean> ClientConnect;
     /// <remarks>
     /// Original: void (*pfnClientDisconnect)(edict_t* pEntity);
     /// </remarks>
@@ -98,7 +98,7 @@ public unsafe struct ServerExportFuncs
     /// <remarks>
     /// Original: void (*pfnClientUserInfoChanged)(edict_t* pEntity, char* infobuffer);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<edict_t*, NChar*, void> ClientUserInfoChanged;
+    public delegate* unmanaged[Cdecl]<edict_t*, NCharPtr, void> ClientUserInfoChanged;
     /// <remarks>
     /// Original: void (*pfnServerActivate)(edict_t* pEdictList, int edictCount, int clientMax);
     /// </remarks>
@@ -133,7 +133,7 @@ public unsafe struct ServerExportFuncs
     /// <remarks>
     /// Original: const char* (*pfnGetGameDescription)();
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*> GetGameDescription;
+    public delegate* unmanaged[Cdecl]<NCharPtr> GetGameDescription;
     /// <summary>
     /// Notify dll about a player customization.
     /// </summary>
@@ -162,7 +162,7 @@ public unsafe struct ServerExportFuncs
     /// <remarks>
     /// Original: void (*pfnSys_Error)(const char* error_string);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, void> Sys_Error;
+    public delegate* unmanaged[Cdecl]<NCharPtr, void> Sys_Error;
     /// <remarks>
     /// Original: void (*pfnPM_Move)(struct playermove_s* ppmove, qboolean server);
     /// </remarks>
@@ -174,7 +174,7 @@ public unsafe struct ServerExportFuncs
     /// <remarks>
     /// Original: char (*pfnPM_FindTextureType)(const char* name);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar> PM_FindTextureType;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NChar> PM_FindTextureType;
     /// <remarks>
     /// Original: void (*pfnSetupVisibility)(struct edict_s* pViewEntity, struct edict_s* pClient, unsigned char** pvs, unsigned char** pas);
     /// </remarks>
@@ -214,7 +214,7 @@ public unsafe struct ServerExportFuncs
     /// <remarks>
     /// Original: int (*pfnConnectionlessPacket)(const struct netadr_s* net_from, const char* args, char* response_buffer, int* response_buffer_size);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<netadr_t*, NChar*, NChar*, int*, int> ConnectionlessPacket;
+    public delegate* unmanaged[Cdecl]<netadr_t*, NCharPtr, NCharPtr, int*, int> ConnectionlessPacket;
     /// <summary>
     /// Enumerates player hulls.  Returns 0 if the hull number doesn't exist, 1 otherwise
     /// </summary>
@@ -236,7 +236,7 @@ public unsafe struct ServerExportFuncs
     /// <remarks>
     /// Original: int (*pfnInconsistentFile)(const struct edict_s* player, const char* filename, char* disconnect_message);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<edict_t*, NChar*, NChar*, int> InconsistentFile;
+    public delegate* unmanaged[Cdecl]<edict_t*, NCharPtr, NCharPtr, int> InconsistentFile;
     /// <summary>
     /// The game .dll should return 1 if lag compensation should be allowed ( could also just set
     /// the sv_unlag cvar.

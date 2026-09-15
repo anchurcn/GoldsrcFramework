@@ -223,7 +223,7 @@ public unsafe struct efx_api_t
     /// <remarks>
     /// Original: int (*Draw_DecalIndexFromName)(char* name);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int> Draw_DecalIndexFromName;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int> Draw_DecalIndexFromName;
     /// <remarks>
     /// Original: void (*R_DecalShoot)(int textureIndex, int entity, int modelIndex, float* position, int flags);
     /// </remarks>

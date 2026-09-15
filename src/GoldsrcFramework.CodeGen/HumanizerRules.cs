@@ -67,6 +67,14 @@ internal sealed class MacroEnumOptions
     /// <summary>Optional documented origin of the macro group, used in remarks.</summary>
     public string? Note { get; init; }
 
+    /// <summary>
+    /// <c>[Flags]</c> request. <c>true</c> emits the attribute, <c>false</c> states explicitly
+    /// that the family is not a bit set, and <c>null</c> means the rule is silent. The silence
+    /// is meaningful: it is what lets the generator point out a family whose values all look
+    /// like single bits without deciding the attribute itself.
+    /// </summary>
+    public bool? Flags { get; init; }
+
     /// <summary>Ordinal of the rule that declared these options (stable emission order).</summary>
     public int Order { get; init; }
 
@@ -74,11 +82,19 @@ internal sealed class MacroEnumOptions
     public static MacroEnumOptions Parse(string value, int order, string location, List<string> problems)
     {
         string? typeName = null, file = null, strip = null, underlying = null, note = null;
+        bool? flags = null;
         foreach (var part in value.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
             var separator = part.IndexOf('=');
             if (separator < 0)
             {
+                // "flags" on its own is an option, not the enum name.
+                if (part.Equals("flags", StringComparison.OrdinalIgnoreCase))
+                {
+                    flags = true;
+                    continue;
+                }
+
                 if (typeName is not null)
                 {
                     problems.Add($"{location}: duplicate enum name \"{part}\" in [macroEnums] (already \"{typeName}\")");
@@ -97,7 +113,16 @@ internal sealed class MacroEnumOptions
                 case "strip": strip = optionValue; break;
                 case "underlying": underlying = optionValue; break;
                 case "note": note = optionValue; break;
-                default: problems.Add($"{location}: unknown [macroEnums] option \"{key}\" (expected enum name, file=, underlying=, strip=, note=)"); break;
+                case "flags":
+                    switch (optionValue.ToLowerInvariant())
+                    {
+                        case "" or "true" or "yes" or "1": flags = true; break;
+                        case "false" or "no" or "0": flags = false; break;
+                        default: problems.Add($"{location}: [macroEnums] option \"flags\" expects true or false, got \"{optionValue}\""); break;
+                    }
+
+                    break;
+                default: problems.Add($"{location}: unknown [macroEnums] option \"{key}\" (expected enum name, file=, underlying=, strip=, note=, flags)"); break;
             }
         }
 
@@ -111,6 +136,7 @@ internal sealed class MacroEnumOptions
             StripPrefix = string.IsNullOrEmpty(strip) ? null : strip,
             File = string.IsNullOrEmpty(file) ? null : file,
             Note = string.IsNullOrEmpty(note) ? null : note,
+            Flags = flags,
             Order = order,
         };
     }
@@ -322,6 +348,15 @@ internal sealed class HumanizerRules
                     && rule.MacroEnum.StripPrefix == first.MacroEnum.StripPrefix) continue;
                 _problems.Add($"{rule.Location}: [macroEnums] \"{rule.Pattern}\" targets enum \"{group.Key}\" with different options than {first.Location}" +
                               $" (file=\"{first.MacroEnum.File}\" underlying=\"{first.MacroEnum.UnderlyingType}\" strip=\"{first.MacroEnum.StripPrefix}\")");
+            }
+
+            // "flags" is tri-state, so only two rules that each answer it differently conflict;
+            // a rule that leaves it unstated is fine next to one that states it.
+            var stated = group.Where(r => r.MacroEnum!.Flags is not null).ToList();
+            if (stated.Select(r => r.MacroEnum!.Flags).Distinct().Count() > 1)
+            {
+                var answers = stated.Select(r => $"{r.Location} says flags={r.MacroEnum!.Flags!.Value.ToString().ToLowerInvariant()}");
+                _problems.Add($"[macroEnums] enum \"{group.Key}\" is declared both as [Flags] and as not: {string.Join(", ", answers)}");
             }
         }
     }

@@ -39,7 +39,7 @@ namespace GoldsrcFramework
         public static extern void HUD_PlayerMoveInit(playermove_t* ppmove);
 
         [DllImport(LegacyClientDll, CallingConvention = CallingConvention.Cdecl)]
-        public static extern sbyte HUD_PlayerMoveTexture(sbyte* name);
+        public static extern byte HUD_PlayerMoveTexture(NChar* name);
 
         [DllImport(LegacyClientDll, CallingConvention = CallingConvention.Cdecl)]
         public static extern void IN_ActivateMouse();
@@ -66,7 +66,7 @@ namespace GoldsrcFramework
         public static extern void CL_GetCameraOffsets(Vector3* ofs);
 
         [DllImport(LegacyClientDll, CallingConvention = CallingConvention.Cdecl)]
-        public static extern kbutton_t* KB_Find(sbyte* name);
+        public static extern kbutton_t* KB_Find(NChar* name);
 
         [DllImport(LegacyClientDll, CallingConvention = CallingConvention.Cdecl)]
         public static extern void CAM_Think();
@@ -75,7 +75,7 @@ namespace GoldsrcFramework
         public static extern void V_CalcRefdef(ref_params_t* pparams);
 
         [DllImport(LegacyClientDll, CallingConvention = CallingConvention.Cdecl)]
-        public static extern int HUD_AddEntity(int type, cl_entity_t* ent, sbyte* modelname);
+        public static extern int HUD_AddEntity(int type, cl_entity_t* ent, NChar* modelname);
 
         [DllImport(LegacyClientDll, CallingConvention = CallingConvention.Cdecl)]
         public static extern void HUD_CreateEntities();
@@ -108,7 +108,7 @@ namespace GoldsrcFramework
         public static extern void Demo_ReadBuffer(int size, byte* buffer);
 
         [DllImport(LegacyClientDll, CallingConvention = CallingConvention.Cdecl)]
-        public static extern int HUD_ConnectionlessPacket(netadr_t* net_from, sbyte* args, sbyte* response_buffer, int* response_buffer_size);
+        public static extern int HUD_ConnectionlessPacket(netadr_t* net_from, NChar* args, NChar* response_buffer, int* response_buffer_size);
 
         [DllImport(LegacyClientDll, CallingConvention = CallingConvention.Cdecl)]
         public static extern int HUD_GetHullBounds(int hullnumber, float* mins, float* maxs);

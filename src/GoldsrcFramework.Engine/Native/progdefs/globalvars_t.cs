@@ -127,7 +127,7 @@ public unsafe struct globalvars_t
     /// <remarks>
     /// Original: const char* pStringBase;
     /// </remarks>
-    public NChar* pStringBase;
+    public NCharPtr pStringBase;
     /// <remarks>
     /// Original: void* pSaveData;
     /// </remarks>

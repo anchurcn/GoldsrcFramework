@@ -198,7 +198,7 @@ namespace GoldsrcFramework
         }
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        private static uint LegacyFunctionFromName(NChar* pName)
+        private static uint LegacyFunctionFromName(NCharPtr pName)
         {
             if (pName == null)
                 return 0;
@@ -224,16 +224,16 @@ namespace GoldsrcFramework
         }
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        private static NChar* LegacyNameForFunction(uint function)
+        private static NCharPtr LegacyNameForFunction(uint function)
         {
             EnsureLegacyModuleLoaded();
 
             nuint address = function;
             if (_legacyFunctionToName.TryGetValue(address, out var namePtr))
-                return (NChar*)namePtr;
+                return NCharPtr.From(namePtr);
 
             Debug.WriteLine($"[LegacyServerInterop] Can't find address: 0x{function:X8}");
-            return null;
+            return NCharPtr.Null;
         }
 
         // DLL_FUNCTIONS 静态转发方法
@@ -257,10 +257,10 @@ namespace GoldsrcFramework
 
         public static void SetAbsBox(edict_t* pent) => LegacyServerApiPtr->DispatchObjectCollsionBox(pent);
 
-        public static void SaveWriteFields(SAVERESTOREDATA* pSaveData, NChar* pname, void* pBaseData, TYPEDESCRIPTION* pFields, int fieldCount)
+        public static void SaveWriteFields(SAVERESTOREDATA* pSaveData, NCharPtr pname, void* pBaseData, TYPEDESCRIPTION* pFields, int fieldCount)
             => LegacyServerApiPtr->SaveWriteFields(pSaveData, pname, pBaseData, pFields, fieldCount);
 
-        public static void SaveReadFields(SAVERESTOREDATA* pSaveData, NChar* pname, void* pBaseData, TYPEDESCRIPTION* pFields, int fieldCount)
+        public static void SaveReadFields(SAVERESTOREDATA* pSaveData, NCharPtr pname, void* pBaseData, TYPEDESCRIPTION* pFields, int fieldCount)
             => LegacyServerApiPtr->SaveReadFields(pSaveData, pname, pBaseData, pFields, fieldCount);
 
         public static void SaveGlobalState(SAVERESTOREDATA* pSaveData) => LegacyServerApiPtr->SaveGlobalState(pSaveData);
@@ -269,7 +269,7 @@ namespace GoldsrcFramework
 
         public static void ResetGlobalState() => LegacyServerApiPtr->ResetGlobalState();
 
-        public static qboolean ClientConnect(edict_t* pEntity, NChar* pszName, NChar* pszAddress, NChar* szRejectReason)
+        public static qboolean ClientConnect(edict_t* pEntity, NCharPtr pszName, NCharPtr pszAddress, NCharPtr szRejectReason)
             => LegacyServerApiPtr->ClientConnect(pEntity, pszName, pszAddress, szRejectReason);
 
         public static void ClientDisconnect(edict_t* pEntity) => LegacyServerApiPtr->ClientDisconnect(pEntity);
@@ -280,7 +280,7 @@ namespace GoldsrcFramework
 
         public static void ClientCommand(edict_t* pEntity) => LegacyServerApiPtr->ClientCommand(pEntity);
 
-        public static void ClientUserInfoChanged(edict_t* pEntity, NChar* infobuffer) => LegacyServerApiPtr->ClientUserInfoChanged(pEntity, infobuffer);
+        public static void ClientUserInfoChanged(edict_t* pEntity, NCharPtr infobuffer) => LegacyServerApiPtr->ClientUserInfoChanged(pEntity, infobuffer);
 
         public static void ServerActivate(edict_t* pEdictList, int edictCount, int clientMax) => LegacyServerApiPtr->ServerActivate(pEdictList, edictCount, clientMax);
 
@@ -296,7 +296,7 @@ namespace GoldsrcFramework
 
         public static void ParmsChangeLevel() => LegacyServerApiPtr->ParmsChangeLevel();
 
-        public static NChar* GetGameDescription() => LegacyServerApiPtr->GetGameDescription();
+        public static NCharPtr GetGameDescription() => LegacyServerApiPtr->GetGameDescription();
 
         public static void PlayerCustomization(edict_t* pEntity, customization_t* pCust) => LegacyServerApiPtr->PlayerCustomization(pEntity, pCust);
 
@@ -306,13 +306,13 @@ namespace GoldsrcFramework
 
         public static void SpectatorThink(edict_t* pEntity) => LegacyServerApiPtr->SpectatorThink(pEntity);
 
-        public static void Sys_Error(NChar* error_string) => LegacyServerApiPtr->Sys_Error(error_string);
+        public static void Sys_Error(NCharPtr error_string) => LegacyServerApiPtr->Sys_Error(error_string);
 
         public static void PM_Move(playermove_t* ppmove, qboolean server) => LegacyServerApiPtr->PM_Move(ppmove, server);
 
         public static void PM_Init(playermove_t* ppmove) => LegacyServerApiPtr->PM_Init(ppmove);
 
-        public static NChar PM_FindTextureType(NChar* name) => LegacyServerApiPtr->PM_FindTextureType(name);
+        public static NChar PM_FindTextureType(NCharPtr name) => LegacyServerApiPtr->PM_FindTextureType(name);
 
         public static void SetupVisibility(edict_t* pViewEntity, edict_t* pClient, byte** pvs, byte** pas)
             => LegacyServerApiPtr->SetupVisibility(pViewEntity, pClient, pvs, pas);
@@ -334,14 +334,14 @@ namespace GoldsrcFramework
 
         public static void CmdEnd(edict_t* player) => LegacyServerApiPtr->CmdEnd(player);
 
-        public static int ConnectionlessPacket(netadr_t* net_from, NChar* args, NChar* response_buffer, int* response_buffer_size)
+        public static int ConnectionlessPacket(netadr_t* net_from, NCharPtr args, NCharPtr response_buffer, int* response_buffer_size)
             => LegacyServerApiPtr->ConnectionlessPacket(net_from, args, response_buffer, response_buffer_size);
 
         public static int GetHullBounds(int hullnumber, float* mins, float* maxs) => LegacyServerApiPtr->GetHullBounds(hullnumber, mins, maxs);
 
         public static void CreateInstancedBaselines() => LegacyServerApiPtr->CreateInstancedBaselines();
 
-        public static int InconsistentFile(edict_t* player, NChar* filename, NChar* disconnect_message)
+        public static int InconsistentFile(edict_t* player, NCharPtr filename, NCharPtr disconnect_message)
             => LegacyServerApiPtr->InconsistentFile(player, filename, disconnect_message);
 
         public static int AllowLagCompensation() => LegacyServerApiPtr->AllowLagCompensation();
@@ -367,13 +367,13 @@ namespace GoldsrcFramework
             return 1;
         }
 
-        public static void CvarValue(edict_t* pEnt, NChar* value)
+        public static void CvarValue(edict_t* pEnt, NCharPtr value)
         {
             if (LegacyServerNewApiPtr != null && LegacyServerNewApiPtr->CvarValue != null)
                 LegacyServerNewApiPtr->CvarValue(pEnt, value);
         }
 
-        public static void CvarValue2(edict_t* pEnt, int requestID, NChar* cvarName, NChar* value)
+        public static void CvarValue2(edict_t* pEnt, int requestID, NCharPtr cvarName, NCharPtr value)
         {
             if (LegacyServerNewApiPtr != null && LegacyServerNewApiPtr->CvarValue2 != null)
                 LegacyServerNewApiPtr->CvarValue2(pEnt, requestID, cvarName, value);

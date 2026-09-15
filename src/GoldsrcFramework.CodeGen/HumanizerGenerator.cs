@@ -27,6 +27,13 @@ internal sealed class HumanizerGenerator
     /// <summary>Macro enum members that could not be emitted, with the reason.</summary>
     public List<string> MacroEnumProblems { get; } = [];
 
+    /// <summary>
+    /// Non-fatal observations about enum families whose values all look like single bits while
+    /// the rules did not say whether they are bit sets. The shape cannot decide it, so these
+    /// never fail the run and never change the emitted code.
+    /// </summary>
+    public List<string> MacroEnumHints { get; } = [];
+
     public HumanizerGenerator(RawAbiGenerator generator, CppCompilation compilation)
     {
         _generator = generator;
@@ -117,6 +124,14 @@ internal sealed class HumanizerGenerator
             if (!groups.TryGetValue(options.TypeName, out var group))
                 groups[options.TypeName] = group = new MacroEnumGroup(options, rule.Location);
 
+            // Aggregated rather than read off the group's first rule: rules are matched per
+            // macro, so the macro seen first need not be the one that carried the option.
+            if (options.Flags is { } groupFlags)
+            {
+                group.FlagsDeclared = true;
+                group.Flags |= groupFlags;
+            }
+
             var memberName = MemberName(options, macro.Name);
             if (string.IsNullOrEmpty(memberName))
             {
@@ -142,6 +157,10 @@ internal sealed class HumanizerGenerator
         {
             var options = group.Options;
             var members = new List<(string MemberName, string Literal)>();
+
+            // Values are only collected for families whose rules left the flags question open:
+            // they are what the "this looks like a bit set" hint is based on.
+            var values = group.FlagsDeclared ? null : new List<long>();
             foreach (var memberName in group.Order)
             {
                 var macro = group.Members[memberName];
@@ -152,6 +171,7 @@ internal sealed class HumanizerGenerator
                     continue;
                 }
 
+                if (values is not null && evaluator.TryEvaluateValue(macro, out var value, out _)) values.Add(value);
                 members.Add((memberName, literal));
             }
 
@@ -159,6 +179,12 @@ internal sealed class HumanizerGenerator
             {
                 MacroEnumProblems.Add($"{group.Source}: [{options.TypeName}] has no resolvable macro; enum not emitted.");
                 continue;
+            }
+
+            if (values is not null && LooksLikeBitSet(values))
+            {
+                MacroEnumHints.Add($"{group.Source}: [{options.TypeName}] has only single-bit values, but the rule does not say \"flags\"." +
+                                   " Add \" | flags\" if it is a bit set, or \" | flags=false\" if it is a selector like WALKMOVE_*/DAMAGE_*.");
             }
 
             var relativePath = ResolveMacroEnumPath(options);
@@ -187,6 +213,12 @@ internal sealed class HumanizerGenerator
 
         /// <summary>Where the grouping rule lives, used as the symbol source.</summary>
         public string Source { get; }
+
+        /// <summary>True when any feeding rule asked for <c>[Flags]</c>.</summary>
+        public bool Flags { get; set; }
+
+        /// <summary>True when some feeding rule stated the flags option either way.</summary>
+        public bool FlagsDeclared { get; set; }
 
         // Keys are member names, so the table says exactly what will be emitted; the macro
         // each name came from is kept next to it.
@@ -220,6 +252,26 @@ internal sealed class HumanizerGenerator
     static string GroupSourceHeader(MacroEnumGroup group) =>
         group.Members.Values.Select(m => m.SourceFile).FirstOrDefault(f => !string.IsNullOrWhiteSpace(f)) ?? string.Empty;
 
+    /// <summary>
+    /// True when every value is zero or a single bit and at least two of them are single bits -
+    /// the shape a bit set has. Used only to hint about a family the rules left undecided: the
+    /// shape alone cannot decide the attribute, because a two-bit set and a three-value selector
+    /// ("WALKMOVE_NORMAL/WORLDONLY/CHECKONLY") are indistinguishable from the numbers.
+    /// </summary>
+    static bool LooksLikeBitSet(List<long> values)
+    {
+        var singleBits = 0;
+        foreach (var value in values)
+        {
+            if (value == 0) continue;
+            if (value < 0) return false;                    // sign-bit masks and negative contents
+            if ((value & (value - 1)) != 0) return false;   // not a power of two
+            singleBits++;
+        }
+
+        return singleBits >= 2;
+    }
+
     void EmitMacroEnum(StringBuilder sb, MacroEnumGroup group, List<(string MemberName, string Literal)> members)
     {
         var options = group.Options;
@@ -237,6 +289,7 @@ internal sealed class HumanizerGenerator
             foreach (var comment in _generator.GetCommentLines(macro)) sb.Append("/// ").AppendLine(XmlEscape(comment));
         }
         sb.AppendLine("/// </remarks>");
+        if (group.Flags) sb.AppendLine("[Flags]");
         sb.Append("public enum ").Append(options.TypeName).Append(" : ").AppendLine(options.UnderlyingType).AppendLine("{");
         foreach (var (memberName, literal) in members)
             sb.Append("    ").Append(memberName).Append(" = ").Append(literal).AppendLine(",");

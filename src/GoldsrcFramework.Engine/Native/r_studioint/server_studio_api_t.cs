@@ -32,7 +32,7 @@ public unsafe struct server_studio_api_t
     /// <remarks>
     /// Original: void (*LoadCacheFile)(char* path, struct cache_user_s* cu);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, cache_user_t*, void> LoadCacheFile;
+    public delegate* unmanaged[Cdecl]<NCharPtr, cache_user_t*, void> LoadCacheFile;
     /// <summary>
     /// Retrieve pointer to studio model data block from a model
     /// </summary>

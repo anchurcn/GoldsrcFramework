@@ -140,7 +140,7 @@ namespace GoldsrcFramework
         }
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static NChar HUD_PlayerMoveTexture(NChar* name)
+        static NChar HUD_PlayerMoveTexture(NCharPtr name)
         {
             return s_client.HUD_PlayerMoveTexture(name);
         }
@@ -194,7 +194,7 @@ namespace GoldsrcFramework
         }
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static kbutton_t* KB_Find(NChar* name)
+        static kbutton_t* KB_Find(NCharPtr name)
         {
             return s_client.KB_Find(name);
         }
@@ -212,7 +212,7 @@ namespace GoldsrcFramework
         }
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static int HUD_AddEntity(int type, cl_entity_t* ent, NChar* modelname)
+        static int HUD_AddEntity(EntityType type, cl_entity_t* ent, NCharPtr modelname)
         {
             return s_client.HUD_AddEntity(type, ent, modelname);
         }
@@ -278,7 +278,7 @@ namespace GoldsrcFramework
         }
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static int HUD_ConnectionlessPacket(netadr_t* net_from, NChar* args, NChar* response_buffer, int* response_buffer_size)
+        static int HUD_ConnectionlessPacket(netadr_t* net_from, NCharPtr args, NCharPtr response_buffer, int* response_buffer_size)
         {
             return s_client.HUD_ConnectionlessPacket(net_from, args, response_buffer, response_buffer_size);
         }
@@ -296,7 +296,7 @@ namespace GoldsrcFramework
         }
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static int HUD_Key_Event(int down, int keynum, NChar* pszCurrentBinding)
+        static int HUD_Key_Event(int down, int keynum, NCharPtr pszCurrentBinding)
         {
             return s_client.HUD_Key_Event(down, keynum, pszCurrentBinding);
         }

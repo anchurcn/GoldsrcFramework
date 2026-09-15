@@ -15,7 +15,7 @@ public unsafe struct hud_player_info_t
     /// <remarks>
     /// Original: char* name;
     /// </remarks>
-    public NChar* name;
+    public NCharPtr name;
     /// <remarks>
     /// Original: short ping;
     /// </remarks>
@@ -38,7 +38,7 @@ public unsafe struct hud_player_info_t
     /// <remarks>
     /// Original: char* model;
     /// </remarks>
-    public NChar* model;
+    public NCharPtr model;
     /// <remarks>
     /// Original: short topcolor;
     /// </remarks>

@@ -206,17 +206,7 @@ public static unsafe class StudioExtensions
     /// Helper to convert fixed NChar array to string
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static string GetString(NativeInterop.NChar* ptr, int maxLength)
-    {
-        if (ptr == null) return string.Empty;
-
-        int length = 0;
-        byte* bytePtr = (byte*)ptr;
-        while (length < maxLength && bytePtr[length] != 0)
-            length++;
-
-        return System.Text.Encoding.UTF8.GetString(bytePtr, length);
-    }
+    public static string GetString(NativeInterop.NCharPtr ptr, int maxLength) => ptr.GetString(maxLength);
 
     /// <summary>
     /// Get name from studiohdr_t

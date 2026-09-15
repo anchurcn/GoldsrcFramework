@@ -423,9 +423,17 @@ mstudioanimvalue_t = union-anim-value
 #                       (default: MacroEnums/<EnumName>.cs)
 #     underlying=TYPE   C# underlying integer type (default: int)
 #     note=TEXT         free-form remark documented on the enum
+#     flags             emit the enum as [Flags] (also accepted as flags=true)
 #
 # Several rules may feed the same enum (one per header or prefix); they must agree
 # on strip/file/underlying, which is validated at load time.
+#
+# "flags" is deliberately never inferred. A family whose values are all single bits looks
+# exactly like a small closed set: WALKMOVE_* is {0,1,2} and DAMAGE_* is {0,1,2} and both are
+# selectors, while EFLAG_* is {1,2} and IS a bit set - the numbers cannot tell them apart.
+# So: write "flags" when the family is a bit set, "flags=false" when it is a selector (that
+# also records the decision), and nothing when undecided - in that last case the run prints a
+# Hint line naming families whose values all look like single bits.
 #
 # Value resolution understands the subset of C constant expressions the headers use for
 # flag families: integer literals (decimal, 0x, 0b, octal, with u/U/l/L suffixes),
@@ -454,17 +462,17 @@ mstudioanimvalue_t = union-anim-value
 
 # --- entity state and appearance -------------------------------------------
 ET_*            = EntityType         | strip=ET_          | file=EngineEnums.cs | note=Entity type handed to cldll_func_t.pAddEntity (HUD_AddEntity).
-FL_*            = EntityFlags        | strip=FL_          | file=EngineEnums.cs | note=entvars_t.flags bits. FL_DORMANT uses bit 31, so it is emitted as unchecked((int)0x80000000).
-EFLAG_*         = EntityStateFlags   | strip=EFLAG_       | file=EngineEnums.cs | underlying=byte | note=entity_state_t.eflags bits. The field is a byte in the ABI, so the enum is byte backed to keep the layout.
-EF_*            = EntityEffects      | strip=EF_          | file=EngineEnums.cs | note=cl_entity_t.curstate.effects bits.
+FL_*            = EntityFlags        | strip=FL_          | file=EngineEnums.cs | flags | note=entvars_t.flags bits. FL_DORMANT uses bit 31, so it is emitted as unchecked((int)0x80000000).
+EFLAG_*         = EntityStateFlags   | strip=EFLAG_       | file=EngineEnums.cs | underlying=byte | flags | note=entity_state_t.eflags bits. The field is a byte in the ABI, so the enum is byte backed to keep the layout.
+EF_*            = EntityEffects      | strip=EF_          | file=EngineEnums.cs | flags | note=cl_entity_t.curstate.effects bits.
 
 # --- movement, solidity and damage state -----------------------------------
 MOVETYPE_*      = MoveType           | strip=MOVETYPE_    | file=EngineEnums.cs | note=entvars_t.movetype. Values 1 and 2 are commented out in const.h.
-WALKMOVE_*      = WalkMoveMode       | strip=WALKMOVE_    | file=EngineEnums.cs | note=Mode argument of the entity walkmove API.
+WALKMOVE_*      = WalkMoveMode       | strip=WALKMOVE_    | file=EngineEnums.cs | flags=false | note=Mode argument of the entity walkmove API. Its values {0,1,2} have the shape of a two-bit set, so the decision is recorded here.
 SOLID_*         = SolidType          | strip=SOLID_       | file=EngineEnums.cs | note=entvars_t.solid.
 DEAD_*          = DeadState          | strip=DEAD_        | file=EngineEnums.cs | note=entvars_t.deadflag.
-DAMAGE_*        = DamageMode         | strip=DAMAGE_      | file=EngineEnums.cs | note=entvars_t.takedamage.
-DMG_*           = DamageType         | strip=DMG_         | file=EngineEnums.cs | note=Damage type bits taken by the damage API. The composite members (DMG_GIB_CORPSE, DMG_SHOWNHUD) combine several bits.
+DAMAGE_*        = DamageMode         | strip=DAMAGE_      | file=EngineEnums.cs | flags=false | note=entvars_t.takedamage. Like WALKMOVE_*, {0,1,2} selects a mode rather than combining bits.
+DMG_*           = DamageType         | strip=DMG_         | file=EngineEnums.cs | flags | note=Damage type bits taken by the damage API. The composite members (DMG_GIB_CORPSE, DMG_SHOWNHUD) combine several bits, so the family is not all single bits - which is exactly why "flags" cannot be inferred.
 # A different family that shares the DMG_ prefix: slot indices into the client health HUD's
 # damage image array. Listed before DMG_* so the longer pattern wins.
 DMG_IMAGE_*     = DamageImage        | strip=DMG_IMAGE_   | file=EngineEnums.cs | note=Damage indicator slot indices of the client health HUD (cl_dll/health.h). DMG_IMAGE_LIFE is a duration in seconds rather than a slot, and shares its value with DMG_IMAGE_COLD.
@@ -473,17 +481,17 @@ DMG_IMAGE_*     = DamageImage        | strip=DMG_IMAGE_   | file=EngineEnums.cs 
 # TE_* is the broadest pattern here: it also matches TE_EXPLFLAG_*, TEFIRE_FLAG_* and
 # TE_BOUNCE_*. The matcher prefers the longest literal pattern, so those three keep their own
 # enums and only the remaining members land in TempEntityType.
-TE_EXPLFLAG_*   = ExplosionFlags     | strip=TE_EXPLFLAG_ | file=EngineEnums.cs | note=Flags of the TE_EXPLOSION message.
-TEFIRE_FLAG_*   = FireFieldFlags     | strip=TEFIRE_FLAG_ | file=EngineEnums.cs | note=Flags of the TE_FIREFIELD message.
-TE_BOUNCE_*     = BounceSound        | strip=TE_BOUNCE_   | file=EngineEnums.cs | note=Sound selected by the TE_BREAKMODEL message.
+TE_EXPLFLAG_*   = ExplosionFlags     | strip=TE_EXPLFLAG_ | file=EngineEnums.cs | flags | note=Flags of the TE_EXPLOSION message. TE_EXPLFLAG_NONE is 0, which a bit set allows.
+TEFIRE_FLAG_*   = FireFieldFlags     | strip=TEFIRE_FLAG_ | file=EngineEnums.cs | flags | note=Flags of the TE_FIREFIELD message.
+TE_BOUNCE_*     = BounceSound        | strip=TE_BOUNCE_   | file=EngineEnums.cs | flags=false | note=Sound selected by the TE_BREAKMODEL message. Values {0,1,2}: a selector, not a bit set.
 TE_*            = TempEntityType     | strip=TE_          | file=EngineEnums.cs | note=Message id of a temporary entity effect (TE_* in const.h).
 
 # --- world contents and surface materials ----------------------------------
 CONTENTS_*      = Contents           | strip=CONTENTS_    | file=EngineEnums.cs | note=Contents of a leaf or point. The tab separated rows in const.h (CONTENTS_ORIGIN and friends) do not survive parsing, so this enum has fewer members than the header.
 CONTENT_*       = ContentType        | strip=CONTENT_     | file=EngineEnums.cs | note=The second contents family. Its values overlap CONTENTS_* but the names differ, so the two are separate enums.
-BREAK_*         = BreakMaterial      | strip=BREAK_       | file=EngineEnums.cs | note=Material of a breakable surface.
-BOUNCE_*        = BounceMaterial     | strip=BOUNCE_      | file=EngineEnums.cs | note=Bounce material. Several members alias the BREAK_* values.
-SF_TRAIN_*      = TrainSpawnFlags    | strip=SF_TRAIN_    | file=EngineEnums.cs | note=Spawnflags of func_train.
+BREAK_*         = BreakMaterial      | strip=BREAK_       | file=EngineEnums.cs | flags | note=Material of a breakable surface. BREAK_TYPEMASK is an aggregate mask rather than a single bit, so the family is not all single bits - another one "flags" cannot be inferred from.
+BOUNCE_*        = BounceMaterial     | strip=BOUNCE_      | file=EngineEnums.cs | flags | note=Bounce material. Several members alias the BREAK_* values, so the aggregate mask comes along.
+SF_TRAIN_*      = TrainSpawnFlags    | strip=SF_TRAIN_    | file=EngineEnums.cs | flags | note=Spawnflags of func_train.
 
 # --- sound and messages ----------------------------------------------------
 CHAN_*          = SoundChannel       | strip=CHAN_        | file=EngineEnums.cs | note=Channel passed to the sound API.
@@ -491,14 +499,14 @@ PITCH_*         = Pitch              | strip=PITCH_       | file=EngineEnums.cs 
 MSG_*           = MessageDestination | strip=MSG_         | file=EngineEnums.cs | note=Destination of a server message.
 
 # --- input and HUD ---------------------------------------------------------
-IN_*            = InputButtons       | strip=IN_          | file=EngineEnums.cs | note=usercmd_t button bits (common/in_buttons.h).
-HIDEHUD_*       = HideHudFlags       | strip=HIDEHUD_     | file=EngineEnums.cs | note=HUD elements hidden by the client (dlls/cdll_dll.h).
+IN_*            = InputButtons       | strip=IN_          | file=EngineEnums.cs | flags | note=usercmd_t button bits (common/in_buttons.h).
+HIDEHUD_*       = HideHudFlags       | strip=HIDEHUD_     | file=EngineEnums.cs | flags | note=HUD elements hidden by the client (dlls/cdll_dll.h).
 
 # --- engine headers --------------------------------------------------------
-SCRINFO_*       = ScreenInfoFlags    | strip=SCRINFO_     | file=EngineEnums.cs | note=SCREENINFO.iFlags bits (engine/cdll_int.h).
-FFADE_*         = ScreenFadeFlags    | strip=FFADE_       | file=EngineEnums.cs | note=screenfade_t.fadeFlags bits (engine/shake.h).
-BEAM_F*         = BeamFlags          | strip=BEAM_F       | file=EngineEnums.cs | note=Beam draw flags (engine/customentity.h). The prefix has no trailing underscore.
-FENTTABLE_*     = EntityTableFlags   | strip=FENTTABLE_   | file=EngineEnums.cs | note=ENTITYTABLE.flags bits (engine/eiface.h). The top bits need unchecked((int)0x...).
-STUDIO_NF_*     = StudioTextureFlags | strip=STUDIO_NF_   | file=EngineEnums.cs | note=mstudiotexture_t.flags bits (engine/studio.h).
-STUDIO_HAS_*    = StudioHasFlags     | strip=STUDIO_HAS_  | file=EngineEnums.cs | note=studiohdr_t feature bits (engine/studio.h).
-STUDIO_LOOPING  = StudioLooping      | strip=STUDIO_      | file=EngineEnums.cs | note=Sequence flag marking a looping animation (engine/studio.h).
+SCRINFO_*       = ScreenInfoFlags    | strip=SCRINFO_     | file=EngineEnums.cs | flags | note=SCREENINFO.iFlags bits (engine/cdll_int.h).
+FFADE_*         = ScreenFadeFlags    | strip=FFADE_       | file=EngineEnums.cs | flags | note=screenfade_t.fadeFlags bits (engine/shake.h). FFADE_IN is 0, which a bit set allows.
+BEAM_F*         = BeamFlags          | strip=BEAM_F       | file=EngineEnums.cs | flags | note=Beam draw flags (engine/customentity.h). The prefix has no trailing underscore.
+FENTTABLE_*     = EntityTableFlags   | strip=FENTTABLE_   | file=EngineEnums.cs | flags | note=ENTITYTABLE.flags bits (engine/eiface.h). The top bits need unchecked((int)0x...).
+STUDIO_NF_*     = StudioTextureFlags | strip=STUDIO_NF_   | file=EngineEnums.cs | flags | note=mstudiotexture_t.flags bits (engine/studio.h).
+STUDIO_HAS_*    = StudioHasFlags     | strip=STUDIO_HAS_  | file=EngineEnums.cs | flags | note=studiohdr_t feature bits (engine/studio.h).
+STUDIO_LOOPING  = StudioLooping      | strip=STUDIO_      | file=EngineEnums.cs | flags | note=Sequence flag marking a looping animation (engine/studio.h).

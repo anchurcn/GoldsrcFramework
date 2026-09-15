@@ -15,14 +15,14 @@ public unsafe struct cvar_t
     /// <remarks>
     /// Original: const char* name;
     /// </remarks>
-    public NChar* name;
+    public NCharPtr name;
     /// <summary>
     /// Technically this should be non-const but that only matters to engine code
     /// </summary>
     /// <remarks>
     /// Original: const char* string;
     /// </remarks>
-    public NChar* @string;
+    public NCharPtr @string;
     /// <remarks>
     /// Original: int flags;
     /// </remarks>

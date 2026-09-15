@@ -82,6 +82,10 @@ internal static class Program
         // Structural rule problems (and anything the macro-enum pass could not resolve) make
         // the generated code wrong rather than merely ugly, so they fail the run.
         foreach (var problem in humanizer.MacroEnumProblems) Console.Error.WriteLine($"Warning (macroEnums): {problem}");
+
+        // Hints are advice, not defects: they only point at enum families the rules left
+        // undecided, so they never change the exit code.
+        foreach (var hint in humanizer.MacroEnumHints) Console.Error.WriteLine($"Hint (macroEnums): {hint}");
         if (rules.Problems.Count > 0) return 1;
 
         ReportRules(rules);

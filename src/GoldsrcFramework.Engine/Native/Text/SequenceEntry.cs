@@ -18,14 +18,14 @@ public unsafe struct sequenceEntry_s
     /// <remarks>
     /// Original: char* fileName;						 // Name of sequence file without .SEQ extension
     /// </remarks>
-    public NChar* fileName;
+    public NCharPtr fileName;
     /// <summary>
     /// Name of entry label in file
     /// </summary>
     /// <remarks>
     /// Original: char* entryName;					 // Name of entry label in file
     /// </remarks>
-    public NChar* entryName;
+    public NCharPtr entryName;
     /// <summary>
     /// Linked list of commands in entry
     /// </summary>

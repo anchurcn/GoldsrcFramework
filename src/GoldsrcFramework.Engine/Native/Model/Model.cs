@@ -185,7 +185,7 @@ public unsafe struct model_t
     /// <remarks>
     /// Original: char* entities;
     /// </remarks>
-    public NChar* entities;
+    public NCharPtr entities;
     /// <summary>
     /// only access through Mod_Extradata
     /// </summary>

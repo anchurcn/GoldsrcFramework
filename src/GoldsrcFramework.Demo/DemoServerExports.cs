@@ -25,12 +25,8 @@ public unsafe class DemoServerExports : FrameworkServerExports
     private const int InMoveLeft = 1 << 9;
     private const int InMoveRight = 1 << 10;
 
-    private const int MoveTypeNone = 0;
-    private const int SolidNot = 0;
-    private const int SolidBBox = 2;
-    private const int EffectNoInterp = 32;
-    private const int EffectNoDraw = 128;
-    private const int FlagFrozen = 1 << 12;
+    // Movement, solidity, effect and flag values come from the generated enums
+    // (MoveType, SolidType, EntityEffects, EntityFlags) in GoldsrcFramework.Engine.Native.
 
     private readonly nint[] balls = new nint[MaxPlayers];
     private readonly usercmd_t[] commands = new usercmd_t[MaxPlayers];
@@ -67,10 +63,10 @@ public unsafe class DemoServerExports : FrameworkServerExports
             return;
 
         ball->v.classname = AllocString("ball_entity");
-        ball->v.solid = SolidBBox;
-        ball->v.movetype = MoveTypeNone;
+        ball->v.solid = SolidType.BBOX;
+        ball->v.movetype = MoveType.NONE;
         ball->v.takedamage = 0;
-        ball->v.effects = EffectNoInterp;
+        ball->v.effects = EntityEffects.NOINTERP;
         ball->v.rendermode = 0;
         ball->v.renderamt = 255;
         ball->v.renderfx = 0;
@@ -84,12 +80,12 @@ public unsafe class DemoServerExports : FrameworkServerExports
         balls[playerIndex] = (nint)ball;
 
         player->v.health = 100;
-        player->v.deadflag = 0;
-        player->v.solid = SolidNot;
-        player->v.movetype = MoveTypeNone;
-        player->v.effects |= EffectNoDraw;
+        player->v.deadflag = DeadState.NO;
+        player->v.solid = SolidType.NOT;
+        player->v.movetype = MoveType.NONE;
+        player->v.effects |= EntityEffects.NODRAW;
         player->v.takedamage = 0;
-        player->v.flags &= ~FlagFrozen;
+        player->v.flags &= ~EntityFlags.FROZEN;
         player->v.iuser1 = ObserverChaseFree;
         player->v.iuser2 = engine->IndexOfEdict(ball);
         player->v.view_ofs = default;

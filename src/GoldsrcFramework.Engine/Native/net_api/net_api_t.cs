@@ -38,7 +38,7 @@ public unsafe struct net_api_t
     /// <remarks>
     /// Original: char* (*AdrToString)(struct netadr_s* a);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<netadr_t*, NChar*> AdrToString;
+    public delegate* unmanaged[Cdecl]<netadr_t*, NCharPtr> AdrToString;
     /// <remarks>
     /// Original: int (*CompareAdr)(struct netadr_s* a, struct netadr_s* b);
     /// </remarks>
@@ -46,18 +46,18 @@ public unsafe struct net_api_t
     /// <remarks>
     /// Original: int (*StringToAdr)(char* s, struct netadr_s* a);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, netadr_t*, int> StringToAdr;
+    public delegate* unmanaged[Cdecl]<NCharPtr, netadr_t*, int> StringToAdr;
     /// <remarks>
     /// Original: const char* (*ValueForKey)(const char* s, const char* key);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar*, NChar*> ValueForKey;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NCharPtr, NCharPtr> ValueForKey;
     /// <remarks>
     /// Original: void (*RemoveKey)(char* s, const char* key);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar*, void> RemoveKey;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NCharPtr, void> RemoveKey;
     /// <remarks>
     /// Original: void (*SetValueForKey)(char* s, const char* key, const char* value, int maxsize);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar*, NChar*, int, void> SetValueForKey;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NCharPtr, NCharPtr, int, void> SetValueForKey;
 }
 

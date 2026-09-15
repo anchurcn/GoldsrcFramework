@@ -94,12 +94,18 @@ public sealed unsafe class ClientSceneManagementSystem : SceneEntityLifecycleSys
     {
         // Create worldspawn once the map actually exposes a brush world model. With a content manager
         // configured but no map loaded yet, retry next frame instead of caching "*1" as missing.
-        if (!hasWorldspawn && (ContentManager is null || ContentManager.IsExist(WorldspawnKey)))
+        // Only commit once the prefab actually produced a collidable: if the content manager/prefab is
+        // not ready yet, CreateWorldspawnEntity returns null and we retry next frame instead of locking
+        // in an empty worldspawn (which would leave worldspawn with no StaticComponent to debug-draw).
+        if (!hasWorldspawn && ContentManager is not null && ContentManager.IsExist(WorldspawnKey))
         {
             var worldspawn = CreateWorldspawnEntity();
-            activeEntities[0] = worldspawn;
-            game.Add(worldspawn);
-            hasWorldspawn = true;
+            if (worldspawn is not null)
+            {
+                activeEntities[0] = worldspawn;
+                game.Add(worldspawn);
+                hasWorldspawn = true;
+            }
         }
 
         // Collect entities that entered this frame (visible now, not visible last frame)
@@ -181,22 +187,24 @@ public sealed unsafe class ClientSceneManagementSystem : SceneEntityLifecycleSys
         return entity;
     }
 
-    private Entity CreateWorldspawnEntity()
+    private Entity? CreateWorldspawnEntity()
     {
         var entity = new Entity("Entity@0(\"worldspawn\")");
         entity.Components.Add(new GoldsrcTransformLinkComponent());
 
         // worldspawn uses StaticComponent + MeshCollider, no PhysicsController/HalfLifeBehavior.
         // The physics prefab is loaded by ContentManager and instantiated here.
-        if (ContentManager is not null)
-        {
-            var prefab = ContentManager.Load<Prefab>(WorldspawnKey);
-            if (prefab is not null)
-            {
-                foreach (var bone in prefab.Instantiate())
-                    bone.Transform.Parent = entity.Transform;
-            }
-        }
+        // Returns null (instead of an empty entity) when the world prefab is not ready, so the caller
+        // can retry next frame rather than committing a worldspawn with no collidable.
+        if (ContentManager is null)
+            return null;
+
+        var prefab = ContentManager.Load<Prefab>(WorldspawnKey);
+        if (prefab is null)
+            return null;
+
+        foreach (var bone in prefab.Instantiate())
+            bone.Transform.Parent = entity.Transform;
 
         return entity;
     }

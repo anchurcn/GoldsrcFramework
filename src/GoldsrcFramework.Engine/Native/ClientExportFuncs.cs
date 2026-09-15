@@ -59,7 +59,7 @@ public unsafe struct ClientExportFuncs
     /// Original: HUD_TEXTURETYPE_FUNC pClientTextureType;
     /// Alias: typedef char (*HUD_TEXTURETYPE_FUNC)(char* name);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar> HUD_PlayerMoveTexture;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NChar> HUD_PlayerMoveTexture;
     /// <remarks>
     /// Original: HUD_IN_ACTIVATEMOUSE_FUNC pIN_ActivateMouse;
     /// Alias: typedef void (*HUD_IN_ACTIVATEMOUSE_FUNC)(void);
@@ -104,7 +104,7 @@ public unsafe struct ClientExportFuncs
     /// Original: HUD_KB_FIND_FUNC pFindKey;
     /// Alias: typedef struct kbutton_s* (*HUD_KB_FIND_FUNC)(const char* name);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, kbutton_t*> KB_Find;
+    public delegate* unmanaged[Cdecl]<NCharPtr, kbutton_t*> KB_Find;
     /// <remarks>
     /// Original: HUD_CAMTHINK_FUNC pCamThink;
     /// Alias: typedef void (*HUD_CAMTHINK_FUNC)(void);
@@ -119,7 +119,7 @@ public unsafe struct ClientExportFuncs
     /// Original: HUD_ADDENTITY_FUNC pAddEntity;
     /// Alias: typedef int (*HUD_ADDENTITY_FUNC)(int type, struct cl_entity_s* ent, const char* modelname);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<EntityType, cl_entity_t*, NChar*, int> HUD_AddEntity;
+    public delegate* unmanaged[Cdecl]<EntityType, cl_entity_t*, NCharPtr, int> HUD_AddEntity;
     /// <remarks>
     /// Original: HUD_CREATEENTITIES_FUNC pCreateEntities;
     /// Alias: typedef void (*HUD_CREATEENTITIES_FUNC)(void);
@@ -174,7 +174,7 @@ public unsafe struct ClientExportFuncs
     /// Original: HUD_CONNECTIONLESS_FUNC pConnectionlessPacket;
     /// Alias: typedef int (*HUD_CONNECTIONLESS_FUNC)(const struct netadr_s* net_from, const char* args, char* response_buffer, int* response_buffer_size);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<netadr_t*, NChar*, NChar*, int*, int> HUD_ConnectionlessPacket;
+    public delegate* unmanaged[Cdecl]<netadr_t*, NCharPtr, NCharPtr, int*, int> HUD_ConnectionlessPacket;
     /// <remarks>
     /// Original: HUD_GETHULLBOUNDS_FUNC pGetHullBounds;
     /// Alias: typedef int (*HUD_GETHULLBOUNDS_FUNC)(int hullnumber, float* mins, float* maxs);
@@ -189,7 +189,7 @@ public unsafe struct ClientExportFuncs
     /// Original: HUD_KEY_EVENT_FUNC pKeyEvent;
     /// Alias: typedef int (*HUD_KEY_EVENT_FUNC)(int eventcode, int keynum, const char* pszCurrentBinding);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<int, int, NChar*, int> HUD_Key_Event;
+    public delegate* unmanaged[Cdecl]<int, int, NCharPtr, int> HUD_Key_Event;
     /// <remarks>
     /// Original: HUD_TEMPENTUPDATE_FUNC pTempEntUpdate;
     /// Alias: typedef void (*HUD_TEMPENTUPDATE_FUNC)(double frametime, double client_time, double cl_gravity, struct tempent_s** ppTempEntFree, struct tempent_s** ppTempEntActive, int (*Callback_AddVisibleEntity)(struct cl_entity_s* pEntity), void (*C...

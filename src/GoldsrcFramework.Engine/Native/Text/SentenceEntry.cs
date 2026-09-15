@@ -18,7 +18,7 @@ public unsafe struct sentenceEntry_s
     /// <remarks>
     /// Original: char* data;					// sentence data (ie "We have hostiles" )
     /// </remarks>
-    public NChar* data;
+    public NCharPtr data;
     /// <summary>
     /// Next loaded entry
     /// </summary>

@@ -60,6 +60,7 @@ public enum EntityType : int
 /// Macro: #define FL_WATERJUMP (1&lt;&lt;11)
 /// Macro: #define FL_WORLDBRUSH (1&lt;&lt;25)
 /// </remarks>
+[Flags]
 public enum EntityFlags : int
 {
     ALWAYSTHINK = 2097152,
@@ -101,6 +102,7 @@ public enum EntityFlags : int
 /// Macro: #define EFLAG_FLESH_SOUND 2
 /// Macro: #define EFLAG_SLERP 1
 /// </remarks>
+[Flags]
 public enum EntityStateFlags : byte
 {
     FLESH_SOUND = 2,
@@ -123,6 +125,7 @@ public enum EntityStateFlags : byte
 /// Macro: #define EF_NOINTERP 32
 /// Macro: #define EF_SNIPERLASER 512
 /// </remarks>
+[Flags]
 public enum EntityEffects : int
 {
     BRIGHTFIELD = 1,
@@ -174,7 +177,7 @@ public enum MoveType : int
 /// <summary>Macros collapsed into an enum by [WalkMoveMode] from const.h.
 /// </summary>
 /// <remarks>
-/// Mode argument of the entity walkmove API.
+/// Mode argument of the entity walkmove API. Its values {0,1,2} have the shape of a two-bit set, so the decision is recorded here.
 /// Macro: #define WALKMOVE_CHECKONLY 2
 /// Macro: #define WALKMOVE_NORMAL 0
 /// Macro: #define WALKMOVE_WORLDONLY 1
@@ -227,7 +230,7 @@ public enum DeadState : int
 /// <summary>Macros collapsed into an enum by [DamageMode] from const.h.
 /// </summary>
 /// <remarks>
-/// entvars_t.takedamage.
+/// entvars_t.takedamage. Like WALKMOVE_*, {0,1,2} selects a mode rather than combining bits.
 /// Macro: #define DAMAGE_AIM 2
 /// Macro: #define DAMAGE_NO 0
 /// Macro: #define DAMAGE_YES 1
@@ -242,7 +245,7 @@ public enum DamageMode : int
 /// <summary>Macros collapsed into an enum by [DamageType] from cdll_dll.h.
 /// </summary>
 /// <remarks>
-/// Damage type bits taken by the damage API. The composite members (DMG_GIB_CORPSE, DMG_SHOWNHUD) combine several bits.
+/// Damage type bits taken by the damage API. The composite members (DMG_GIB_CORPSE, DMG_SHOWNHUD) combine several bits, so the family is not all single bits - which is exactly why "flags" cannot be inferred.
 /// Macro: #define DMG_ACID (1&lt;&lt;20)
 /// Macro: #define DMG_AIMED (1&lt;&lt;28)
 /// Macro: #define DMG_ALWAYSGIB (1&lt;&lt;13)
@@ -285,6 +288,7 @@ public enum DamageMode : int
 /// Macro: #define DMG_TRANQ DMG_MORTAR
 /// Macro: #define DMG_WALLPIERCING (1&lt;&lt;29)
 /// </remarks>
+[Flags]
 public enum DamageType : int
 {
     ACID = 1048576,
@@ -368,13 +372,14 @@ public enum DamageImage : int
 /// <summary>Macros collapsed into an enum by [ExplosionFlags] from const.h.
 /// </summary>
 /// <remarks>
-/// Flags of the TE_EXPLOSION message.
+/// Flags of the TE_EXPLOSION message. TE_EXPLFLAG_NONE is 0, which a bit set allows.
 /// Macro: #define TE_EXPLFLAG_NOADDITIVE 1
 /// Macro: #define TE_EXPLFLAG_NODLIGHTS 2
 /// Macro: #define TE_EXPLFLAG_NONE 0
 /// Macro: #define TE_EXPLFLAG_NOPARTICLES 8
 /// Macro: #define TE_EXPLFLAG_NOSOUND 4
 /// </remarks>
+[Flags]
 public enum ExplosionFlags : int
 {
     NOADDITIVE = 1,
@@ -395,6 +400,7 @@ public enum ExplosionFlags : int
 /// Macro: #define TEFIRE_FLAG_PLANAR 16
 /// Macro: #define TEFIRE_FLAG_SOMEFLOAT 2
 /// </remarks>
+[Flags]
 public enum FireFieldFlags : int
 {
     ADDITIVE = 32,
@@ -408,7 +414,7 @@ public enum FireFieldFlags : int
 /// <summary>Macros collapsed into an enum by [BounceSound] from const.h.
 /// </summary>
 /// <remarks>
-/// Sound selected by the TE_BREAKMODEL message.
+/// Sound selected by the TE_BREAKMODEL message. Values {0,1,2}: a selector, not a bit set.
 /// Macro: #define TE_BOUNCE_NULL 0
 /// Macro: #define TE_BOUNCE_SHELL 1
 /// Macro: #define TE_BOUNCE_SHOTSHELL 2
@@ -604,7 +610,7 @@ public enum ContentType : int
 /// <summary>Macros collapsed into an enum by [BreakMaterial] from const.h.
 /// </summary>
 /// <remarks>
-/// Material of a breakable surface.
+/// Material of a breakable surface. BREAK_TYPEMASK is an aggregate mask rather than a single bit, so the family is not all single bits - another one "flags" cannot be inferred from.
 /// Macro: #define BREAK_2 0x80
 /// Macro: #define BREAK_CONCRETE 0x40
 /// Macro: #define BREAK_FLESH 0x04
@@ -615,6 +621,7 @@ public enum ContentType : int
 /// Macro: #define BREAK_TYPEMASK 0x4F
 /// Macro: #define BREAK_WOOD 0x08
 /// </remarks>
+[Flags]
 public enum BreakMaterial : int
 {
     _2 = 128,
@@ -631,7 +638,7 @@ public enum BreakMaterial : int
 /// <summary>Macros collapsed into an enum by [BounceMaterial] from const.h.
 /// </summary>
 /// <remarks>
-/// Bounce material. Several members alias the BREAK_* values.
+/// Bounce material. Several members alias the BREAK_* values, so the aggregate mask comes along.
 /// Macro: #define BOUNCE_CONCRETE BREAK_CONCRETE
 /// Macro: #define BOUNCE_FLESH BREAK_FLESH
 /// Macro: #define BOUNCE_GLASS BREAK_GLASS
@@ -641,6 +648,7 @@ public enum BreakMaterial : int
 /// Macro: #define BOUNCE_SHRAP 0x10
 /// Macro: #define BOUNCE_WOOD BREAK_WOOD
 /// </remarks>
+[Flags]
 public enum BounceMaterial : int
 {
     CONCRETE = 64,
@@ -661,6 +669,7 @@ public enum BounceMaterial : int
 /// Macro: #define SF_TRAIN_START_ON 4
 /// Macro: #define SF_TRAIN_WAIT_RETRIGGER 1
 /// </remarks>
+[Flags]
 public enum TrainSpawnFlags : int
 {
     PASSABLE = 8,
@@ -762,6 +771,7 @@ public enum MessageDestination : int
 /// Macro: #define IN_SCORE (1&lt;&lt;15)
 /// Macro: #define IN_USE (1&lt;&lt;5)
 /// </remarks>
+[Flags]
 public enum InputButtons : int
 {
     ALT1 = 16384,
@@ -791,6 +801,7 @@ public enum InputButtons : int
 /// Macro: #define HIDEHUD_HEALTH (1&lt;&lt;3)
 /// Macro: #define HIDEHUD_WEAPONS (1&lt;&lt;0)
 /// </remarks>
+[Flags]
 public enum HideHudFlags : int
 {
     ALL = 4,
@@ -806,6 +817,7 @@ public enum HideHudFlags : int
 /// Macro: #define SCRINFO_SCREENFLASH 1
 /// Macro: #define SCRINFO_STRETCHED 2
 /// </remarks>
+[Flags]
 public enum ScreenInfoFlags : int
 {
     SCREENFLASH = 1,
@@ -815,13 +827,14 @@ public enum ScreenInfoFlags : int
 /// <summary>Macros collapsed into an enum by [ScreenFadeFlags] from shake.h.
 /// </summary>
 /// <remarks>
-/// screenfade_t.fadeFlags bits (engine/shake.h).
+/// screenfade_t.fadeFlags bits (engine/shake.h). FFADE_IN is 0, which a bit set allows.
 /// Macro: #define FFADE_IN 0x0000
 /// Macro: #define FFADE_LONGFADE 0x0008
 /// Macro: #define FFADE_MODULATE 0x0002
 /// Macro: #define FFADE_OUT 0x0001
 /// Macro: #define FFADE_STAYOUT 0x0004
 /// </remarks>
+[Flags]
 public enum ScreenFadeFlags : int
 {
     IN = 0,
@@ -840,6 +853,7 @@ public enum ScreenFadeFlags : int
 /// Macro: #define BEAM_FSINE 0x10
 /// Macro: #define BEAM_FSOLID 0x20
 /// </remarks>
+[Flags]
 public enum BeamFlags : int
 {
     SHADEIN = 64,
@@ -857,6 +871,7 @@ public enum BeamFlags : int
 /// Macro: #define FENTTABLE_PLAYER 0x80000000
 /// Macro: #define FENTTABLE_REMOVED 0x40000000
 /// </remarks>
+[Flags]
 public enum EntityTableFlags : int
 {
     GLOBAL = 268435456,
@@ -877,6 +892,7 @@ public enum EntityTableFlags : int
 /// Macro: #define STUDIO_NF_MASKED 0x0040
 /// Macro: #define STUDIO_NF_NOMIPS 0x0008
 /// </remarks>
+[Flags]
 public enum StudioTextureFlags : int
 {
     ADDITIVE = 32,
@@ -897,6 +913,7 @@ public enum StudioTextureFlags : int
 /// Macro: #define STUDIO_HAS_NORMALS 0x0001
 /// Macro: #define STUDIO_HAS_VERTICES 0x0002
 /// </remarks>
+[Flags]
 public enum StudioHasFlags : int
 {
     BBOX = 4,
@@ -911,6 +928,7 @@ public enum StudioHasFlags : int
 /// Sequence flag marking a looping animation (engine/studio.h).
 /// Macro: #define STUDIO_LOOPING 0x0001
 /// </remarks>
+[Flags]
 public enum StudioLooping : int
 {
     LOOPING = 1,

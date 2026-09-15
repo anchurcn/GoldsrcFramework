@@ -31,10 +31,10 @@ public unsafe struct ServerNewExportFuncs
     /// <remarks>
     /// Original: void (*pfnCvarValue)(const edict_t* pEnt, const char* value);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<edict_t*, NChar*, void> CvarValue;
+    public delegate* unmanaged[Cdecl]<edict_t*, NCharPtr, void> CvarValue;
     /// <remarks>
     /// Original: void (*pfnCvarValue2)(const edict_t* pEnt, int requestID, const char* cvarName, const char* value);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<edict_t*, int, NChar*, NChar*, void> CvarValue2;
+    public delegate* unmanaged[Cdecl]<edict_t*, int, NCharPtr, NCharPtr, void> CvarValue2;
 }
 

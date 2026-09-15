@@ -18,14 +18,14 @@ public unsafe struct SAVERESTOREDATA
     /// <remarks>
     /// Original: char* pBaseData;							// Start of all entity save data
     /// </remarks>
-    public NChar* pBaseData;
+    public NCharPtr pBaseData;
     /// <summary>
     /// Current buffer pointer for sequential access
     /// </summary>
     /// <remarks>
     /// Original: char* pCurrentData;							// Current buffer pointer for sequential access
     /// </remarks>
-    public NChar* pCurrentData;
+    public NCharPtr pCurrentData;
     /// <summary>
     /// Current data size
     /// </summary>
@@ -60,7 +60,7 @@ public unsafe struct SAVERESTOREDATA
     /// <remarks>
     /// Original: char** pTokens;								// Hash table of entity strings (sparse)
     /// </remarks>
-    public NChar** pTokens;
+    public NCharPtr* pTokens;
     /// <summary>
     /// Holds a global entity table ID
     /// </summary>

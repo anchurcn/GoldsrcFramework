@@ -19,15 +19,15 @@ public unsafe struct event_api_t
     /// <remarks>
     /// Original: void (*EV_PlaySound)(int ent, float* origin, int channel, const char* sample, float volume, float attenuation, int fFlags, int pitch);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<int, float*, int, NChar*, float, float, int, int, void> EV_PlaySound;
+    public delegate* unmanaged[Cdecl]<int, float*, int, NCharPtr, float, float, int, int, void> EV_PlaySound;
     /// <remarks>
     /// Original: void (*EV_StopSound)(int ent, int channel, const char* sample);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<int, int, NChar*, void> EV_StopSound;
+    public delegate* unmanaged[Cdecl]<int, int, NCharPtr, void> EV_StopSound;
     /// <remarks>
     /// Original: int (*EV_FindModelIndex)(const char* pmodel);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int> EV_FindModelIndex;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int> EV_FindModelIndex;
     /// <remarks>
     /// Original: int (*EV_IsLocal)(int playernum);
     /// </remarks>
@@ -83,7 +83,7 @@ public unsafe struct event_api_t
     /// <remarks>
     /// Original: unsigned short (*EV_PrecacheEvent)(int type, const char* psz);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<int, NChar*, ushort> EV_PrecacheEvent;
+    public delegate* unmanaged[Cdecl]<int, NCharPtr, ushort> EV_PrecacheEvent;
     /// <remarks>
     /// Original: void (*EV_PlaybackEvent)(int flags, const struct edict_s* pInvoker, unsigned short eventindex, float delay, float* origin, float* angles, float fparam1, float fparam2, int iparam1, int iparam2, int bparam1, int bparam2);
     /// </remarks>
@@ -91,7 +91,7 @@ public unsafe struct event_api_t
     /// <remarks>
     /// Original: const char* (*EV_TraceTexture)(int ground, float* vstart, float* vend);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<int, float*, float*, NChar*> EV_TraceTexture;
+    public delegate* unmanaged[Cdecl]<int, float*, float*, NCharPtr> EV_TraceTexture;
     /// <remarks>
     /// Original: void (*EV_StopAllSounds)(int entnum, int entchannel);
     /// </remarks>
@@ -99,6 +99,6 @@ public unsafe struct event_api_t
     /// <remarks>
     /// Original: void (*EV_KillEvents)(int entnum, const char* eventname);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<int, NChar*, void> EV_KillEvents;
+    public delegate* unmanaged[Cdecl]<int, NCharPtr, void> EV_KillEvents;
 }
 

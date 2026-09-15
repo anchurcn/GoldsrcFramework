@@ -92,10 +92,10 @@ public unsafe struct client_textmessage_t
     /// <remarks>
     /// Original: const char* pName;
     /// </remarks>
-    public NChar* pName;
+    public NCharPtr pName;
     /// <remarks>
     /// Original: const char* pMessage;
     /// </remarks>
-    public NChar* pMessage;
+    public NCharPtr pMessage;
 }
 

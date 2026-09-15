@@ -19,7 +19,7 @@ public unsafe struct ClientEngineFuncs
     /// Original: pfnEngSrc_pfnSPR_Load_t pfnSPR_Load;
     /// Alias: typedef HSPRITE (*pfnEngSrc_pfnSPR_Load_t)(const char* szPicName);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, HSPRITE> SPR_Load;
+    public delegate* unmanaged[Cdecl]<NCharPtr, HSPRITE> SPR_Load;
     /// <remarks>
     /// Original: pfnEngSrc_pfnSPR_Frames_t pfnSPR_Frames;
     /// Alias: typedef int (*pfnEngSrc_pfnSPR_Frames_t)(HSPRITE hPic);
@@ -69,7 +69,7 @@ public unsafe struct ClientEngineFuncs
     /// Original: pfnEngSrc_pfnSPR_GetList_t pfnSPR_GetList;
     /// Alias: typedef struct client_sprite_s* (*pfnEngSrc_pfnSPR_GetList_t)(const char* psz, int* piCount);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int*, client_sprite_t*> SPR_GetList;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int*, client_sprite_t*> SPR_GetList;
     /// <remarks>
     /// Original: pfnEngSrc_pfnFillRGBA_t pfnFillRGBA;
     /// Alias: typedef void (*pfnEngSrc_pfnFillRGBA_t)(int x, int y, int width, int height, int r, int g, int b, int a);
@@ -89,37 +89,37 @@ public unsafe struct ClientEngineFuncs
     /// Original: pfnEngSrc_pfnRegisterVariable_t pfnRegisterVariable;
     /// Alias: typedef struct cvar_s* (*pfnEngSrc_pfnRegisterVariable_t)(const char* szName, const char* szValue, int flags);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar*, int, cvar_t*> RegisterVariable;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NCharPtr, int, cvar_t*> RegisterVariable;
     /// <remarks>
     /// Original: pfnEngSrc_pfnGetCvarFloat_t pfnGetCvarFloat;
     /// Alias: typedef float (*pfnEngSrc_pfnGetCvarFloat_t)(const char* szName);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, float> GetCvarFloat;
+    public delegate* unmanaged[Cdecl]<NCharPtr, float> GetCvarFloat;
     /// <remarks>
     /// Original: pfnEngSrc_pfnGetCvarString_t pfnGetCvarString;
     /// Alias: typedef const char* (*pfnEngSrc_pfnGetCvarString_t)(const char* szName);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar*> GetCvarString;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NCharPtr> GetCvarString;
     /// <remarks>
     /// Original: pfnEngSrc_pfnAddCommand_t pfnAddCommand;
     /// Alias: typedef int (*pfnEngSrc_pfnAddCommand_t)(const char* cmd_name, void (*pfnEngSrc_function)(void));
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, delegate* unmanaged[Cdecl]<void>, int> AddCommand;
+    public delegate* unmanaged[Cdecl]<NCharPtr, delegate* unmanaged[Cdecl]<void>, int> AddCommand;
     /// <remarks>
     /// Original: pfnEngSrc_pfnHookUserMsg_t pfnHookUserMsg;
     /// Alias: typedef int (*pfnEngSrc_pfnHookUserMsg_t)(const char* szMsgName, pfnUserMsgHook pfn);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, delegate* unmanaged[Cdecl]<NChar*, int, void*, int>, int> HookUserMsg;
+    public delegate* unmanaged[Cdecl]<NCharPtr, delegate* unmanaged[Cdecl]<NCharPtr, int, void*, int>, int> HookUserMsg;
     /// <remarks>
     /// Original: pfnEngSrc_pfnServerCmd_t pfnServerCmd;
     /// Alias: typedef int (*pfnEngSrc_pfnServerCmd_t)(const char* szCmdString);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int> ServerCmd;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int> ServerCmd;
     /// <remarks>
     /// Original: pfnEngSrc_pfnClientCmd_t pfnClientCmd;
     /// Alias: typedef int (*pfnEngSrc_pfnClientCmd_t)(const char* szCmdString);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int> ClientCmd;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int> ClientCmd;
     /// <remarks>
     /// Original: pfnEngSrc_pfnGetPlayerInfo_t pfnGetPlayerInfo;
     /// Alias: typedef void (*pfnEngSrc_pfnGetPlayerInfo_t)(int ent_num, struct hud_player_info_s* pinfo);
@@ -129,7 +129,7 @@ public unsafe struct ClientEngineFuncs
     /// Original: pfnEngSrc_pfnPlaySoundByName_t pfnPlaySoundByName;
     /// Alias: typedef void (*pfnEngSrc_pfnPlaySoundByName_t)(const char* szSound, float volume);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, float, void> PlaySoundByName;
+    public delegate* unmanaged[Cdecl]<NCharPtr, float, void> PlaySoundByName;
     /// <remarks>
     /// Original: pfnEngSrc_pfnPlaySoundByIndex_t pfnPlaySoundByIndex;
     /// Alias: typedef void (*pfnEngSrc_pfnPlaySoundByIndex_t)(int iSound, float volume);
@@ -144,7 +144,7 @@ public unsafe struct ClientEngineFuncs
     /// Original: pfnEngSrc_pfnTextMessageGet_t pfnTextMessageGet;
     /// Alias: typedef struct client_textmessage_s* (*pfnEngSrc_pfnTextMessageGet_t)(const char* pName);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, client_textmessage_t*> TextMessageGet;
+    public delegate* unmanaged[Cdecl]<NCharPtr, client_textmessage_t*> TextMessageGet;
     /// <remarks>
     /// Original: pfnEngSrc_pfnDrawCharacter_t pfnDrawCharacter;
     /// Alias: typedef int (*pfnEngSrc_pfnDrawCharacter_t)(int x, int y, int number, int r, int g, int b);
@@ -154,7 +154,7 @@ public unsafe struct ClientEngineFuncs
     /// Original: pfnEngSrc_pfnDrawConsoleString_t pfnDrawConsoleString;
     /// Alias: typedef int (*pfnEngSrc_pfnDrawConsoleString_t)(int x, int y, char* string);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<int, int, NChar*, int> DrawConsoleString;
+    public delegate* unmanaged[Cdecl]<int, int, NCharPtr, int> DrawConsoleString;
     /// <remarks>
     /// Original: pfnEngSrc_pfnDrawSetTextColor_t pfnDrawSetTextColor;
     /// Alias: typedef void (*pfnEngSrc_pfnDrawSetTextColor_t)(float r, float g, float b);
@@ -164,17 +164,17 @@ public unsafe struct ClientEngineFuncs
     /// Original: pfnEngSrc_pfnDrawConsoleStringLen_t pfnDrawConsoleStringLen;
     /// Alias: typedef void (*pfnEngSrc_pfnDrawConsoleStringLen_t)(const char* string, int* length, int* height);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int*, int*, void> DrawConsoleStringLen;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int*, int*, void> DrawConsoleStringLen;
     /// <remarks>
     /// Original: pfnEngSrc_pfnConsolePrint_t pfnConsolePrint;
     /// Alias: typedef void (*pfnEngSrc_pfnConsolePrint_t)(const char* string);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, void> ConsolePrint;
+    public delegate* unmanaged[Cdecl]<NCharPtr, void> ConsolePrint;
     /// <remarks>
     /// Original: pfnEngSrc_pfnCenterPrint_t pfnCenterPrint;
     /// Alias: typedef void (*pfnEngSrc_pfnCenterPrint_t)(const char* string);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, void> CenterPrint;
+    public delegate* unmanaged[Cdecl]<NCharPtr, void> CenterPrint;
     /// <remarks>
     /// Original: pfnEngSrc_GetWindowCenterX_t GetWindowCenterX;
     /// Alias: typedef int (*pfnEngSrc_GetWindowCenterX_t)(void);
@@ -204,7 +204,7 @@ public unsafe struct ClientEngineFuncs
     /// Original: pfnEngSrc_Cvar_SetValue_t Cvar_SetValue;
     /// Alias: typedef void (*pfnEngSrc_Cvar_SetValue_t)(const char* cvar, float value);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, float, void> Cvar_SetValue;
+    public delegate* unmanaged[Cdecl]<NCharPtr, float, void> Cvar_SetValue;
     /// <remarks>
     /// Original: pfnEngSrc_Cmd_Argc_t Cmd_Argc;
     /// Alias: typedef int (*pfnEngSrc_Cmd_Argc_t)(void);
@@ -214,37 +214,37 @@ public unsafe struct ClientEngineFuncs
     /// Original: pfnEngSrc_Cmd_Argv_t Cmd_Argv;
     /// Alias: typedef const char* (*pfnEngSrc_Cmd_Argv_t)(int arg);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<int, NChar*> Cmd_Argv;
+    public delegate* unmanaged[Cdecl]<int, NCharPtr> Cmd_Argv;
     /// <remarks>
     /// Original: pfnEngSrc_Con_Printf_t Con_Printf;
     /// Alias: typedef void (*pfnEngSrc_Con_Printf_t)(const char* fmt, ...);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, void> Con_Printf;
+    public delegate* unmanaged[Cdecl]<NCharPtr, void> Con_Printf;
     /// <remarks>
     /// Original: pfnEngSrc_Con_DPrintf_t Con_DPrintf;
     /// Alias: typedef void (*pfnEngSrc_Con_DPrintf_t)(const char* fmt, ...);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, void> Con_DPrintf;
+    public delegate* unmanaged[Cdecl]<NCharPtr, void> Con_DPrintf;
     /// <remarks>
     /// Original: pfnEngSrc_Con_NPrintf_t Con_NPrintf;
     /// Alias: typedef void (*pfnEngSrc_Con_NPrintf_t)(int pos, const char* fmt, ...);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<int, NChar*, void> Con_NPrintf;
+    public delegate* unmanaged[Cdecl]<int, NCharPtr, void> Con_NPrintf;
     /// <remarks>
     /// Original: pfnEngSrc_Con_NXPrintf_t Con_NXPrintf;
     /// Alias: typedef void (*pfnEngSrc_Con_NXPrintf_t)(struct con_nprint_s* info, const char* fmt, ...);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<con_nprint_t*, NChar*, void> Con_NXPrintf;
+    public delegate* unmanaged[Cdecl]<con_nprint_t*, NCharPtr, void> Con_NXPrintf;
     /// <remarks>
     /// Original: pfnEngSrc_PhysInfo_ValueForKey_t PhysInfo_ValueForKey;
     /// Alias: typedef const char* (*pfnEngSrc_PhysInfo_ValueForKey_t)(const char* key);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar*> PhysInfo_ValueForKey;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NCharPtr> PhysInfo_ValueForKey;
     /// <remarks>
     /// Original: pfnEngSrc_ServerInfo_ValueForKey_t ServerInfo_ValueForKey;
     /// Alias: typedef const char* (*pfnEngSrc_ServerInfo_ValueForKey_t)(const char* key);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar*> ServerInfo_ValueForKey;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NCharPtr> ServerInfo_ValueForKey;
     /// <remarks>
     /// Original: pfnEngSrc_GetClientMaxspeed_t GetClientMaxspeed;
     /// Alias: typedef float (*pfnEngSrc_GetClientMaxspeed_t)(void);
@@ -254,7 +254,7 @@ public unsafe struct ClientEngineFuncs
     /// Original: pfnEngSrc_CheckParm_t CheckParm;
     /// Alias: typedef int (*pfnEngSrc_CheckParm_t)(const char* parm, const char** ppnext);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar**, int> CheckParm;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NCharPtr*, int> CheckParm;
     /// <remarks>
     /// Original: pfnEngSrc_Key_Event_t Key_Event;
     /// Alias: typedef void (*pfnEngSrc_Key_Event_t)(int key, int down);
@@ -319,7 +319,7 @@ public unsafe struct ClientEngineFuncs
     /// Original: pfnEngSrc_CL_LoadModel_t CL_LoadModel;
     /// Alias: typedef struct model_s* (*pfnEngSrc_CL_LoadModel_t)(const char* modelname, int* index);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int*, model_t*> CL_LoadModel;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int*, model_t*> CL_LoadModel;
     /// <remarks>
     /// Original: pfnEngSrc_CL_CreateVisibleEntity_t CL_CreateVisibleEntity;
     /// Alias: typedef int (*pfnEngSrc_CL_CreateVisibleEntity_t)(int type, struct cl_entity_s* ent);
@@ -334,12 +334,12 @@ public unsafe struct ClientEngineFuncs
     /// Original: pfnEngSrc_pfnPlaySoundByNameAtLocation_t pfnPlaySoundByNameAtLocation;
     /// Alias: typedef void (*pfnEngSrc_pfnPlaySoundByNameAtLocation_t)(const char* szSound, float volume, float* origin);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, float, float*, void> PlaySoundByNameAtLocation;
+    public delegate* unmanaged[Cdecl]<NCharPtr, float, float*, void> PlaySoundByNameAtLocation;
     /// <remarks>
     /// Original: pfnEngSrc_pfnPrecacheEvent_t pfnPrecacheEvent;
     /// Alias: typedef unsigned short (*pfnEngSrc_pfnPrecacheEvent_t)(int type, const char* psz);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<int, NChar*, ushort> PrecacheEvent;
+    public delegate* unmanaged[Cdecl]<int, NCharPtr, ushort> PrecacheEvent;
     /// <remarks>
     /// Original: pfnEngSrc_pfnPlaybackEvent_t pfnPlaybackEvent;
     /// Alias: typedef void (*pfnEngSrc_pfnPlaybackEvent_t)(int flags, const struct edict_s* pInvoker, unsigned short eventindex, float delay, const float* origin, const float* angles, float fparam1, float fparam2, int iparam1, int iparam2, int bparam1...
@@ -364,7 +364,7 @@ public unsafe struct ClientEngineFuncs
     /// Original: pfnEngSrc_pfnHookEvent_t pfnHookEvent;
     /// Alias: typedef void (*pfnEngSrc_pfnHookEvent_t)(const char* name, void (*pfnEvent)(struct event_args_s* args));
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, delegate* unmanaged[Cdecl]<event_args_t*, void>, void> HookEvent;
+    public delegate* unmanaged[Cdecl]<NCharPtr, delegate* unmanaged[Cdecl]<event_args_t*, void>, void> HookEvent;
     /// <remarks>
     /// Original: pfnEngSrc_Con_IsVisible_t Con_IsVisible;
     /// Alias: typedef int (*pfnEngSrc_Con_IsVisible_t)();
@@ -374,22 +374,22 @@ public unsafe struct ClientEngineFuncs
     /// Original: pfnEngSrc_pfnGetGameDirectory_t pfnGetGameDirectory;
     /// Alias: typedef const char* (*pfnEngSrc_pfnGetGameDirectory_t)(void);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*> GetGameDirectory;
+    public delegate* unmanaged[Cdecl]<NCharPtr> GetGameDirectory;
     /// <remarks>
     /// Original: pfnEngSrc_pfnGetCvarPointer_t pfnGetCvarPointer;
     /// Alias: typedef struct cvar_s* (*pfnEngSrc_pfnGetCvarPointer_t)(const char* szName);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, cvar_t*> GetCvarPointer;
+    public delegate* unmanaged[Cdecl]<NCharPtr, cvar_t*> GetCvarPointer;
     /// <remarks>
     /// Original: pfnEngSrc_Key_LookupBinding_t Key_LookupBinding;
     /// Alias: typedef const char* (*pfnEngSrc_Key_LookupBinding_t)(const char* pBinding);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar*> Key_LookupBinding;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NCharPtr> Key_LookupBinding;
     /// <remarks>
     /// Original: pfnEngSrc_pfnGetLevelName_t pfnGetLevelName;
     /// Alias: typedef const char* (*pfnEngSrc_pfnGetLevelName_t)(void);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*> GetLevelName;
+    public delegate* unmanaged[Cdecl]<NCharPtr> GetLevelName;
     /// <remarks>
     /// Original: pfnEngSrc_pfnGetScreenFade_t pfnGetScreenFade;
     /// Alias: typedef void (*pfnEngSrc_pfnGetScreenFade_t)(struct screenfade_s* fade);
@@ -414,12 +414,12 @@ public unsafe struct ClientEngineFuncs
     /// Original: pfnEngSrc_COM_LoadFile_t COM_LoadFile;
     /// Alias: typedef byte* (*pfnEngSrc_COM_LoadFile_t)(const char* path, int usehunk, int* pLength);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int, int*, byte*> COM_LoadFile;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int, int*, byte*> COM_LoadFile;
     /// <remarks>
     /// Original: pfnEngSrc_COM_ParseFile_t COM_ParseFile;
     /// Alias: typedef char* (*pfnEngSrc_COM_ParseFile_t)(const char* data, char* token);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar*, NChar*> COM_ParseFile;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NCharPtr, NCharPtr> COM_ParseFile;
     /// <remarks>
     /// Original: pfnEngSrc_COM_FreeFile_t COM_FreeFile;
     /// Alias: typedef void (*pfnEngSrc_COM_FreeFile_t)(void* buffer);
@@ -458,32 +458,32 @@ public unsafe struct ClientEngineFuncs
     /// Original: pfnEngSrc_LoadMapSprite_t LoadMapSprite;
     /// Alias: typedef struct model_s* (*pfnEngSrc_LoadMapSprite_t)(const char* filename);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, model_t*> LoadMapSprite;
+    public delegate* unmanaged[Cdecl]<NCharPtr, model_t*> LoadMapSprite;
     /// <remarks>
     /// Original: pfnEngSrc_COM_AddAppDirectoryToSearchPath_t COM_AddAppDirectoryToSearchPath;
     /// Alias: typedef void (*pfnEngSrc_COM_AddAppDirectoryToSearchPath_t)(const char* pszBaseDir, const char* appName);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar*, void> COM_AddAppDirectoryToSearchPath;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NCharPtr, void> COM_AddAppDirectoryToSearchPath;
     /// <remarks>
     /// Original: pfnEngSrc_COM_ExpandFilename_t COM_ExpandFilename;
     /// Alias: typedef int (*pfnEngSrc_COM_ExpandFilename_t)(const char* fileName, char* nameOutBuffer, int nameOutBufferSize);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar*, int, int> COM_ExpandFilename;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NCharPtr, int, int> COM_ExpandFilename;
     /// <remarks>
     /// Original: pfnEngSrc_PlayerInfo_ValueForKey_t PlayerInfo_ValueForKey;
     /// Alias: typedef const char* (*pfnEngSrc_PlayerInfo_ValueForKey_t)(int playerNum, const char* key);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<int, NChar*, NChar*> PlayerInfo_ValueForKey;
+    public delegate* unmanaged[Cdecl]<int, NCharPtr, NCharPtr> PlayerInfo_ValueForKey;
     /// <remarks>
     /// Original: pfnEngSrc_PlayerInfo_SetValueForKey_t PlayerInfo_SetValueForKey;
     /// Alias: typedef void (*pfnEngSrc_PlayerInfo_SetValueForKey_t)(const char* key, const char* value);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar*, void> PlayerInfo_SetValueForKey;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NCharPtr, void> PlayerInfo_SetValueForKey;
     /// <remarks>
     /// Original: pfnEngSrc_GetPlayerUniqueID_t GetPlayerUniqueID;
     /// Alias: typedef qboolean (*pfnEngSrc_GetPlayerUniqueID_t)(int iPlayer, char playerID[16]);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<int, NChar*, qboolean> GetPlayerUniqueID;
+    public delegate* unmanaged[Cdecl]<int, NCharPtr, qboolean> GetPlayerUniqueID;
     /// <remarks>
     /// Original: pfnEngSrc_GetTrackerIDForPlayer_t GetTrackerIDForPlayer;
     /// Alias: typedef int (*pfnEngSrc_GetTrackerIDForPlayer_t)(int playerSlot);
@@ -498,7 +498,7 @@ public unsafe struct ClientEngineFuncs
     /// Original: pfnEngSrc_pfnServerCmdUnreliable_t pfnServerCmdUnreliable;
     /// Alias: typedef int (*pfnEngSrc_pfnServerCmdUnreliable_t)(char* szCmdString);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int> ServerCmdUnreliable;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int> ServerCmdUnreliable;
     /// <remarks>
     /// Original: pfnEngSrc_GetMousePos_t pfnGetMousePos;
     /// Alias: typedef void (*pfnEngSrc_GetMousePos_t)(Point* ppt);
@@ -533,7 +533,7 @@ public unsafe struct ClientEngineFuncs
     /// Original: pfnEngSrc_GetCmdFunctionName_t GetCmdFunctionName;
     /// Alias: typedef const char* (*pfnEngSrc_GetCmdFunctionName_t)(unsigned int cmdhandle);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<uint, NChar*> GetCmdFunctionName;
+    public delegate* unmanaged[Cdecl]<uint, NCharPtr> GetCmdFunctionName;
     /// <remarks>
     /// Original: pfnEngSrc_GetClientOldTime_t hudGetClientOldTime;
     /// Alias: typedef float (*pfnEngSrc_GetClientOldTime_t)();
@@ -568,7 +568,7 @@ public unsafe struct ClientEngineFuncs
     /// Original: pfnEngSrc_pfnSequenceGet_t pfnSequenceGet;
     /// Alias: typedef sequenceEntry_s* (*pfnEngSrc_pfnSequenceGet_t)(const char* fileName, const char* entryName);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar*, sequenceEntry_s*> SequenceGet;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NCharPtr, sequenceEntry_s*> SequenceGet;
     /// <remarks>
     /// Original: pfnEngSrc_pfnSPR_DrawGeneric_t pfnSPR_DrawGeneric;
     /// Alias: typedef void (*pfnEngSrc_pfnSPR_DrawGeneric_t)(int frame, int x, int y, const Rect* prc, int src, int dest, int w, int h);
@@ -578,22 +578,22 @@ public unsafe struct ClientEngineFuncs
     /// Original: pfnEngSrc_pfnSequencePickSentence_t pfnSequencePickSentence;
     /// Alias: typedef sentenceEntry_s* (*pfnEngSrc_pfnSequencePickSentence_t)(const char* sentenceName, int pickMethod, int* entryPicked);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int, int*, sentenceEntry_s*> SequencePickSentence;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int, int*, sentenceEntry_s*> SequencePickSentence;
     /// <remarks>
     /// Original: pfnEngSrc_pfnDrawString_t pfnDrawString;
     /// Alias: typedef int (*pfnEngSrc_pfnDrawString_t)(int x, int y, const char* str, int r, int g, int b);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<int, int, NChar*, int, int, int, int> DrawString;
+    public delegate* unmanaged[Cdecl]<int, int, NCharPtr, int, int, int, int> DrawString;
     /// <remarks>
     /// Original: pfnEngSrc_pfnDrawStringReverse_t pfnDrawStringReverse;
     /// Alias: typedef int (*pfnEngSrc_pfnDrawStringReverse_t)(int x, int y, const char* str, int r, int g, int b);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<int, int, NChar*, int, int, int, int> DrawStringReverse;
+    public delegate* unmanaged[Cdecl]<int, int, NCharPtr, int, int, int, int> DrawStringReverse;
     /// <remarks>
     /// Original: pfnEngSrc_LocalPlayerInfo_ValueForKey_t LocalPlayerInfo_ValueForKey;
     /// Alias: typedef const char* (*pfnEngSrc_LocalPlayerInfo_ValueForKey_t)(const char* key);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar*> LocalPlayerInfo_ValueForKey;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NCharPtr> LocalPlayerInfo_ValueForKey;
     /// <remarks>
     /// Original: pfnEngSrc_pfnVGUI2DrawCharacter_t pfnVGUI2DrawCharacter;
     /// Alias: typedef int (*pfnEngSrc_pfnVGUI2DrawCharacter_t)(int x, int y, int ch, unsigned int font);
@@ -608,7 +608,7 @@ public unsafe struct ClientEngineFuncs
     /// Original: pfnEngSrc_COM_GetApproxWavePlayLength COM_GetApproxWavePlayLength;
     /// Alias: typedef unsigned int (*pfnEngSrc_COM_GetApproxWavePlayLength)(const char* filename);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, uint> COM_GetApproxWavePlayLength;
+    public delegate* unmanaged[Cdecl]<NCharPtr, uint> COM_GetApproxWavePlayLength;
     /// <remarks>
     /// Original: pfnEngSrc_pfnGetCareerUI_t pfnGetCareerUI;
     /// Alias: typedef void* (*pfnEngSrc_pfnGetCareerUI_t)();
@@ -618,7 +618,7 @@ public unsafe struct ClientEngineFuncs
     /// Original: pfnEngSrc_Cvar_Set_t Cvar_Set;
     /// Alias: typedef void (*pfnEngSrc_Cvar_Set_t)(const char* cvar, const char* value);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar*, void> Cvar_Set;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NCharPtr, void> Cvar_Set;
     /// <remarks>
     /// Original: pfnEngSrc_pfnIsPlayingCareerMatch_t pfnIsCareerMatch;
     /// Alias: typedef int (*pfnEngSrc_pfnIsPlayingCareerMatch_t)();
@@ -628,12 +628,12 @@ public unsafe struct ClientEngineFuncs
     /// Original: pfnEngSrc_pfnPlaySoundVoiceByName_t pfnPlaySoundVoiceByName;
     /// Alias: typedef void (*pfnEngSrc_pfnPlaySoundVoiceByName_t)(const char* szSound, float volume, int pitch);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, float, int, void> PlaySoundVoiceByName;
+    public delegate* unmanaged[Cdecl]<NCharPtr, float, int, void> PlaySoundVoiceByName;
     /// <remarks>
     /// Original: pfnEngSrc_pfnPrimeMusicStream_t pfnPrimeMusicStream;
     /// Alias: typedef void (*pfnEngSrc_pfnPrimeMusicStream_t)(const char* szFilename, int looping);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int, void> PrimeMusicStream;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int, void> PrimeMusicStream;
     /// <remarks>
     /// Original: pfnEngSrc_GetAbsoluteTime_t GetAbsoluteTime;
     /// Alias: typedef double (*pfnEngSrc_GetAbsoluteTime_t)(void);
@@ -658,7 +658,7 @@ public unsafe struct ClientEngineFuncs
     /// Original: pfnEngSrc_pfnPlaySoundByNameAtPitch_t pfnPlaySoundByNameAtPitch;
     /// Alias: typedef void (*pfnEngSrc_pfnPlaySoundByNameAtPitch_t)(const char* szSound, float volume, int pitch);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, float, int, void> PlaySoundByNameAtPitch;
+    public delegate* unmanaged[Cdecl]<NCharPtr, float, int, void> PlaySoundByNameAtPitch;
     /// <remarks>
     /// Original: pfnEngSrc_pfnFillRGBABlend_t pfnFillRGBABlend;
     /// Alias: typedef void (*pfnEngSrc_pfnFillRGBABlend_t)(int x, int y, int width, int height, int r, int g, int b, int a);
@@ -683,6 +683,6 @@ public unsafe struct ClientEngineFuncs
     /// Original: pfnEngSrc_pfnFilteredClientCmd_t pfnFilteredClientCmd;
     /// Alias: typedef int (*pfnEngSrc_pfnFilteredClientCmd_t)(const char* szCmdString);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int> FilteredClientCmd;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int> FilteredClientCmd;
 }
 

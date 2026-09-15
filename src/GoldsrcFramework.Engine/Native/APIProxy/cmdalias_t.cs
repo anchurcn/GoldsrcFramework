@@ -23,6 +23,6 @@ public unsafe struct cmdalias_t
     /// <remarks>
     /// Original: char* value;
     /// </remarks>
-    public NChar* value;
+    public NCharPtr value;
 }
 

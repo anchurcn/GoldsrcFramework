@@ -17,29 +17,8 @@ public unsafe class StudioModelRenderer
 {
     #region Constants and Enums
 
-    // Move type enumeration
-    private enum MoveType
-    {
-        MOVETYPE_NONE = 0,
-        MOVETYPE_WALK = 3,
-        MOVETYPE_STEP = 4,
-        MOVETYPE_FLY = 5,
-        MOVETYPE_TOSS = 6,
-        MOVETYPE_PUSH = 7,
-        MOVETYPE_NOCLIP = 8,
-        MOVETYPE_FLYMISSILE = 9,
-        MOVETYPE_BOUNCE = 10,
-        MOVETYPE_BOUNCEMISSILE = 11,
-        MOVETYPE_FOLLOW = 12,
-        MOVETYPE_PUSHSTEP = 13
-    }
-
-    // Entity flags
-    [Flags]
-    private enum EntityFlags
-    {
-        EFLAG_SLERP = 1
-    }
+    // Move type and entity flag values now come from the generated enums (MoveType,
+    // EntityFlags, EntityStateFlags) in GoldsrcFramework.Engine.Native.
 
     private const int STUDIO_RENDER = 0x0001;
     private const int STUDIO_EVENTS = 0x0002;
@@ -268,7 +247,7 @@ public unsafe class StudioModelRenderer
             deadplayer.weaponmodel = 0;
             deadplayer.gaitsequence = 0;
 
-            deadplayer.movetype = (int)MoveType.MOVETYPE_NONE;
+            deadplayer.movetype = MoveType.NONE;
             deadplayer.angles = m_pCurrentEntity->curstate.angles;
             deadplayer.origin = m_pCurrentEntity->curstate.origin;
 
@@ -302,7 +281,7 @@ public unsafe class StudioModelRenderer
                 return true;
         }
 
-        if (m_pCurrentEntity->curstate.movetype == (int)MoveType.MOVETYPE_FOLLOW)
+        if (m_pCurrentEntity->curstate.movetype == MoveType.FOLLOW)
         {
             StudioMergeBones(m_pRenderModel);
         }
@@ -997,7 +976,7 @@ public unsafe class StudioModelRenderer
         angles.Z = m_pCurrentEntity->curstate.angles.Z; // ROLL
 
         // Handle MOVETYPE_STEP interpolation
-        if (m_pCurrentEntity->curstate.movetype == (int)MoveType.MOVETYPE_STEP)
+        if (m_pCurrentEntity->curstate.movetype == MoveType.STEP)
         {
             float f = 0;
             float d;
@@ -1026,7 +1005,7 @@ public unsafe class StudioModelRenderer
             mstudioseqdesc_t* pseqdesc = m_pStudioHeader->GetSequences() + m_pCurrentEntity->curstate.sequence;
 
             if ((pseqdesc->motiontype & (int)StudioMotionFlags.STUDIO_LX) != 0 ||
-                (m_pCurrentEntity->curstate.eflags & (int)EntityFlags.EFLAG_SLERP) != 0)
+                (m_pCurrentEntity->curstate.eflags & EntityStateFlags.SLERP) != 0)
             {
                 modelpos.X += (m_pCurrentEntity->origin.X - m_pCurrentEntity->latched.prevorigin.X) * f;
                 modelpos.Y += (m_pCurrentEntity->origin.Y - m_pCurrentEntity->latched.prevorigin.Y) * f;
@@ -1059,7 +1038,7 @@ public unsafe class StudioModelRenderer
                     angles.Z += d * f;
             }
         }
-        else if (m_pCurrentEntity->curstate.movetype != (int)MoveType.MOVETYPE_NONE)
+        else if (m_pCurrentEntity->curstate.movetype != MoveType.NONE)
         {
             angles = m_pCurrentEntity->angles;
         }

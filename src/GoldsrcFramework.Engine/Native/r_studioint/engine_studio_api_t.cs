@@ -32,14 +32,14 @@ public unsafe struct engine_studio_api_t
     /// <remarks>
     /// Original: void (*LoadCacheFile)(char* path, struct cache_user_s* cu);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, cache_user_t*, void> LoadCacheFile;
+    public delegate* unmanaged[Cdecl]<NCharPtr, cache_user_t*, void> LoadCacheFile;
     /// <summary>
     /// Retrieve model pointer for the named model
     /// </summary>
     /// <remarks>
     /// Original: struct model_s* (*Mod_ForName)(const char* name, int crash_if_missing);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int, model_t*> Mod_ForName;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int, model_t*> Mod_ForName;
     /// <summary>
     /// Retrieve pointer to studio model data block from a model
     /// </summary>
@@ -95,7 +95,7 @@ public unsafe struct engine_studio_api_t
     /// <remarks>
     /// Original: struct cvar_s* (*GetCvar)(const char* name);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, cvar_t*> GetCvar;
+    public delegate* unmanaged[Cdecl]<NCharPtr, cvar_t*> GetCvar;
     /// <summary>
     /// Get current render origin and view vectors ( up, right and vpn )
     /// </summary>

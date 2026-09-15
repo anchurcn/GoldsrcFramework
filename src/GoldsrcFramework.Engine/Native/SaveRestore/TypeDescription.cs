@@ -19,7 +19,7 @@ public unsafe struct TYPEDESCRIPTION
     /// <remarks>
     /// Original: const char* fieldName;
     /// </remarks>
-    public NChar* fieldName;
+    public NCharPtr fieldName;
     /// <remarks>
     /// Original: int fieldOffset;
     /// </remarks>

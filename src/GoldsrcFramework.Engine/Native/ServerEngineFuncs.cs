@@ -18,19 +18,19 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: int (*pfnPrecacheModel)(const char* s);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int> PrecacheModel;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int> PrecacheModel;
     /// <remarks>
     /// Original: int (*pfnPrecacheSound)(const char* s);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int> PrecacheSound;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int> PrecacheSound;
     /// <remarks>
     /// Original: void (*pfnSetModel)(edict_t* e, const char* m);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<edict_t*, NChar*, void> SetModel;
+    public delegate* unmanaged[Cdecl]<edict_t*, NCharPtr, void> SetModel;
     /// <remarks>
     /// Original: int (*pfnModelIndex)(const char* m);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int> ModelIndex;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int> ModelIndex;
     /// <remarks>
     /// Original: int (*pfnModelFrames)(int modelIndex);
     /// </remarks>
@@ -42,7 +42,7 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: void (*pfnChangeLevel)(const char* s1, const char* s2);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar*, void> ChangeLevel;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NCharPtr, void> ChangeLevel;
     /// <remarks>
     /// Original: void (*pfnGetSpawnParms)(edict_t* ent);
     /// </remarks>
@@ -74,7 +74,7 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: edict_t* (*pfnFindEntityByString)(edict_t* pEdictStartSearchAfter, const char* pszField, const char* pszValue);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<edict_t*, NChar*, NChar*, edict_t*> FindEntityByString;
+    public delegate* unmanaged[Cdecl]<edict_t*, NCharPtr, NCharPtr, edict_t*> FindEntityByString;
     /// <remarks>
     /// Original: int (*pfnGetEntityIllum)(edict_t* pEnt);
     /// </remarks>
@@ -137,11 +137,11 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: void (*pfnEmitSound)(edict_t* entity, int channel, const char* sample, /*int*/ float volume, float attenuation, int fFlags, int pitch);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<edict_t*, SoundChannel, NChar*, float, float, int, Pitch, void> EmitSound;
+    public delegate* unmanaged[Cdecl]<edict_t*, SoundChannel, NCharPtr, float, float, int, Pitch, void> EmitSound;
     /// <remarks>
     /// Original: void (*pfnEmitAmbientSound)(edict_t* entity, float* pos, const char* samp, float vol, float attenuation, int fFlags, int pitch);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<edict_t*, float*, NChar*, float, float, int, Pitch, void> EmitAmbientSound;
+    public delegate* unmanaged[Cdecl]<edict_t*, float*, NCharPtr, float, float, int, Pitch, void> EmitAmbientSound;
     /// <remarks>
     /// Original: void (*pfnTraceLine)(const float* v1, const float* v2, int fNoMonsters, edict_t* pentToSkip, TraceResult* ptr);
     /// </remarks>
@@ -165,7 +165,7 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: const char* (*pfnTraceTexture)(edict_t* pTextureEntity, const float* v1, const float* v2);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<edict_t*, float*, float*, NChar*> TraceTexture;
+    public delegate* unmanaged[Cdecl]<edict_t*, float*, float*, NCharPtr> TraceTexture;
     /// <remarks>
     /// Original: void (*pfnTraceSphere)(const float* v1, const float* v2, int fNoMonsters, float radius, edict_t* pentToSkip, TraceResult* ptr);
     /// </remarks>
@@ -177,7 +177,7 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: void (*pfnServerCommand)(const char* str);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, void> ServerCommand;
+    public delegate* unmanaged[Cdecl]<NCharPtr, void> ServerCommand;
     /// <remarks>
     /// Original: void (*pfnServerExecute)();
     /// </remarks>
@@ -185,7 +185,7 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: void (*pfnClientCommand)(edict_t* pEdict, const char* szFmt, ...);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<edict_t*, NChar*, void> ClientCommand;
+    public delegate* unmanaged[Cdecl]<edict_t*, NCharPtr, void> ClientCommand;
     /// <remarks>
     /// Original: void (*pfnParticleEffect)(const float* org, const float* dir, float color, float count);
     /// </remarks>
@@ -193,11 +193,11 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: void (*pfnLightStyle)(int style, const char* val);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<int, NChar*, void> LightStyle;
+    public delegate* unmanaged[Cdecl]<int, NCharPtr, void> LightStyle;
     /// <remarks>
     /// Original: int (*pfnDecalIndex)(const char* name);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int> DecalIndex;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int> DecalIndex;
     /// <remarks>
     /// Original: int (*pfnPointContents)(const float* rgflVector);
     /// </remarks>
@@ -237,7 +237,7 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: void (*pfnWriteString)(const char* sz);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, void> WriteString;
+    public delegate* unmanaged[Cdecl]<NCharPtr, void> WriteString;
     /// <remarks>
     /// Original: void (*pfnWriteEntity)(int iValue);
     /// </remarks>
@@ -249,27 +249,27 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: float (*pfnCVarGetFloat)(const char* szVarName);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, float> CVarGetFloat;
+    public delegate* unmanaged[Cdecl]<NCharPtr, float> CVarGetFloat;
     /// <remarks>
     /// Original: const char* (*pfnCVarGetString)(const char* szVarName);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar*> CVarGetString;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NCharPtr> CVarGetString;
     /// <remarks>
     /// Original: void (*pfnCVarSetFloat)(const char* szVarName, float flValue);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, float, void> CVarSetFloat;
+    public delegate* unmanaged[Cdecl]<NCharPtr, float, void> CVarSetFloat;
     /// <remarks>
     /// Original: void (*pfnCVarSetString)(const char* szVarName, const char* szValue);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar*, void> CVarSetString;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NCharPtr, void> CVarSetString;
     /// <remarks>
     /// Original: void (*pfnAlertMessage)(ALERT_TYPE atype, const char* szFmt, ...);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<ALERT_TYPE, NChar*, void> AlertMessage;
+    public delegate* unmanaged[Cdecl]<ALERT_TYPE, NCharPtr, void> AlertMessage;
     /// <remarks>
     /// Original: void (*pfnEngineFprintf)(void* pfile, const char* szFmt, ...);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<void*, NChar*, void> EngineFprintf;
+    public delegate* unmanaged[Cdecl]<void*, NCharPtr, void> EngineFprintf;
     /// <remarks>
     /// Original: void* (*pfnPvAllocEntPrivateData)(edict_t* pEdict, int32 cb);
     /// </remarks>
@@ -285,11 +285,11 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: const char* (*pfnSzFromIndex)(int iString);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<int, NChar*> SzFromIndex;
+    public delegate* unmanaged[Cdecl]<int, NCharPtr> SzFromIndex;
     /// <remarks>
     /// Original: int (*pfnAllocString)(const char* szValue);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int> AllocString;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int> AllocString;
     /// <remarks>
     /// Original: struct entvars_s* (*pfnGetVarsOfEnt)(edict_t* pEdict);
     /// </remarks>
@@ -321,7 +321,7 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: int (*pfnRegUserMsg)(const char* pszName, int iSize);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int, int> RegUserMsg;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int, int> RegUserMsg;
     /// <remarks>
     /// Original: void (*pfnAnimationAutomove)(const edict_t* pEdict, float flTime);
     /// </remarks>
@@ -333,36 +333,36 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: uint32 (*pfnFunctionFromName)(const char* pName);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, uint> FunctionFromName;
+    public delegate* unmanaged[Cdecl]<NCharPtr, uint> FunctionFromName;
     /// <remarks>
     /// Original: const char* (*pfnNameForFunction)(uint32 function);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<uint, NChar*> NameForFunction;
+    public delegate* unmanaged[Cdecl]<uint, NCharPtr> NameForFunction;
     /// <summary>
     /// JOHN: engine callbacks so game DLL can print messages to individual clients
     /// </summary>
     /// <remarks>
     /// Original: void (*pfnClientPrintf)(edict_t* pEdict, PRINT_TYPE ptype, const char* szMsg); // JOHN: engine callbacks so game DLL can print messages to individual clients
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<edict_t*, PRINT_TYPE, NChar*, void> ClientPrintf;
+    public delegate* unmanaged[Cdecl]<edict_t*, PRINT_TYPE, NCharPtr, void> ClientPrintf;
     /// <remarks>
     /// Original: void (*pfnServerPrint)(const char* szMsg);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, void> ServerPrint;
+    public delegate* unmanaged[Cdecl]<NCharPtr, void> ServerPrint;
     /// <summary>
     /// these 3 added
     /// </summary>
     /// <remarks>
     /// Original: const char* (*pfnCmd_Args)();		  // these 3 added
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*> Cmd_Args;
+    public delegate* unmanaged[Cdecl]<NCharPtr> Cmd_Args;
     /// <summary>
     /// so game DLL can easily
     /// </summary>
     /// <remarks>
     /// Original: const char* (*pfnCmd_Argv)(int argc); // so game DLL can easily
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<int, NChar*> Cmd_Argv;
+    public delegate* unmanaged[Cdecl]<int, NCharPtr> Cmd_Argv;
     /// <summary>
     /// access client 'cmd' strings
     /// </summary>
@@ -413,7 +413,7 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: byte* (*pfnLoadFileForMe)(const char* filename, int* pLength);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int*, byte*> LoadFileForMe;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int*, byte*> LoadFileForMe;
     /// <remarks>
     /// Original: void (*pfnFreeFile)(void* buffer);
     /// </remarks>
@@ -424,15 +424,15 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: void (*pfnEndSection)(const char* pszSectionName); // trigger_endsection
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, void> EndSection;
+    public delegate* unmanaged[Cdecl]<NCharPtr, void> EndSection;
     /// <remarks>
     /// Original: int (*pfnCompareFileTime)(const char* filename1, const char* filename2, int* iCompare);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar*, int*, int> CompareFileTime;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NCharPtr, int*, int> CompareFileTime;
     /// <remarks>
     /// Original: void (*pfnGetGameDir)(char* szGetGameDir);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, void> GetGameDir;
+    public delegate* unmanaged[Cdecl]<NCharPtr, void> GetGameDir;
     /// <remarks>
     /// Original: void (*pfnCvar_RegisterVariable)(cvar_t* variable);
     /// </remarks>
@@ -451,7 +451,7 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: edict_t* (*pfnCreateFakeClient)(const char* netname); // returns NULL if fake client can't be created
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, edict_t*> CreateFakeClient;
+    public delegate* unmanaged[Cdecl]<NCharPtr, edict_t*> CreateFakeClient;
     /// <remarks>
     /// Original: void (*pfnRunPlayerMove)(edict_t* fakeclient, const float* viewangles, float forwardmove, float sidemove, float upmove, unsigned short buttons, byte impulse, byte msec);
     /// </remarks>
@@ -466,23 +466,23 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: char* (*pfnGetInfoKeyBuffer)(edict_t* e); // passing in NULL gets the serverinfo
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<edict_t*, NChar*> GetInfoKeyBuffer;
+    public delegate* unmanaged[Cdecl]<edict_t*, NCharPtr> GetInfoKeyBuffer;
     /// <remarks>
     /// Original: char* (*pfnInfoKeyValue)(char* infobuffer, const char* key);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar*, NChar*> InfoKeyValue;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NCharPtr, NCharPtr> InfoKeyValue;
     /// <remarks>
     /// Original: void (*pfnSetKeyValue)(char* infobuffer, const char* key, const char* value);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar*, NChar*, void> SetKeyValue;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NCharPtr, NCharPtr, void> SetKeyValue;
     /// <remarks>
     /// Original: void (*pfnSetClientKeyValue)(int clientIndex, char* infobuffer, const char* key, const char* value);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<int, NChar*, NChar*, NChar*, void> SetClientKeyValue;
+    public delegate* unmanaged[Cdecl]<int, NCharPtr, NCharPtr, NCharPtr, void> SetClientKeyValue;
     /// <remarks>
     /// Original: int (*pfnIsMapValid)(const char* filename);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int> IsMapValid;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int> IsMapValid;
     /// <remarks>
     /// Original: void (*pfnStaticDecal)(const float* origin, int decalIndex, int entityIndex, int modelIndex);
     /// </remarks>
@@ -490,7 +490,7 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: int (*pfnPrecacheGeneric)(const char* s);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int> PrecacheGeneric;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int> PrecacheGeneric;
     /// <summary>
     /// returns the server assigned userid for this player.  useful for logging frags, etc.  returns -1 if the edict couldn't be found in the list of clients
     /// </summary>
@@ -504,7 +504,7 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: void (*pfnBuildSoundMsg)(edict_t* entity, int channel, const char* sample, /*int*/ float volume, float attenuation, int fFlags, int pitch, int msg_dest, int msg_type, const float* pOrigin, edict_t* ed);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<edict_t*, int, NChar*, float, float, int, int, int, int, float*, edict_t*, void> BuildSoundMsg;
+    public delegate* unmanaged[Cdecl]<edict_t*, int, NCharPtr, float, float, int, int, int, int, float*, edict_t*, void> BuildSoundMsg;
     /// <summary>
     /// is this a dedicated server?
     /// </summary>
@@ -515,7 +515,7 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: cvar_t* (*pfnCVarGetPointer)(const char* szVarName);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, cvar_t*> CVarGetPointer;
+    public delegate* unmanaged[Cdecl]<NCharPtr, cvar_t*> CVarGetPointer;
     /// <summary>
     /// returns the server assigned WONid for this player.  useful for logging frags, etc.  returns -1 if the edict couldn't be found in the list of clients
     /// </summary>
@@ -529,23 +529,23 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: void (*pfnInfo_RemoveKey)(char* s, const char* key);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar*, void> Info_RemoveKey;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NCharPtr, void> Info_RemoveKey;
     /// <remarks>
     /// Original: const char* (*pfnGetPhysicsKeyValue)(const edict_t* pClient, const char* key);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<edict_t*, NChar*, NChar*> GetPhysicsKeyValue;
+    public delegate* unmanaged[Cdecl]<edict_t*, NCharPtr, NCharPtr> GetPhysicsKeyValue;
     /// <remarks>
     /// Original: void (*pfnSetPhysicsKeyValue)(const edict_t* pClient, const char* key, const char* value);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<edict_t*, NChar*, NChar*, void> SetPhysicsKeyValue;
+    public delegate* unmanaged[Cdecl]<edict_t*, NCharPtr, NCharPtr, void> SetPhysicsKeyValue;
     /// <remarks>
     /// Original: const char* (*pfnGetPhysicsInfoString)(const edict_t* pClient);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<edict_t*, NChar*> GetPhysicsInfoString;
+    public delegate* unmanaged[Cdecl]<edict_t*, NCharPtr> GetPhysicsInfoString;
     /// <remarks>
     /// Original: unsigned short (*pfnPrecacheEvent)(int type, const char* psz);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<int, NChar*, ushort> PrecacheEvent;
+    public delegate* unmanaged[Cdecl]<int, NCharPtr, ushort> PrecacheEvent;
     /// <remarks>
     /// Original: void (*pfnPlaybackEvent)(int flags, const edict_t* pInvoker, unsigned short eventindex, float delay, const float* origin, const float* angles, float fparam1, float fparam2, int iparam1, int iparam2, int bparam1, int bparam2);
     /// </remarks>
@@ -565,15 +565,15 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: void (*pfnDeltaSetField)(struct delta_s* pFields, const char* fieldname);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<delta_s*, NChar*, void> DeltaSetField;
+    public delegate* unmanaged[Cdecl]<delta_s*, NCharPtr, void> DeltaSetField;
     /// <remarks>
     /// Original: void (*pfnDeltaUnsetField)(struct delta_s* pFields, const char* fieldname);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<delta_s*, NChar*, void> DeltaUnsetField;
+    public delegate* unmanaged[Cdecl]<delta_s*, NCharPtr, void> DeltaUnsetField;
     /// <remarks>
     /// Original: void (*pfnDeltaAddEncoder)(const char* name, void (*conditionalencode)(struct delta_s* pFields, const unsigned char* from, const unsigned char* to));
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, delegate* unmanaged[Cdecl]<delta_s*, byte*, byte*, void>, void> DeltaAddEncoder;
+    public delegate* unmanaged[Cdecl]<NCharPtr, delegate* unmanaged[Cdecl]<delta_s*, byte*, byte*, void>, void> DeltaAddEncoder;
     /// <remarks>
     /// Original: int (*pfnGetCurrentPlayer)();
     /// </remarks>
@@ -585,7 +585,7 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: int (*pfnDeltaFindField)(struct delta_s* pFields, const char* fieldname);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<delta_s*, NChar*, int> DeltaFindField;
+    public delegate* unmanaged[Cdecl]<delta_s*, NCharPtr, int> DeltaFindField;
     /// <remarks>
     /// Original: void (*pfnDeltaSetFieldByIndex)(struct delta_s* pFields, int fieldNumber);
     /// </remarks>
@@ -605,7 +605,7 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: void (*pfnCvar_DirectSet)(struct cvar_s* var, const char* value);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<cvar_t*, NChar*, void> Cvar_DirectSet;
+    public delegate* unmanaged[Cdecl]<cvar_t*, NCharPtr, void> Cvar_DirectSet;
     /// <summary>
     /// Forces the client and server to be running with the same version of the specified file
     /// ( e.g., a player model ).
@@ -614,7 +614,7 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: void (*pfnForceUnmodified)(FORCE_TYPE type, float* mins, float* maxs, const char* filename);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<FORCE_TYPE, float*, float*, NChar*, void> ForceUnmodified;
+    public delegate* unmanaged[Cdecl]<FORCE_TYPE, float*, float*, NCharPtr, void> ForceUnmodified;
     /// <remarks>
     /// Original: void (*pfnGetPlayerStats)(const edict_t* pClient, int* ping, int* packet_loss);
     /// </remarks>
@@ -622,7 +622,7 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: void (*pfnAddServerCommand)(const char* cmd_name, void (*function)());
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, delegate* unmanaged[Cdecl]<void>, void> AddServerCommand;
+    public delegate* unmanaged[Cdecl]<NCharPtr, delegate* unmanaged[Cdecl]<void>, void> AddServerCommand;
     /// <summary>
     /// For voice communications, set which clients hear eachother.
     /// NOTE: these functions take player entity indices (starting at 1).
@@ -638,7 +638,7 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: const char* (*pfnGetPlayerAuthId)(edict_t* e);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<edict_t*, NChar*> GetPlayerAuthId;
+    public delegate* unmanaged[Cdecl]<edict_t*, NCharPtr> GetPlayerAuthId;
     /// <summary>
     /// PSV: Added for CZ training map
     /// const char *(*pfnKeyNameForBinding)		( const char* pBinding );
@@ -646,22 +646,22 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: sequenceEntry_s* (*pfnSequenceGet)(const char* fileName, const char* entryName);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar*, sequenceEntry_s*> SequenceGet;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NCharPtr, sequenceEntry_s*> SequenceGet;
     /// <remarks>
     /// Original: sentenceEntry_s* (*pfnSequencePickSentence)(const char* groupName, int pickMethod, int* picked);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int, int*, sentenceEntry_s*> SequencePickSentence;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int, int*, sentenceEntry_s*> SequencePickSentence;
     /// <summary>
     /// LH: Give access to filesize via filesystem
     /// </summary>
     /// <remarks>
     /// Original: int (*pfnGetFileSize)(const char* filename);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int> GetFileSize;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int> GetFileSize;
     /// <remarks>
     /// Original: unsigned int (*pfnGetApproxWavePlayLen)(const char* filepath);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, uint> GetApproxWavePlayLen;
+    public delegate* unmanaged[Cdecl]<NCharPtr, uint> GetApproxWavePlayLen;
     /// <summary>
     /// MDC: Added for CZ career-mode
     /// </summary>
@@ -675,7 +675,7 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: int (*pfnGetLocalizedStringLength)(const char* label);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int> GetLocalizedStringLength;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int> GetLocalizedStringLength;
     /// <summary>
     /// BGC: added to facilitate persistent storage of tutor message decay values for
     /// different career game profiles.  Also needs to persist regardless of mp.dll being
@@ -704,15 +704,15 @@ public unsafe struct ServerEngineFuncs
     /// <remarks>
     /// Original: void (*pfnQueryClientCvarValue)(const edict_t* player, const char* cvarName);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<edict_t*, NChar*, void> QueryClientCvarValue;
+    public delegate* unmanaged[Cdecl]<edict_t*, NCharPtr, void> QueryClientCvarValue;
     /// <remarks>
     /// Original: void (*pfnQueryClientCvarValue2)(const edict_t* player, const char* cvarName, int requestID);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<edict_t*, NChar*, int, void> QueryClientCvarValue2;
+    public delegate* unmanaged[Cdecl]<edict_t*, NCharPtr, int, void> QueryClientCvarValue2;
     /// <remarks>
     /// Original: int (*pfnCheckParm)(const char* pchCmdLineToken, const char** ppnext);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar**, int> CheckParm;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NCharPtr*, int> CheckParm;
     /// <remarks>
     /// Original: edict_t* (*pfnPEntityOfEntIndexAllEntities)(int iEntIndex);
     /// </remarks>

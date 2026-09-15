@@ -395,7 +395,7 @@ public unsafe struct playermove_t
     /// <remarks>
     /// Original: const char* (*PM_Info_ValueForKey)(const char* s, const char* key);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, NChar*, NChar*> PM_Info_ValueForKey;
+    public delegate* unmanaged[Cdecl]<NCharPtr, NCharPtr, NCharPtr> PM_Info_ValueForKey;
     /// <remarks>
     /// Original: void (*PM_Particle)(float* origin, int color, float life, int zpos, int zvel);
     /// </remarks>
@@ -407,15 +407,15 @@ public unsafe struct playermove_t
     /// <remarks>
     /// Original: void (*Con_NPrintf)(int idx, const char* fmt, ...);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<int, NChar*, void> Con_NPrintf;
+    public delegate* unmanaged[Cdecl]<int, NCharPtr, void> Con_NPrintf;
     /// <remarks>
     /// Original: void (*Con_DPrintf)(const char* fmt, ...);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, void> Con_DPrintf;
+    public delegate* unmanaged[Cdecl]<NCharPtr, void> Con_DPrintf;
     /// <remarks>
     /// Original: void (*Con_Printf)(const char* fmt, ...);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, void> Con_Printf;
+    public delegate* unmanaged[Cdecl]<NCharPtr, void> Con_Printf;
     /// <remarks>
     /// Original: double (*Sys_FloatTime)();
     /// </remarks>
@@ -474,11 +474,11 @@ public unsafe struct playermove_t
     /// <remarks>
     /// Original: int (*COM_FileSize)(const char* filename);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int> COM_FileSize;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int> COM_FileSize;
     /// <remarks>
     /// Original: byte* (*COM_LoadFile)(const char* path, int usehunk, int* pLength);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<NChar*, int, int*, byte*> COM_LoadFile;
+    public delegate* unmanaged[Cdecl]<NCharPtr, int, int*, byte*> COM_LoadFile;
     /// <remarks>
     /// Original: void (*COM_FreeFile)(void* buffer);
     /// </remarks>
@@ -486,7 +486,7 @@ public unsafe struct playermove_t
     /// <remarks>
     /// Original: char* (*memfgets)(byte* pMemFile, int fileSize, int* pFilePos, char* pBuffer, int bufferSize);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<byte*, int, int*, NChar*, int, NChar*> memfgets;
+    public delegate* unmanaged[Cdecl]<byte*, int, int*, NCharPtr, int, NCharPtr> memfgets;
     /// <summary>
     /// Functions
     /// Run functions for this frame?
@@ -498,11 +498,11 @@ public unsafe struct playermove_t
     /// <remarks>
     /// Original: void (*PM_PlaySound)(int channel, const char* sample, float volume, float attenuation, int fFlags, int pitch);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<int, NChar*, float, float, int, int, void> PM_PlaySound;
+    public delegate* unmanaged[Cdecl]<int, NCharPtr, float, float, int, int, void> PM_PlaySound;
     /// <remarks>
     /// Original: const char* (*PM_TraceTexture)(int ground, float* vstart, float* vend);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<int, float*, float*, NChar*> PM_TraceTexture;
+    public delegate* unmanaged[Cdecl]<int, float*, float*, NCharPtr> PM_TraceTexture;
     /// <remarks>
     /// Original: void (*PM_PlaybackEventFull)(int flags, int clientindex, unsigned short eventindex, float delay, float* origin, float* angles, float fparam1, float fparam2, int iparam1, int iparam2, int bparam1, int bparam2);
     /// </remarks>

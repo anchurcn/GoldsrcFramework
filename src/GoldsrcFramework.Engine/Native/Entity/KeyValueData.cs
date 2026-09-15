@@ -21,21 +21,21 @@ public unsafe struct KeyValueData
     /// <remarks>
     /// Original: const char* szClassName; // in: entity classname
     /// </remarks>
-    public NChar* szClassName;
+    public NCharPtr szClassName;
     /// <summary>
     /// in: name of key
     /// </summary>
     /// <remarks>
     /// Original: const char* szKeyName;	 // in: name of key
     /// </remarks>
-    public NChar* szKeyName;
+    public NCharPtr szKeyName;
     /// <summary>
     /// in: value of key
     /// </summary>
     /// <remarks>
     /// Original: const char* szValue;	 // in: value of key
     /// </remarks>
-    public NChar* szValue;
+    public NCharPtr szValue;
     /// <summary>
     /// out: DLL sets to true if key-value pair was understood
     /// </summary>

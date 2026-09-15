@@ -89,10 +89,9 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         LegacyClientInterop.HUD_PlayerMoveInit(ppmove);
     }
 
-    public virtual NChar HUD_PlayerMoveTexture(NChar* name)
+    public virtual NChar HUD_PlayerMoveTexture(NCharPtr name)
     {
-        sbyte result = LegacyClientInterop.HUD_PlayerMoveTexture((sbyte*)name);
-        return new NChar((byte)result);
+        return new NChar(LegacyClientInterop.HUD_PlayerMoveTexture(name));
     }
 
     public virtual void IN_ActivateMouse()
@@ -135,9 +134,9 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         LegacyClientInterop.CL_GetCameraOffsets(ofs);
     }
 
-    public virtual kbutton_t* KB_Find(NChar* name)
+    public virtual kbutton_t* KB_Find(NCharPtr name)
     {
-        return LegacyClientInterop.KB_Find((sbyte*)name);
+        return LegacyClientInterop.KB_Find(name);
     }
 
     public virtual void CAM_Think()
@@ -150,16 +149,16 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         LegacyClientInterop.V_CalcRefdef(pparams);
     }
 
-    public virtual int HUD_AddEntity(int type, cl_entity_t* ent, NChar* modelname)
+    public virtual int HUD_AddEntity(EntityType type, cl_entity_t* ent, NCharPtr modelname)
     {
-        var result = LegacyClientInterop.HUD_AddEntity(type, ent, (sbyte*)modelname);
+        var result = LegacyClientInterop.HUD_AddEntity((int)type, ent, modelname);
 
         // Mark this entity as visible for the ClientSceneManagementSystem.
-        // Only normal entities (ET_NORMAL) and players are tracked. The engine calls this for brush
+        // Only normal entities and players are tracked. The engine calls this for brush
         // model entities too, so doors, platforms and func_wall come through here as well.
-        if (type == 0 || type == 1) // ET_NORMAL = 0, ET_PLAYER = 1
+        if (type is EntityType.NORMAL or EntityType.PLAYER)
         {
-            clientGame?.SceneManagement.MarkEntityVisible(ent, type == 1);
+            clientGame?.SceneManagement.MarkEntityVisible(ent, type == EntityType.PLAYER);
         }
 
         return result;
@@ -222,9 +221,9 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         LegacyClientInterop.Demo_ReadBuffer(size, buffer);
     }
 
-    public virtual int HUD_ConnectionlessPacket(netadr_t* net_from, NChar* args, NChar* response_buffer, int* response_buffer_size)
+    public virtual int HUD_ConnectionlessPacket(netadr_t* net_from, NCharPtr args, NCharPtr response_buffer, int* response_buffer_size)
     {
-        return LegacyClientInterop.HUD_ConnectionlessPacket(net_from, (sbyte*)args, (sbyte*)response_buffer, response_buffer_size);
+        return LegacyClientInterop.HUD_ConnectionlessPacket(net_from, args, response_buffer, response_buffer_size);
     }
 
     public virtual int HUD_GetHullBounds(int hullnumber, float* mins, float* maxs)
@@ -237,7 +236,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         LegacyClientInterop.HUD_Frame(time);
     }
 
-    public virtual int HUD_Key_Event(int eventcode, int keynum, NChar* pszCurrentBinding)
+    public virtual int HUD_Key_Event(int eventcode, int keynum, NCharPtr pszCurrentBinding)
     {
         return LegacyClientInterop.HUD_Key_Event(eventcode, keynum, pszCurrentBinding);
     }
@@ -379,15 +378,15 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         if (engine == null || engine->GetLevelName == null)
             return false;
 
-        NChar* levelName = engine->GetLevelName();
-        if (levelName == null)
+        NCharPtr levelName = engine->GetLevelName();
+        if (levelName.IsNull)
             return false;
 
-        while (length < buffer.Length && length < MaxLevelNameLength && (byte)levelName[length] != 0)
-        {
-            buffer[length] = (byte)levelName[length];
-            length++;
-        }
+        // The engine hands back a NUL-terminated name; copy it out without its terminator,
+        // capped by both the scan bound and the caller's buffer.
+        ReadOnlySpan<byte> name = levelName.AsByteSpan(MaxLevelNameLength);
+        length = Math.Min(name.Length, buffer.Length);
+        name[..length].CopyTo(buffer);
 
         return length > 0;
     }
@@ -409,13 +408,13 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
 
         fixed (byte* namePointer = name)
         {
-            if (engine->GetCvarPointer((NChar*)namePointer) != null)
+            if (engine->GetCvarPointer(NCharPtr.From(namePointer)) != null)
                 return; // already registered (e.g. on re-init)
 
             Span<byte> value = stackalloc byte[8];
             WriteAscii("1", value);
             fixed (byte* valuePointer = value)
-                engine->RegisterVariable((NChar*)namePointer, (NChar*)valuePointer, 0);
+                engine->RegisterVariable(NCharPtr.From(namePointer), NCharPtr.From(valuePointer), 0);
         }
     }
 
@@ -434,7 +433,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
 
         fixed (byte* namePointer = name)
         {
-            cvar_t* cvar = engine->GetCvarPointer((NChar*)namePointer);
+            cvar_t* cvar = engine->GetCvarPointer(NCharPtr.From(namePointer));
             return cvar != null && cvar->value != 0f;
         }
     }
@@ -457,13 +456,13 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
 
         fixed (byte* namePointer = name)
         {
-            if (engine->GetCvarPointer((NChar*)namePointer) != null)
+            if (engine->GetCvarPointer(NCharPtr.From(namePointer)) != null)
                 return; // already registered (e.g. on re-init)
 
             Span<byte> value = stackalloc byte[8];
             WriteAscii("1", value);
             fixed (byte* valuePointer = value)
-                engine->RegisterVariable((NChar*)namePointer, (NChar*)valuePointer, 0);
+                engine->RegisterVariable(NCharPtr.From(namePointer), NCharPtr.From(valuePointer), 0);
         }
     }
 
@@ -484,7 +483,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
 
         fixed (byte* namePointer = name)
         {
-            cvar_t* cvar = engine->GetCvarPointer((NChar*)namePointer);
+            cvar_t* cvar = engine->GetCvarPointer(NCharPtr.From(namePointer));
             return cvar == null || cvar->value != 0f;
         }
     }
@@ -520,7 +519,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         buffer[length] = 0;
 
         fixed (byte* pointer = buffer)
-            engine->ClientCmd((NChar*)pointer);
+            engine->ClientCmd(NCharPtr.From(pointer));
     }
 
     /// <summary>
@@ -541,7 +540,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         buffer[length] = 0;
 
         fixed (byte* pointer = buffer)
-            engine->Con_Printf((NChar*)pointer);
+            engine->Con_Printf(NCharPtr.From(pointer));
     }
 
 }

@@ -39,13 +39,23 @@ public readonly unsafe struct NCharPtr : IEquatable<NCharPtr>
     /// <summary><c>true</c> when the pointer is null.</summary>
     public bool IsNull => _ptr == null;
 
-    // ----- Construction (explicit; deliberate) -----
+    // ----- Construction -----
+    // Wrapping a raw byte* is explicit: that is the path taken when the source is a managed
+    // buffer whose lifetime the caller has to think about. Wrapping a raw NChar* is implicit:
+    // it just reinterprets a pointer that is already native, so it adds no lifetime risk and
+    // keeps the call sites that migrate from NChar* readable.
 
     /// <summary>Wrap a raw <c>byte*</c>. Lifetime is the caller's responsibility.</summary>
     public static NCharPtr From(byte* ptr) => new(ptr);
 
     /// <summary>Wrap a raw <c>NChar*</c>. Lifetime is the caller's responsibility.</summary>
     public static NCharPtr From(NChar* ptr) => new((byte*)ptr);
+
+    /// <summary>
+    /// Implicit wrap of a raw <c>NChar*</c>, so a native <c>char*</c> can be passed wherever an
+    /// <see cref="NCharPtr"/> is expected without a <c>From</c> on every argument.
+    /// </summary>
+    public static implicit operator NCharPtr(NChar* ptr) => new((byte*)ptr);
 
     /// <summary>Wrap a pointer carried as a native integer (<see cref="nint"/>, alias for <see cref="IntPtr"/>).</summary>
     public static NCharPtr From(nint value) => new((byte*)value);
