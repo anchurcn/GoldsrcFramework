@@ -15,21 +15,12 @@ public interface IContentManager
     bool IsExist(string key);
 
     /// <summary>
-    /// Loads a strongly-typed resource. T may be <see cref="Stride.Engine.Model"/> (visual)
-    /// or <see cref="Prefab"/> (physics skeleton template).
+    /// Loads a strongly-typed resource. T may be <see cref="Stride.Engine.Model"/> (visual),
+    /// <see cref="Prefab"/> (physics skeleton template) or
+    /// <see cref="GoldsrcFramework.Engine.Native.StudioModel"/> (studio model header, by model name).
     /// Call <see cref="IsExist"/> first to confirm the resource exists.
     /// </summary>
     T? Load<T>(string key) where T : class;
-
-    /// <summary>
-    /// Returns the studio bone hierarchy of a model: for every studio bone, its parent bone index
-    /// (-1 for a root bone). Brush models have a single implicit root bone, so they return <c>[-1]</c>.
-    /// </summary>
-    /// <remarks>
-    /// Returns an empty array when the hierarchy is unknown. Skeletons still work, but bones without a
-    /// rigid body can then only be anchored to the pivot bone instead of their real parent chain.
-    /// </remarks>
-    int[] GetStudioBoneParents(string key);
 
     /// <summary>
     /// Pre-caches the physics prefabs of every brush model of the current map.

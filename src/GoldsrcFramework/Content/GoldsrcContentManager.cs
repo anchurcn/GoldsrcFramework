@@ -36,8 +36,6 @@ public sealed unsafe class GoldsrcContentManager : IContentManager
     /// <summary>Hard cap on the model table scan, matching gsphysics' lookup table size.</summary>
     private const int MaxModelIndex = 1024;
 
-    private static readonly int[] BrushBoneParents = [-1];
-
     private readonly BspWorldGeometry worldGeometry = new();
     private readonly Dictionary<int, Prefab> brushPrefabs = [];
     private readonly HashSet<int> unusableBrushModels = [];
@@ -54,17 +52,13 @@ public sealed unsafe class GoldsrcContentManager : IContentManager
     /// <inheritdoc/>
     public T? Load<T>(string key) where T : class
     {
+        if (typeof(T) == typeof(StudioModel))
+            return LoadStudioModel(key) as T;
+
         if (typeof(T) != typeof(Prefab))
             return null;
 
         return LoadBrushPrefab(key) as T;
-    }
-
-    /// <inheritdoc/>
-    public int[] GetStudioBoneParents(string key)
-    {
-        // A brush model has a single implicit root bone. The studio hierarchy is a separate part.
-        return [.. BrushBoneParents];
     }
 
     /// <inheritdoc/>
@@ -190,5 +184,37 @@ public sealed unsafe class GoldsrcContentManager : IContentManager
             return false;
 
         return int.TryParse(key.AsSpan(1), out modelIndex) && modelIndex >= 1;
+    }
+
+    /// <summary>
+    /// Loads a studio model by name, e.g. <c>"models/player/gordon.mdl"</c>, and wraps the engine's
+    /// studio model header in a <see cref="StudioModel"/>. Returns null when the name does not
+    /// resolve to a studio model.
+    /// </summary>
+    private static StudioModel? LoadStudioModel(string modelName)
+    {
+        // The engine stores a model name in a char[MAX_MODEL_NAME] buffer, so a longer name cannot
+        // name a model.
+        const int MaxModelName = 64;
+
+        var studio = EngineApi.PStudio;
+        if (studio == null || studio->Mod_ForName == null || studio->Mod_Extradata == null)
+            return null;
+        if (string.IsNullOrEmpty(modelName) || modelName.Length >= MaxModelName)
+            return null;
+
+        Span<byte> buffer = stackalloc byte[MaxModelName];
+        int length = Encoding.ASCII.GetBytes(modelName, buffer);
+        buffer[length] = 0;
+
+        model_t* model;
+        fixed (byte* pointer = buffer)
+            model = studio->Mod_ForName(NCharPtr.From(pointer), 0);
+
+        if (model == null || model->type != modtype_t.mod_studio)
+            return null;
+
+        var header = studio->Mod_Extradata(model);
+        return header == null ? null : new StudioModel((studiohdr_t*)header);
     }
 }

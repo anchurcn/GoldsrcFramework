@@ -210,8 +210,7 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
             {
                 // LoadSkeleton detaches and releases the previous skeleton. The bone hierarchy is
                 // needed so that bones without a rigid body can be anchored to a simulated ancestor.
-                var boneParents = ContentManager.GetStudioBoneParents(ModelKey!);
-                physics.LoadSkeleton(prefab.Instantiate(), boneParents);
+                physics.LoadSkeleton(prefab.Instantiate(), GetStudioBoneParents(ModelKey!));
                 physics.Enable();
                 return;
             }
@@ -219,6 +218,30 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
 
         // No physics data for this model: NullPhysicsSkeleton, rendering still works.
         physics.LoadSkeleton([], []);
+    }
+
+    /// <summary>
+    /// Studio bone hierarchy of the model behind <paramref name="key"/>: for every studio bone its
+    /// parent bone index, -1 for a root bone.
+    /// </summary>
+    /// <remarks>
+    /// Read here rather than requested from the content manager: the content manager only hands out
+    /// the studio header as a <see cref="StudioModel"/>, and the hierarchy is a plain read of it.
+    /// A brush model - or any model without a studio header - has a single implicit root bone, so
+    /// <c>[-1]</c>.
+    /// </remarks>
+    private unsafe int[] GetStudioBoneParents(string key)
+    {
+        var studioModel = ContentManager.Load<StudioModel>(key);
+        if (studioModel is null || studioModel.Header->numbones <= 0)
+            return [-1];
+
+        var bones = studioModel.Header->GetBones();
+        var parents = new int[studioModel.Header->numbones];
+        for (var i = 0; i < parents.Length; i++)
+            parents[i] = bones[i].parent;
+
+        return parents;
     }
 
     /// <summary>
