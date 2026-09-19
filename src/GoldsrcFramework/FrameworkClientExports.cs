@@ -50,7 +50,11 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         LegacyClientInterop.HUD_Init();
 
         var game = new GoldsrcClientGame();
-        game.SceneManagement.ContentManager = new GoldsrcContentManager();
+
+        // The content manager is a service: registered once here, at the composition root, and taken
+        // from the registry by every consumer (the scene management system, the physics behaviors).
+        game.Services.AddService<IContentManager>(new GoldsrcContentManager());
+
         clientGame = game;
         RegisterDebugDrawCvar();
         RegisterPhysicsDepthTestCvar();

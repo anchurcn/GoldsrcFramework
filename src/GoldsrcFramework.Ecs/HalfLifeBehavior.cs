@@ -143,16 +143,16 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
     /// Reloads the physics skeleton when the entity switched to a different model. The first call
     /// always loads.
     /// <para>
-    /// Change detection is <see cref="ValidateModelCookie"/>, which reads the live model cookie and
+    /// Change detection is <see cref="CheckModelChanged"/>, which reads the live model cookie and
     /// compares it with the one the current skeleton was built for.
     /// </para>
     /// </summary>
     private unsafe void EnsureSkeletonLoaded()
     {
-        var modelChanged = ValidateModelCookie(out var newModelCookie);
+        var modelChanged = CheckModelChanged(out var currentCookie);
         if (modelChanged)
         {
-            modelCookie = newModelCookie;
+            modelCookie = currentCookie;
         }
 
         if (skeletonLoaded && !modelChanged)
@@ -168,22 +168,24 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
     /// whether it differs from <see cref="modelCookie"/> - i.e. whether the entity switched to a
     /// different model and the skeleton has to be rebuilt.
     /// </summary>
-    /// <param name="newModelCookie">
+    /// <param name="currentCookie">
     /// The freshly read cookie, for the caller to record when this returns <c>true</c>.
     /// </param>
     /// <returns><c>true</c> when the entity is no longer on the model the skeleton was built for.</returns>
-    private unsafe bool ValidateModelCookie(out IntPtr newModelCookie)
+    private unsafe bool CheckModelChanged(out IntPtr currentCookie)
     {
         if (IsPlayer)
         {
-            newModelCookie = clEntity.PlayerInfo->model.GetNCharPtr();
-            return ModelNameEquals(NCharPtr.From(newModelCookie), NCharPtr.From(modelCookie));
+            // A player model is identified by its name. Comparing names rather than the pointers is
+            // deliberate: the engine hands a model slot back to the free list and reuses it for the
+            // next model, so one address can describe two different models over time.
+            currentCookie = clEntity.PlayerInfo->model.GetNCharPtr();
+            return !ModelNameEquals(NCharPtr.From(currentCookie), NCharPtr.From(modelCookie));
         }
-        else
-        {
-            newModelCookie = clEntity.NativeEntity->curstate.modelindex;
-            return newModelCookie == modelCookie;
-        }
+
+        // Every other model is identified by its index in the engine's model table.
+        currentCookie = clEntity.NativeEntity->curstate.modelindex;
+        return currentCookie != modelCookie;
     }
 
 
@@ -267,18 +269,54 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
 
 
     /// <summary>
-    /// Physics resource key of an entity, or null when this part of the framework cannot provide
-    /// one. Brush models are keyed by model index; studio models are resolved by name elsewhere.
+    /// Physics resource key of an entity, or null when the entity has no physics data.
     /// </summary>
+    /// <remarks>
+    /// A brush model is keyed by model index (<c>*&lt;index&gt;</c>); a studio model is keyed by the
+    /// path of its physics data (<c>models/barney.gpd</c>). Both are what
+    /// <see cref="IContentManager.Load{T}"/> expects.
+    /// </remarks>
     private static unsafe string? GetPhysicsModelKey(cl_entity_t* nativeEntity)
     {
         if (nativeEntity == null || nativeEntity->model == null)
             return null;
+
+        if (nativeEntity->model->type == modtype_t.mod_studio)
+            return GetStudioPhysicsKey(nativeEntity->model);
 
         if (nativeEntity->model->type != modtype_t.mod_brush)
             return null;
 
         int modelIndex = nativeEntity->curstate.modelindex;
         return modelIndex >= 1 ? $"*{modelIndex}" : null;
+    }
+
+    /// <summary>
+    /// Physics resource key of a studio model: its name with the extension replaced by <c>.gpd</c>,
+    /// e.g. <c>models/barney.mdl</c> to <c>models/barney.gpd</c>.
+    /// </summary>
+    /// <remarks>
+    /// The content manager accepts either spelling, so the key stays a plain model path and no
+    /// separate key space is needed. Player models keep the legacy layout
+    /// (<c>models/player.mdl</c>, <c>models/player/gordon/gordon.mdl</c>) because only the
+    /// extension is swapped.
+    /// </remarks>
+    private static unsafe string? GetStudioPhysicsKey(model_t* model)
+    {
+        // The engine keeps a model name in a fixed size char buffer, so a longer name cannot name a
+        // model and needs no handling.
+        Span<char> name = stackalloc char[MaxModelNameLength];
+        int length = 0;
+
+        while (length < MaxModelNameLength && (byte)model->name[length] != 0)
+        {
+            name[length] = (char)(byte)model->name[length];
+            length++;
+        }
+
+        if (length < 5 || !name[..length].EndsWith(".mdl", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        return new string(name[..(length - 4)]) + ".gpd";
     }
 }

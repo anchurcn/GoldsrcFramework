@@ -38,8 +38,15 @@ public sealed unsafe class ClientSceneManagementSystem : SceneEntityLifecycleSys
         this.game = game ?? throw new ArgumentNullException(nameof(game));
     }
 
-    /// <summary>Content manager injected into <see cref="HalfLifeBehavior"/> for physics prefab loading.</summary>
-    public IContentManager? ContentManager { get; set; }
+    /// <summary>
+    /// Content manager used for physics prefab loading, resolved from the service registry.
+    /// </summary>
+    /// <remarks>
+    /// Resolved on demand instead of being injected: it is a service, so the composition root
+    /// registers it once and every consumer - this system and <see cref="HalfLifeBehavior"/> alike -
+    /// takes it from the same registry.
+    /// </remarks>
+    public IContentManager? ContentManager => Services.GetService<IContentManager>();
 
     /// <summary>Returns the entity associated with an entindex, or null if none exists.</summary>
     public Entity? GetEntity(int entindex)
