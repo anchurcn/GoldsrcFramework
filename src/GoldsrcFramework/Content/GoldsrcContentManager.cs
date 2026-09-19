@@ -1,4 +1,5 @@
 using System.Text;
+using GoldsrcFramework.Content.Gpd;
 using GoldsrcFramework.Ecs;
 using GoldsrcFramework.Engine.Native;
 using NativeInterop;
@@ -43,10 +44,12 @@ public sealed unsafe class GoldsrcContentManager : IContentManager
     /// <inheritdoc/>
     public bool IsExist(string key)
     {
-        if (!TryParseBrushKey(key, out int modelIndex))
-            return false;
+        if (TryParseBrushKey(key, out int modelIndex))
+            return GetBrushModel(modelIndex) is not null;
 
-        return GetBrushModel(modelIndex) is not null;
+        // A studio model's physics data is its .gpd. A model the engine has not loaded yet reports
+        // false without being remembered, so the caller retries once the map is up.
+        return ResolveStudioPath(key, out var studioPath) && LoadStudioPhysicsAsset(studioPath) is not null;
     }
 
     /// <inheritdoc/>
@@ -58,7 +61,19 @@ public sealed unsafe class GoldsrcContentManager : IContentManager
         if (typeof(T) != typeof(Prefab))
             return null;
 
-        return LoadBrushPrefab(key) as T;
+        return LoadPrefab(key) as T;
+    }
+
+    /// <summary>
+    /// Loads the physics skeleton prefab of a brush model (<c>*&lt;index&gt;</c>) or of a studio
+    /// model (<c>*.mdl</c> / <c>*.gpd</c>).
+    /// </summary>
+    private Prefab? LoadPrefab(string key)
+    {
+        if (TryParseBrushKey(key, out int modelIndex))
+            return LoadBrushPrefab(modelIndex);
+
+        return ResolveStudioPath(key, out var studioPath) ? LoadStudioPhysicsAsset(studioPath) : null;
     }
 
     /// <inheritdoc/>
@@ -121,6 +136,11 @@ public sealed unsafe class GoldsrcContentManager : IContentManager
         brushPrefabs.Clear();
         unusableBrushModels.Clear();
         worldGeometry.Reset();
+
+        // Studio physics data is bound to the header of a model the engine may unload with the map,
+        // so it is map-scoped as well.
+        studioPhysics.Clear();
+        unusableStudioModels.Clear();
     }
 
     private Prefab? LoadBrushPrefab(string key)
@@ -216,5 +236,147 @@ public sealed unsafe class GoldsrcContentManager : IContentManager
 
         var header = studio->Mod_Extradata(model);
         return header == null ? null : new StudioModel((studiohdr_t*)header);
+    }
+
+    // ── Studio model physics data (.gpd) ──────────────────────────────────────────
+
+    /// <summary>
+    /// Model name plus physics data path of one studio model. The two are kept together so a key in
+    /// either form resolves to the same cache entry.
+    /// </summary>
+    private readonly record struct StudioPath(string Model, string Data);
+
+    /// <summary>
+    /// A studio model's physics skeleton prefab together with the model header checksum it was built
+    /// for, so a model reloaded with different bytes at the same path invalidates the entry.
+    /// </summary>
+    private sealed record StudioPhysicsEntry(string Checksum, Prefab Prefab);
+
+    /// <summary>Physics skeleton prefabs of studio models, keyed by model name.</summary>
+    private readonly Dictionary<string, StudioPhysicsEntry> studioPhysics = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Studio models that are known to have no usable physics data for this map. Remembered so a
+    /// model without a <c>.gpd</c> is not looked up and parsed again for every entity that uses it.
+    /// </summary>
+    private readonly HashSet<string> unusableStudioModels = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Resolves the physics skeleton prefab of a studio model, loading, validating and caching it on
+    /// first use.
+    /// </summary>
+    /// <returns>
+    /// The prefab template, or null when the model has no usable physics data. A failure is only
+    /// remembered when the model itself was available: a model the engine has not loaded yet is
+    /// reported as missing without being cached, so the next call retries.
+    /// </returns>
+    private Prefab? LoadStudioPhysicsAsset(StudioPath path)
+    {
+        if (studioPhysics.TryGetValue(path.Model, out var cached))
+        {
+            // The prefab is only valid for the header it was authored against.
+            if (TryReadStudioChecksum(path.Model, out string liveChecksum) &&
+                GpdFile.ChecksumMatches(cached.Checksum, liveChecksum))
+            {
+                return cached.Prefab;
+            }
+
+            studioPhysics.Remove(path.Model);
+        }
+
+        if (unusableStudioModels.Contains(path.Model))
+            return null;
+
+        var studio = LoadStudioModel(path.Model);
+        if (studio is null)
+            return null; // not a loaded studio model — retry later
+
+        if (!GpdFile.TryComputeChecksum(studio.Header, out string checksum))
+            return null; // the header is unreadable right now — retry later
+
+        if (!GpdFile.TryRead(path.Data, out byte[] xml))
+        {
+            Print($"[gsf] studio physics: {path.Model} has no {path.Data}");
+            unusableStudioModels.Add(path.Model);
+            return null;
+        }
+
+        if (!GpdParser.TryParse(xml, out var asset, out string parseError))
+        {
+            Print($"[gsf] studio physics: {path.Data} is invalid: {parseError}");
+            unusableStudioModels.Add(path.Model);
+            return null;
+        }
+
+        if (!GpdFile.ChecksumMatches(asset!.Checksum, checksum))
+        {
+            Print($"[gsf] studio physics: {path.Data} was authored against a different model");
+            unusableStudioModels.Add(path.Model);
+            return null;
+        }
+
+        var prefab = StudioPhysicsPrefabFactory.TryCreate(asset, studio.Header, out string buildError);
+        if (prefab is null)
+        {
+            Print($"[gsf] studio physics: {path.Data} cannot be built: {buildError}");
+            unusableStudioModels.Add(path.Model);
+            return null;
+        }
+
+        studioPhysics[path.Model] = new StudioPhysicsEntry(checksum, prefab);
+
+        // One line per model per map, mirroring the brush diagnostic above.
+        Print($"[gsf] studio physics: {path.Model} -> {asset.RigidBodies.Length} bodies, " +
+              $"{asset.Constraints.Length} constraints, {studio.Header->numbones} bones");
+
+        return prefab;
+    }
+
+    /// <summary>
+    /// Checksum of the studio header the engine currently has loaded for a model, if it can be read.
+    /// </summary>
+    private bool TryReadStudioChecksum(string modelPath, out string checksum)
+    {
+        checksum = string.Empty;
+
+        var studio = LoadStudioModel(modelPath);
+        return studio is not null && GpdFile.TryComputeChecksum(studio.Header, out checksum);
+    }
+
+    /// <summary>
+    /// Resolves a studio model key to the model name and the physics data path.
+    /// </summary>
+    /// <remarks>
+    /// Both spellings are accepted so callers can use whichever name they already hold:
+    /// <c>models/barney.mdl</c> and <c>models/barney.gpd</c> resolve to the same pair. Player models
+    /// keep the legacy layout (<c>models/player.mdl</c> and
+    /// <c>models/player/gordon/gordon.mdl</c>) because this only swaps the extension.
+    /// </remarks>
+    private static bool ResolveStudioPath(string key, out StudioPath path)
+    {
+        path = default;
+
+        if (string.IsNullOrEmpty(key) || key.Length <= 4)
+            return false;
+
+        // The engine resolves these names inside its search path, so a drive or a directory traversal
+        // must never reach it.
+        if (key.Contains("..", StringComparison.Ordinal) || key.Contains(':') || key[0] is '/' or '\\')
+            return false;
+
+        ReadOnlySpan<char> name = key;
+        if (name.EndsWith(".gpd", StringComparison.OrdinalIgnoreCase))
+        {
+            path = new StudioPath(key[..^4] + ".mdl", key);
+            return true;
+        }
+
+        if (name.EndsWith(".mdl", StringComparison.OrdinalIgnoreCase))
+        {
+            path = new StudioPath(key, key[..^4] + ".gpd");
+            return true;
+        }
+
+        return false;
     }
 }
