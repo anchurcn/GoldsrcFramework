@@ -156,12 +156,16 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         // Mark this entity as visible for the ClientSceneManagementSystem.
         // Only normal entities and players are tracked. The engine calls this for brush
         // model entities too, so doors, platforms and func_wall come through here as well.
-        if (type is EntityType.NORMAL or EntityType.PLAYER)
+        if (type is EntityType.NORMAL)
         {
-            clientGame?.SceneManagement.MarkEntityVisible(ent, type == EntityType.PLAYER);
+            clientGame?.SceneManagement.MarkEntityVisible(ent, false, null);
+        }
+        else if (type is EntityType.PLAYER)
+        {
+            clientGame?.SceneManagement.MarkEntityVisible(ent, true, EngineApi.PStudio->PlayerInfo(ent->index - 1));
         }
 
-        return result;
+            return result;
     }
 
     public virtual void HUD_CreateEntities()
@@ -249,6 +253,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
             return;
 
         game.SyncGravity(cl_gravity);
+        game.SceneManagement?.MarkWorldSpawnVisible(EngineApi.PClient->GetEntityByIndex(0));
         game.Tick(TimeSpan.FromSeconds(client_time), TimeSpan.FromSeconds(Math.Min(frametime, 0.1)));
 
     }

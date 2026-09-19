@@ -1,3 +1,4 @@
+using GoldsrcFramework.Engine.Native;
 using GoldsrcFramework.LinearMath;
 using NativeInterop;
 using Stride.Engine;
@@ -21,10 +22,13 @@ namespace GoldsrcFramework.Ecs;
 public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
 {
     /// <summary>The physics controller for this entity, created during <see cref="OnEnter"/>.</summary>
-    public PhysicsController? PhysicsController { get; private set; }
+    public PhysicsController PhysicsController { get; private set; }
 
-    /// <summary>Whether this entity is a player (model validated by name instead of by pointer).</summary>
-    public bool IsPlayer { get; set; }
+    /// <summary>
+    /// Whether this entity is a player. Selects how the model cookie is read: a player model is
+    /// identified by its name, every other model by its index.
+    /// </summary>
+    public bool IsPlayer => clEntity.IsPlayer;
 
     /// <summary>Whether the entity is currently playing a death sequence. Set externally.</summary>
     public bool IsPlayingDeathSequence { get; set; }
@@ -35,33 +39,49 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
     public bool RagdollRigged { get; private set; }
 
     /// <summary>Content manager used to load physics prefabs. Set by the entity creation system.</summary>
-    public IContentManager? ContentManager { get; set; }
+    public IContentManager ContentManager { get; set; }
 
     /// <summary>The model key used for loading the physics prefab. Set externally each frame.</summary>
     public string? ModelKey { get; set; }
 
-    private Components.ClEntityComponent? clEntity;
-    private int modelIndex;
-    private NCharPtr modelNamePtr;
-    private bool skeletonLoaded;
+    private Components.ClEntityComponent clEntity;
 
+    /// <summary>
+    /// Identity of the model the currently loaded physics skeleton was built for - the record that
+    /// <see cref="ValidateModelCookie"/> compares the live engine state against. Only written when
+    /// the model actually changed, so it never drifts away from the skeleton it describes.
+    /// <para>
+    /// The value is a cookie: it is only ever compared, never interpreted as an address or an index -
+    /// which of the two it is follows from <see cref="IsPlayer"/>. For players it is the native
+    /// pointer to the model name (<c>model_t.name</c>); for every other entity the native
+    /// <c>curstate.modelindex</c>, or <c>-1</c> when there is no native entity.
+    /// </para>
+    /// </summary>
+    private IntPtr modelCookie;
+
+    private bool skeletonLoaded;
+    private bool onEnter;
     private const int MaxModelNameLength = 64; // MAX_MODEL_NAME
+
+    public HalfLifeBehavior()
+    {
+        // Init on start.
+        ContentManager = null!;
+        clEntity = null!;
+        PhysicsController = null!;
+    }
+    public override void Start()
+    {
+        ContentManager = this.Entity.EntityManager.Services.GetService<IContentManager>()
+            ?? throw new NullReferenceException("IContentManager is not registered.");
+        clEntity = Entity.Get<Components.ClEntityComponent>();
+        PhysicsController = new PhysicsController();
+        Entity.Components.Add(PhysicsController);
+    }
 
     public void OnEnter()
     {
-        clEntity = Entity.Get<Components.ClEntityComponent>();
-
-        if (PhysicsController is null)
-        {
-            PhysicsController = new PhysicsController();
-            Entity.Components.Add(PhysicsController);
-
-            // First time we see this entity: load (and enable) the skeleton.
-            EnsureSkeletonLoaded();
-        }
-
-        // Coming back into the PVS: the skeleton is still loaded, just re-attach it.
-        PhysicsController.Enable();
+        onEnter = true;
     }
 
     public void OnExit()
@@ -71,9 +91,8 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
 
     public override void Update(GameTime gameTime)
     {
+        EnsureSkeletonLoaded();
         var physics = PhysicsController;
-        if (physics is null)
-            return;
 
         // The skeleton is currently living in a ragdoll temp entity: only watch for respawn.
         if (RagdollRigged)
@@ -87,7 +106,11 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
             return;
         }
 
-        EnsureSkeletonLoaded();
+        if (onEnter)
+        {
+            physics.Enable();
+            onEnter = false;
+        }
 
         // Only a kinematic, enabled skeleton is driven by the animation each frame.
         if (!physics.IsEnabled || physics.MotionType != PhysicsMotionType.Kinematic)
@@ -117,55 +140,56 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
     }
 
     /// <summary>
-    /// Compares the current model identity against the last loaded one and reloads the skeleton when
-    /// it changed. The first call always loads.
+    /// Reloads the physics skeleton when the entity switched to a different model. The first call
+    /// always loads.
     /// <para>
-    /// Non-player entities are identified by their native <c>modelindex</c>; players are identified
-    /// by the native model name string, because player models resolve by name rather than index.
+    /// Change detection is <see cref="ValidateModelCookie"/>, which reads the live model cookie and
+    /// compares it with the one the current skeleton was built for.
     /// </para>
     /// </summary>
     private unsafe void EnsureSkeletonLoaded()
     {
-        if (ContentManager is null || ModelKey is null)
-            return;
-
-        bool modelChanged;
-        if (IsPlayer)
+        var modelChanged = ValidateModelCookie(out var newModelCookie);
+        if (modelChanged)
         {
-            var currentName = GetCurrentModelNamePointer();
-            modelChanged = !ModelNameEquals(currentName, modelNamePtr);
-            modelNamePtr = currentName;
-        }
-        else
-        {
-            int currentIndex = clEntity is not null && clEntity.HasNativeEntity
-                ? clEntity.NativeEntity->curstate.modelindex
-                : -1;
-            modelChanged = modelIndex != currentIndex;
-            modelIndex = currentIndex;
+            modelCookie = newModelCookie;
         }
 
         if (skeletonLoaded && !modelChanged)
             return;
 
         skeletonLoaded = true;
+        ModelKey = GetPhysicsModelKey(clEntity.NativeEntity);
         ReloadSkeleton();
     }
 
     /// <summary>
-    /// Pointer to the current native model name (a NUL-terminated ASCII string in <c>model_t.name</c>),
-    /// or <see cref="NCharPtr.Null"/> when no model is bound.
+    /// Reads the cookie of the model the engine has bound to this entity right now and reports
+    /// whether it differs from <see cref="modelCookie"/> - i.e. whether the entity switched to a
+    /// different model and the skeleton has to be rebuilt.
     /// </summary>
-    private unsafe NCharPtr GetCurrentModelNamePointer()
+    /// <param name="newModelCookie">
+    /// The freshly read cookie, for the caller to record when this returns <c>true</c>.
+    /// </param>
+    /// <returns><c>true</c> when the entity is no longer on the model the skeleton was built for.</returns>
+    private unsafe bool ValidateModelCookie(out IntPtr newModelCookie)
     {
-        if (clEntity is not { HasNativeEntity: true })
-            return NCharPtr.Null;
-
-        return clEntity.NativeEntity->model is null ? NCharPtr.Null : clEntity.NativeEntity->model->name.GetNCharPtr();
+        if (IsPlayer)
+        {
+            newModelCookie = clEntity.PlayerInfo->model.GetNCharPtr();
+            return ModelNameEquals(NCharPtr.From(newModelCookie), NCharPtr.From(modelCookie));
+        }
+        else
+        {
+            newModelCookie = clEntity.NativeEntity->curstate.modelindex;
+            return newModelCookie == modelCookie;
+        }
     }
 
+
     /// <summary>
-    /// Compares two native model name strings ignoring case, without allocating a managed string.
+    /// Compares two native model name strings byte for byte, without allocating a managed string.
+    /// Reads at most <see cref="MaxModelNameLength"/> bytes of each, stopping at the terminating NUL.
     /// </summary>
     private static bool ModelNameEquals(NCharPtr current, NCharPtr last)
     {
@@ -179,7 +203,7 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
     {
         var physics = PhysicsController!;
 
-        if (ContentManager!.IsExist(ModelKey!))
+        if (ContentManager.IsExist(ModelKey!))
         {
             var prefab = ContentManager.Load<Prefab>(ModelKey!);
             if (prefab is not null)
@@ -215,5 +239,23 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
         // reading one inside the Update phase.
         Entity.Transform.UpdateWorldMatrix();
         return [Entity.Transform.WorldMatrix.ToMatrix3x4()];
+    }
+
+
+
+    /// <summary>
+    /// Physics resource key of an entity, or null when this part of the framework cannot provide
+    /// one. Brush models are keyed by model index; studio models are resolved by name elsewhere.
+    /// </summary>
+    private static unsafe string? GetPhysicsModelKey(cl_entity_t* nativeEntity)
+    {
+        if (nativeEntity == null || nativeEntity->model == null)
+            return null;
+
+        if (nativeEntity->model->type != modtype_t.mod_brush)
+            return null;
+
+        int modelIndex = nativeEntity->curstate.modelindex;
+        return modelIndex >= 1 ? $"*{modelIndex}" : null;
     }
 }

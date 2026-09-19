@@ -57,7 +57,7 @@ public sealed unsafe class ClientSceneManagementSystem : SceneEntityLifecycleSys
     /// read while the Stride entity for it is being created.
     /// </param>
     /// <param name="isPlayer">True for <c>ET_PLAYER</c> entities, which resolve their model by name.</param>
-    public void MarkEntityVisible(cl_entity_t* nativeEntity, bool isPlayer)
+    public void MarkEntityVisible(cl_entity_t* nativeEntity, bool isPlayer, player_info_t* pPlayerInfo)
     {
         if (nativeEntity == null)
             return;
@@ -67,7 +67,12 @@ public sealed unsafe class ClientSceneManagementSystem : SceneEntityLifecycleSys
             return; // worldspawn handled separately
 
         thisFrameVisible.Add(entindex);
-        visibleState[entindex] = new VisibleEntity(nativeEntity, isPlayer);
+        visibleState[entindex] = new VisibleEntity(nativeEntity, isPlayer, pPlayerInfo);
+    }
+
+    public void MarkWorldSpawnVisible(cl_entity_t* nativeEntity)
+    {
+        visibleState[nativeEntity->index] = new VisibleEntity(nativeEntity, false, null); // index is zero.
     }
 
     /// <summary>
@@ -99,13 +104,11 @@ public sealed unsafe class ClientSceneManagementSystem : SceneEntityLifecycleSys
         // in an empty worldspawn (which would leave worldspawn with no StaticComponent to debug-draw).
         if (!hasWorldspawn && ContentManager is not null && ContentManager.IsExist(WorldspawnKey))
         {
-            var worldspawn = CreateWorldspawnEntity();
-            if (worldspawn is not null)
-            {
-                activeEntities[0] = worldspawn;
-                game.Add(worldspawn);
-                hasWorldspawn = true;
-            }
+            var worldspawnEntIndex = 0;
+            var entity = CreateEntity(worldspawnEntIndex);
+            activeEntities[worldspawnEntIndex] = entity;
+            pendingAdd.Add(entity);
+            hasWorldspawn = true;
         }
 
         // Collect entities that entered this frame (visible now, not visible last frame)
@@ -166,63 +169,25 @@ public sealed unsafe class ClientSceneManagementSystem : SceneEntityLifecycleSys
             entity.Components.Add(new GoldsrcTransformLinkComponent(
                 new ClEntityTransformBinding(visible.NativeEntity),
                 TransformAuthority.Goldsrc));
+
+            if (visible.IsPlayer)
+            {
+                entity.Components.Add(new ClEntityComponent(visible.NativeEntity));
+
+            }
+            else
+            {
+                entity.Components.Add(new ClEntityComponent(visible.NativeEntity));
+            }
+
+            var behavior = new HalfLifeBehavior();
+            entity.Components.Add(behavior);
         }
         else
         {
-            entity.Components.Add(new GoldsrcTransformLinkComponent());
+            throw new InvalidOperationException("Native entity cannot be null.");
         }
-
-        var behavior = new HalfLifeBehavior
-        {
-            ContentManager = ContentManager,
-            IsPlayer = visible.IsPlayer,
-            ModelKey = GetPhysicsModelKey(visible.NativeEntity),
-        };
-
-        if (visible.NativeEntity is not null)
-            entity.Components.Add(new ClEntityComponent(visible.NativeEntity));
-
-        entity.Components.Add(behavior);
-
         return entity;
-    }
-
-    private Entity? CreateWorldspawnEntity()
-    {
-        var entity = new Entity("Entity@0(\"worldspawn\")");
-        entity.Components.Add(new GoldsrcTransformLinkComponent());
-
-        // worldspawn uses StaticComponent + MeshCollider, no PhysicsController/HalfLifeBehavior.
-        // The physics prefab is loaded by ContentManager and instantiated here.
-        // Returns null (instead of an empty entity) when the world prefab is not ready, so the caller
-        // can retry next frame rather than committing a worldspawn with no collidable.
-        if (ContentManager is null)
-            return null;
-
-        var prefab = ContentManager.Load<Prefab>(WorldspawnKey);
-        if (prefab is null)
-            return null;
-
-        foreach (var bone in prefab.Instantiate())
-            bone.Transform.Parent = entity.Transform;
-
-        return entity;
-    }
-
-    /// <summary>
-    /// Physics resource key of an entity, or null when this part of the framework cannot provide
-    /// one. Brush models are keyed by model index; studio models are resolved by name elsewhere.
-    /// </summary>
-    private static string? GetPhysicsModelKey(cl_entity_t* nativeEntity)
-    {
-        if (nativeEntity == null || nativeEntity->model == null)
-            return null;
-
-        if (nativeEntity->model->type != modtype_t.mod_brush)
-            return null;
-
-        int modelIndex = nativeEntity->curstate.modelindex;
-        return modelIndex >= 1 ? $"*{modelIndex}" : null;
     }
 
     private static string DescribeEntity(int entindex, cl_entity_t* nativeEntity)
@@ -252,14 +217,16 @@ public sealed unsafe class ClientSceneManagementSystem : SceneEntityLifecycleSys
     /// <summary>Native entity seen this frame plus the metadata needed to build its Stride entity.</summary>
     private readonly struct VisibleEntity
     {
-        public VisibleEntity(cl_entity_t* nativeEntity, bool isPlayer)
+        public VisibleEntity(cl_entity_t* nativeEntity, bool isPlayer, player_info_t* pPlayerInfo)
         {
             NativeEntity = nativeEntity;
             IsPlayer = isPlayer;
+            PPlayerInfo = pPlayerInfo;
         }
 
         public cl_entity_t* NativeEntity { get; }
 
         public bool IsPlayer { get; }
+        public player_info_t* PPlayerInfo { get; }
     }
 }

@@ -16,11 +16,21 @@ public unsafe sealed class ClEntityComponent : EntityComponent
     public ClEntityComponent(cl_entity_t* nativeEntity)
     {
         NativeEntity = nativeEntity;
+        PlayerInfo = null;
+    }
+
+    public ClEntityComponent(cl_entity_t* nativeEntity, player_info_t* pPlayerInfo)
+    {
+        NativeEntity = nativeEntity;
+        PlayerInfo = pPlayerInfo;
     }
 
     public cl_entity_t* NativeEntity { get; set; }
+    public player_info_t* PlayerInfo { get; set; }
 
     public bool HasNativeEntity => NativeEntity != null;
 
     public int Index => NativeEntity != null ? NativeEntity->index : -1;
+
+    public bool IsPlayer => NativeEntity->player.Value != 0;
 }
