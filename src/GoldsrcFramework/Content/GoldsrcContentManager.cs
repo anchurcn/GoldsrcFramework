@@ -56,13 +56,26 @@ public sealed unsafe class GoldsrcContentManager : IContentManager
     public T? Load<T>(string key) where T : class
     {
         if (typeof(T) == typeof(StudioModel))
-            return LoadStudioModel(key) as T;
+            return LoadStudioModel(ResolveStudioModelName(key)) as T;
 
         if (typeof(T) != typeof(Prefab))
             return null;
 
         return LoadPrefab(key) as T;
     }
+
+    /// <summary>
+    /// Model name behind a studio key: the key itself when it already names a model, otherwise the
+    /// model the key's physics data belongs to.
+    /// </summary>
+    /// <remarks>
+    /// A studio key is either <c>models/barney.mdl</c> or <c>models/barney.gpd</c>, and only the
+    /// former may be handed to the engine: naming the physics data takes the model loader through
+    /// its format dispatch, which reports the file as an unknown format and loads nothing. A key
+    /// that names neither (the engine may still resolve it on its own) is passed through unchanged.
+    /// </remarks>
+    private static string ResolveStudioModelName(string key)
+        => ResolveStudioPath(key, out var path) ? path.Model : key;
 
     /// <summary>
     /// Loads the physics skeleton prefab of a brush model (<c>*&lt;index&gt;</c>) or of a studio

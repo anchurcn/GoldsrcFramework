@@ -12,7 +12,6 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\GoldsrcFramework.Ecs\GoldsrcFramework.Ecs.csproj" />
 		<ProjectReference Include="..\GoldsrcFramework.Engine\GoldsrcFramework.Engine.csproj" />
 		<ProjectReference Include="..\GoldsrcFramework.Math\GoldsrcFramework.Math.csproj" />
 	</ItemGroup>
@@ -28,6 +27,7 @@
 		<PackageReference Include="Silk.NET.OpenGL" Version="2.23.0" />
 		<PackageReference Include="Stride.Engine" Version="4.4.0-beta4" />
 		<PackageReference Include="Stride.Graphics" Version="4.4.0-beta4" />
+		<PackageReference Include="Stride.BepuPhysics" Version="4.4.0-beta4" />
 	</ItemGroup>
 
 	<PropertyGroup>
