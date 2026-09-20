@@ -70,13 +70,56 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
         clEntity = null!;
         PhysicsController = null!;
     }
+    /// <summary>
+    /// Binds the entity level dependencies and makes sure exactly one <see cref="PhysicsController"/>
+    /// is attached to this entity.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b><see cref="Start"/> is not called once per instance.</b> The script system forgets a script
+    /// whenever its entity leaves the scene - Stride reports that as a component removal, because
+    /// removing an entity from the <c>EntityManager</c> notifies the processors with <c>forceRemove</c> -
+    /// so an entity that leaves and later re-enters the PVS is registered again and
+    /// <see cref="Start"/> runs a second time on the <b>same</b> instance. Upstream behaves the same
+    /// way: <c>ScriptProcessor</c> maps those same notifications onto <c>ScriptSystem.Add</c> /
+    /// <c>Remove</c>, and <c>Add</c> queues the script for <c>Start</c> again.
+    /// </para>
+    /// <para>
+    /// Everything here is therefore written to be re-entrant, and the controller is taken from the
+    /// entity instead of being created unconditionally.
+    /// </para>
+    /// </remarks>
     public override void Start()
     {
         ContentManager = this.Entity.EntityManager.Services.GetService<IContentManager>()
             ?? throw new NullReferenceException("IContentManager is not registered.");
         clEntity = Entity.Get<Components.ClEntityComponent>();
-        PhysicsController = new PhysicsController();
-        Entity.Components.Add(PhysicsController);
+
+        // Reuse what a previous Start left on the entity: the controller outlives the entity leaving
+        // the scene, and a second component of a type without [AllowMultipleComponents] cannot be added
+        // to the same entity at all. Nothing else needs to be redone for the re-entering case either -
+        // Disable() only detaches the bone entities and keeps them, so Enable() (which OnEnter leads to)
+        // restores that very same skeleton. The skeleton and model state below is deliberately left
+        // untouched on a re-entering entity, so it keeps its pose instead of reloading the prefab.
+        PhysicsController = GetOrAddPhysicsController();
+    }
+
+    /// <summary>
+    /// The controller attached to this entity, adding one when there is none yet.
+    /// </summary>
+    /// <remarks>
+    /// The lookup goes through <see cref="Entity.Get{T}"/> - this entity's own components, children
+    /// excluded - so an entity that re-enters the scene hands back the controller its first
+    /// <see cref="Start"/> created instead of stacking a second one.
+    /// </remarks>
+    private PhysicsController GetOrAddPhysicsController()
+    {
+        if (Entity.Get<PhysicsController>() is { } existing)
+            return existing;
+
+        var controller = new PhysicsController();
+        Entity.Components.Add(controller);
+        return controller;
     }
 
     public void OnEnter()

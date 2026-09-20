@@ -179,7 +179,7 @@ public sealed unsafe class ClientSceneManagementSystem : SceneEntityLifecycleSys
 
             if (visible.IsPlayer)
             {
-                entity.Components.Add(new ClEntityComponent(visible.NativeEntity));
+                entity.Components.Add(new ClEntityComponent(visible.NativeEntity, visible.PPlayerInfo));
 
             }
             else

@@ -296,7 +296,8 @@ public sealed class PhysicsController : EntityComponent
             if (mask is not null && boneIndex < mask.Length && !mask[boneIndex])
                 continue;
 
-            pose[boneIndex] = ComposeWorldMatrix(body.Position, body.Orientation).ToMatrix3x4();
+            // A body pose is centred on the collider's mass; report the bone's own origin instead.
+            pose[boneIndex] = ComposeWorldMatrix(ToBoneOrigin(bone, body), body.Orientation).ToMatrix3x4();
         }
 
         // 2. Non-simulated bones follow their anchor, which is always a simulated bone and has just been
@@ -531,18 +532,46 @@ public sealed class PhysicsController : EntityComponent
     private static void SetPhysicsBonePose(PhysicsBoneData bone, StrideMatrix pose)
     {
         pose.Decompose(out StrideVector3 _, out StrideQuaternion rotation, out StrideVector3 translation);
-        bone.Body?.Teleport(translation, rotation);
+
+        // The caller hands us the bone's own origin, while a body pose is expressed at the
+        // collider's center of mass; the two differ by the rotated offset.
+        bone.Body?.Teleport(translation + BoneCenterOfMassOffset(bone, rotation), rotation);
     }
 
     private static StrideMatrix GetBoneWorldMatrix(PhysicsBoneData bone)
     {
         if (bone.Body is { } body)
-            return ComposeWorldMatrix(body.Position, body.Orientation);
+            return ComposeWorldMatrix(ToBoneOrigin(bone, body), body.Orientation);
 
         // Static bones (worldspawn) have no physics pose to read; fall back to the entity transform.
         bone.Bone.Transform.UpdateWorldMatrix();
         return bone.Bone.Transform.WorldMatrix;
     }
+
+    /// <summary>
+    /// Position of a bone's own origin, given the pose of its body.
+    /// </summary>
+    /// <remarks>
+    /// A Stride body pose is expressed at the collider's center of mass rather than at the entity
+    /// transform - <c>CollidableComponent</c> converts between the two when it attaches and when it
+    /// writes back - so the pose <see cref="SetPose"/> sends to the simulation is centred on that
+    /// mass. Subtracting the offset again is what makes the round trip return the bone origin the
+    /// caller works in, and what puts each shape where the bind pose puts it.
+    /// </remarks>
+    private static StrideVector3 ToBoneOrigin(PhysicsBoneData bone, BodyComponent body)
+        => body.Position - BoneCenterOfMassOffset(bone, body.Orientation);
+
+    /// <summary>
+    /// The collider's center of mass, rotated from the bone's frame into world space.
+    /// </summary>
+    /// <remarks>
+    /// Read on every call instead of being cached: a collider only learns its center of mass once it
+    /// is attached to a simulation, and detaching resets it to zero. It stays zero for every collider
+    /// that is not a compound - a brush model's mesh in particular - so those bones convert to and
+    /// from nothing.
+    /// </remarks>
+    private static StrideVector3 BoneCenterOfMassOffset(PhysicsBoneData bone, StrideQuaternion rotation)
+        => StrideVector3.Transform(bone.Collidable.CenterOfMass, rotation);
 
     private static StrideMatrix ComposeWorldMatrix(StrideVector3 translation, StrideQuaternion rotation)
     {
