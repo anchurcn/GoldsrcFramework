@@ -63,6 +63,13 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
     private bool onEnter;
     private const int MaxModelNameLength = 64; // MAX_MODEL_NAME
 
+    /// <summary>
+    /// Studio bone matrices of the model, as written by <c>PreStudioModelRenderer</c>. Allocated on
+    /// first use - a brush model never needs it - and reused afterwards, because it is a plain output
+    /// buffer that carries no per-frame state of its own.
+    /// </summary>
+    private Matrix3x4[]? studioPose;
+
     public HalfLifeBehavior()
     {
         // Init on start.
@@ -159,7 +166,7 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
         if (!physics.IsEnabled || physics.MotionType != PhysicsMotionType.Kinematic)
             return;
 
-        if (IsPlayingDeathSequence)
+        if (IsPlayingDeathSequence && !physics.IsNullSkeleton)
         {
             // Hand the current pose over to the ragdoll. The snapshot keeps the pose of bones that
             // have no rigid body - a fist stays clenched instead of relaxing into the bind pose.
@@ -295,18 +302,30 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
     /// </summary>
     /// <remarks>
     /// Brush models have a single implicit root bone that sits at the model origin, so a one element
-    /// pose is the whole skeleton. Studio models need the full studio bone array, which comes from
-    /// <c>PreStudioModelRenderer.SetupBones</c> - not implemented in this part.
+    /// pose is the whole skeleton. A studio model instead needs the whole studio bone array of the
+    /// animation the engine has applied to the entity this frame, which <c>PreStudioModelRenderer</c>
+    /// produces - the same array the renderer draws from.
     /// </remarks>
-    private Matrix3x4[]? GetCurrentPose()
+    private unsafe Matrix3x4[]? GetCurrentPose()
     {
-        if (PhysicsController!.PhysicsBones.Count != 1)
+        if (PhysicsController!.PhysicsBones.Count == 1)
+        {
+            // World matrices are only refreshed during the Draw phase, so refresh explicitly before
+            // reading one inside the Update phase.
+            Entity.Transform.UpdateWorldMatrix();
+            return [Entity.Transform.WorldMatrix.ToMatrix3x4()];
+        }
+
+        // Anything else is a studio model. Sampling its animation here, in the script stage, is what
+        // keeps the skeleton in step with the model: a kinematic skeleton is driven from a pose, and
+        // the render pass runs too late to hand one over for the step that follows.
+        if (clEntity.NativeEntity == null)
             return null;
 
-        // World matrices are only refreshed during the Draw phase, so refresh explicitly before
-        // reading one inside the Update phase.
-        Entity.Transform.UpdateWorldMatrix();
-        return [Entity.Transform.WorldMatrix.ToMatrix3x4()];
+        studioPose ??= new Matrix3x4[StudioConstants.MAXSTUDIOBONES];
+        return Rendering.PreStudioModelRenderer.SetupBones(clEntity.NativeEntity, studioPose) > 0
+            ? studioPose
+            : null;
     }
 
 

@@ -320,7 +320,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
     public void HUD_NewMap(string levelName)
     {
         CurrentLevelName = levelName;
-
+        
         // Drop the previous map's physics resources and entities, then warm the new map's brush
         // prefabs so the first visible brush entity does not pay for triangulation.
         clientGame?.Reset();
