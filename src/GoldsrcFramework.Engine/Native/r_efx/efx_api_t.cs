@@ -279,19 +279,19 @@ public unsafe struct efx_api_t
     /// <remarks>
     /// Original: TEMPENTITY* (*CL_TempEntAlloc)(float* org, struct model_s* model);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<float*, model_t*, TEMPENTITY*> CL_TempEntAlloc;
+    public delegate* unmanaged[Cdecl]<Vector3*, model_t*, TEMPENTITY*> CL_TempEntAlloc;
     /// <remarks>
     /// Original: TEMPENTITY* (*CL_TempEntAllocNoModel)(float* org);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<float*, TEMPENTITY*> CL_TempEntAllocNoModel;
+    public delegate* unmanaged[Cdecl]<Vector3*, TEMPENTITY*> CL_TempEntAllocNoModel;
     /// <remarks>
     /// Original: TEMPENTITY* (*CL_TempEntAllocHigh)(float* org, struct model_s* model);
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<float*, model_t*, TEMPENTITY*> CL_TempEntAllocHigh;
+    public delegate* unmanaged[Cdecl]<Vector3*, model_t*, TEMPENTITY*> CL_TempEntAllocHigh;
     /// <remarks>
     /// Original: TEMPENTITY* (*CL_TentEntAllocCustom)(float* origin, struct model_s* model, int high, void (*callback)(struct tempent_s* ent, float frametime, float currenttime));
     /// </remarks>
-    public delegate* unmanaged[Cdecl]<float*, model_t*, int, delegate* unmanaged[Cdecl]<TEMPENTITY*, float, float, void>, TEMPENTITY*> CL_TentEntAllocCustom;
+    public delegate* unmanaged[Cdecl]<Vector3*, model_t*, int, delegate* unmanaged[Cdecl]<TEMPENTITY*, float, float, void>, TEMPENTITY*> CL_TentEntAllocCustom;
     /// <remarks>
     /// Original: void (*R_GetPackedColor)(short* packed, short color);
     /// </remarks>

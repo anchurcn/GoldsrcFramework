@@ -395,6 +395,14 @@ enginefuncs_t.pfnEmitSound.pitch = Pitch
 enginefuncs_t.pfnEmitAmbientSound.pitch = Pitch
 enginefuncs_t.pfnWalkMove.iMode = WalkMoveMode
 
+# The four CL_TempEnt* allocators take the spawn origin as a float* (3 floats);
+# surface it as a Vector3 so call sites read naturally and match the rest of the
+# humanized layer's float[3] -> Vector3 convention.
+efx_api_t.CL_TempEntAlloc.org = Vector3*
+efx_api_t.CL_TempEntAllocHigh.org = Vector3*
+efx_api_t.CL_TempEntAllocNoModel.org = Vector3*
+efx_api_t.CL_TentEntAllocCustom.origin = Vector3*
+
 
 # ---------------------------------------------------------------------------
 [emit]
