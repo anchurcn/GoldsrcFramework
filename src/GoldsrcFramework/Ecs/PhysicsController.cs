@@ -258,6 +258,20 @@ public sealed class PhysicsController : EntityComponent
         }
     }
 
+    public void SetPivotBonePoseByRootTransform(Stride.Core.Mathematics.Matrix rootTransformMatrix)
+    {
+        if (!IsEnabled || IsNullSkeleton || pivotPhysicsBone is null)
+            return;
+
+        // LoadSkeleton established:  modelRoot = pivotWorld * modelRootOffset
+        //                           modelRootOffset = Invert(pivotLocal)
+        // Given the model root, reconstruct the pivot bone's world transform and drive it.
+        StrideMatrix.Invert(ref modelRootOffset, out var inverseOffset);
+        StrideMatrix.Multiply(ref rootTransformMatrix, ref inverseOffset, out var pivotWorld);
+
+        SetPhysicsBonePose(pivotPhysicsBone, pivotWorld);
+    }
+
     /// <summary>
     /// Rebuilds the full studio skeleton pose: simulated bones are read from the physics simulation,
     /// non-simulated bones are reconstructed on top of their anchor.

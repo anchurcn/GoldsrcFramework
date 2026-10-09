@@ -64,11 +64,17 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
     private const int MaxModelNameLength = 64; // MAX_MODEL_NAME
 
     /// <summary>
+    /// The ragdoll this entity's skeleton was handed to while it is dead. Remembered so the corpse can
+    /// be released when the entity comes back, which is also what keeps the ragdoll from accumulating.
+    /// </summary>
+    private Entity? ragdollEntity;
+
+    /// <summary>
     /// Studio bone matrices of the model, as written by <c>PreStudioModelRenderer</c>. Allocated on
     /// first use - a brush model never needs it - and reused afterwards, because it is a plain output
     /// buffer that carries no per-frame state of its own.
     /// </summary>
-    private Matrix3x4[]? studioPose;
+    private Lazy<Matrix3x4[]> studioPose = new Lazy<Matrix3x4[]>(new Matrix3x4[StudioConstants.MAXSTUDIOBONES]);
 
     public HalfLifeBehavior()
     {
@@ -139,7 +145,7 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
         PhysicsController?.Disable();
     }
 
-    public override void Update(GameTime gameTime)
+    public unsafe override void Update(GameTime gameTime)
     {
         EnsureSkeletonLoaded();
         var physics = PhysicsController;
@@ -151,6 +157,10 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
             {
                 RagdollRigged = false;
                 physics.Enable();
+
+                // The corpse has served its purpose: the entity is alive again and draws itself.
+                RagdollHelper.Release(ragdollEntity);
+                ragdollEntity = null;
             }
 
             return;
@@ -170,23 +180,24 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
         {
             // Hand the current pose over to the ragdoll. The snapshot keeps the pose of bones that
             // have no rigid body - a fist stays clenched instead of relaxing into the bind pose.
-            var deathPose = GetCurrentPose();
+            var deathPose = Rendering.PreStudioModelRenderer.SetupBones(clEntity.NativeEntity, studioPose.Value) > 0
+                ? studioPose.Value
+                : null;
             if (deathPose is not null)
             {
                 var snapshot = physics.CapturePoseSnapshot(deathPose);
-                if (RagdollHelper.CreateRagdollFor(Entity, ModelKey, deathPose, snapshot) is not null)
+                if (RagdollHelper.CreateRagdollFor(Entity, ModelKey, deathPose, snapshot) is { } ragdoll)
                 {
                     physics.Disable();
                     RagdollRigged = true;
+                    ragdollEntity = ragdoll;
                 }
             }
 
             return;
         }
 
-        var pose = GetCurrentPose();
-        if (pose is not null)
-            physics.SetPose(pose);
+        UpdateSkeletonPose();
     }
 
     /// <summary>
@@ -248,7 +259,7 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
         if (current.IsNull || last.IsNull)
             return current.IsNull && last.IsNull;
 
-        return 
+        return
             current.AsByteSpan(MaxModelNameLength).SequenceEqual(last.AsByteSpan(MaxModelNameLength));
     }
     private void ReloadSkeleton()
@@ -262,7 +273,7 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
             {
                 // LoadSkeleton detaches and releases the previous skeleton. The bone hierarchy is
                 // needed so that bones without a rigid body can be anchored to a simulated ancestor.
-                physics.LoadSkeleton(prefab.Instantiate(), GetStudioBoneParents(ModelKey!));
+                physics.LoadSkeleton(prefab.Instantiate(), RagdollHelper.BoneParents(ContentManager, ModelKey!));
                 physics.Enable();
                 return;
             }
@@ -270,30 +281,6 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
 
         // No physics data for this model: NullPhysicsSkeleton, rendering still works.
         physics.LoadSkeleton([], []);
-    }
-
-    /// <summary>
-    /// Studio bone hierarchy of the model behind <paramref name="key"/>: for every studio bone its
-    /// parent bone index, -1 for a root bone.
-    /// </summary>
-    /// <remarks>
-    /// Read here rather than requested from the content manager: the content manager only hands out
-    /// the studio header as a <see cref="StudioModel"/>, and the hierarchy is a plain read of it.
-    /// A brush model - or any model without a studio header - has a single implicit root bone, so
-    /// <c>[-1]</c>.
-    /// </remarks>
-    private unsafe int[] GetStudioBoneParents(string key)
-    {
-        var studioModel = ContentManager.Load<StudioModel>(key);
-        if (studioModel is null || studioModel.Header->numbones <= 0)
-            return [-1];
-
-        var bones = studioModel.Header->GetBones();
-        var parents = new int[studioModel.Header->numbones];
-        for (var i = 0; i < parents.Length; i++)
-            parents[i] = bones[i].parent;
-
-        return parents;
     }
 
     /// <summary>
@@ -306,26 +293,24 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
     /// animation the engine has applied to the entity this frame, which <c>PreStudioModelRenderer</c>
     /// produces - the same array the renderer draws from.
     /// </remarks>
-    private unsafe Matrix3x4[]? GetCurrentPose()
+    private unsafe void UpdateSkeletonPose()
     {
-        if (PhysicsController!.PhysicsBones.Count == 1)
+        if (clEntity.NativeEntity->model->type == modtype_t.mod_brush)
         {
-            // World matrices are only refreshed during the Draw phase, so refresh explicitly before
-            // reading one inside the Update phase.
             Entity.Transform.UpdateWorldMatrix();
-            return [Entity.Transform.WorldMatrix.ToMatrix3x4()];
+            PhysicsController.SetPivotBonePoseByRootTransform(Entity.Transform.WorldMatrix);
+            return;
         }
 
         // Anything else is a studio model. Sampling its animation here, in the script stage, is what
         // keeps the skeleton in step with the model: a kinematic skeleton is driven from a pose, and
         // the render pass runs too late to hand one over for the step that follows.
-        if (clEntity.NativeEntity == null)
-            return null;
 
-        studioPose ??= new Matrix3x4[StudioConstants.MAXSTUDIOBONES];
-        return Rendering.PreStudioModelRenderer.SetupBones(clEntity.NativeEntity, studioPose) > 0
-            ? studioPose
+        var result = Rendering.PreStudioModelRenderer.SetupBones(clEntity.NativeEntity, studioPose.Value) > 0
+            ? studioPose.Value
             : null;
+
+        PhysicsController.SetPose(result);
     }
 
 

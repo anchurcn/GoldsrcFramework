@@ -1,22 +1,79 @@
+using System.Runtime.InteropServices;
+using System.Text;
+using GoldsrcFramework.Engine.Native;
 using GoldsrcFramework.LinearMath;
+using NativeInterop;
+using Stride.BepuPhysics;
+using Stride.BepuPhysics.Constraints;
+using Stride.Core;
 using Stride.Engine;
 using Stride.Engine.Design;
+using GoldsrcVector3 = GoldsrcFramework.LinearMath.Vector3;
+using StrideVector3 = Stride.Core.Mathematics.Vector3;
 
 namespace GoldsrcFramework.Ecs;
 
 /// <summary>
-/// Helper for creating a ragdoll from an entity that owns a <see cref="PhysicsController"/>.
-/// Clones the original entity's physics bones into an independent dynamic temp entity. The original
-/// entity's skeleton is left untouched; the caller is expected to <see cref="PhysicsController.Disable"/>
-/// it afterwards (see <see cref="HalfLifeBehavior"/>).
+/// Creates, links and destroys ragdolls, and owns their lifetime.
 /// </summary>
+/// <remarks>
+/// <para>
+/// A ragdoll is two things that have to be kept together: a Stride scene entity that simulates the
+/// skeleton, and a client entity (<c>cl_entity_t</c>) that the engine draws. The engine knows nothing
+/// about the scene, so a ragdoll without a client entity of its own simulates perfectly and is never
+/// seen.
+/// </para>
+/// <para>
+/// <b>How the two are linked.</b> The client entity is a temp entity the client owns - the engine adds
+/// it to the render list every frame. It carries the ragdoll in two ways, each serving one direction:
+/// </para>
+/// <list type="bullet">
+/// <item>
+/// Its <c>curstate.iuser4</c> holds a <see cref="GCHandle"/> to the Stride entity, which is how the
+/// renderer gets from an entity it is asked to draw back to the skeleton supplying the pose. The
+/// field is one of the <c>iuser</c> slots Half-Life leaves to the mod.
+/// </item>
+/// <item>
+/// The Stride entity holds a <see cref="Components.ClEntityComponent"/> pointing back at the client
+/// entity, which is how the ragdoll keeps the one the engine draws where the simulation put it.
+/// </item>
+/// </list>
+/// <para>
+/// A corpse is also marked with <see cref="kRenderFxRagdoll"/> in <c>curstate.renderfx</c>: it is what
+/// tells the renderer this client entity is a ragdoll, and it is the guard that makes reading
+/// <c>iuser4</c> safe - server entities have their own <c>iuser</c> values, set by the game.
+/// </para>
+/// </remarks>
 public static class RagdollHelper
 {
+    /// <summary>FTENT_PERSIST - the entity is meant to stay, so the engine must not age it out.</summary>
+    private const int TempEntityPersist = 0x0000_2000;
+
+    /// <summary>FTENT_NOMODEL - nothing left to draw, the entity can be recycled.</summary>
+    private const int TempEntityNoModel = 0x0004_0000;
+
     /// <summary>
-    /// Creates a ragdoll temp entity for the given entity and adds it to the same root scene.
+    /// Render effect marking a client entity as a ragdoll. Well outside the effects GoldSrc defines,
+    /// so the renderer's switch treats it as no effect, and unique enough to be used as a marker.
+    /// </summary>
+    private const int kRenderFxRagdoll = 3601;
+
+    /// <summary>Console variable holding how long a corpse stays, in seconds.</summary>
+    private const string CorpseStayCvar = "phys_corpsestay";
+
+    /// <summary>How long a corpse stays when the cvar is missing or not positive.</summary>
+    private const float DefaultCorpseStaySeconds = 30.0f;
+
+    private const int MaxModelNameLength = 64; // MAX_MODEL_NAME
+
+    // ── Creation ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Creates a ragdoll for the given entity and adds it to the same root scene: the general form,
+    /// cloning the skeleton the entity is already wearing.
     /// </summary>
     /// <param name="originalEntity">The entity whose physics skeleton is cloned.</param>
-    /// <param name="modelName">Optional model name, only used to name the temp entity.</param>
+    /// <param name="modelName">Optional model name, only used to name the entity.</param>
     /// <param name="initialPose">
     /// Studio bone world-space matrices used to place the ragdoll's simulated bones.
     /// </param>
@@ -25,7 +82,7 @@ public static class RagdollHelper
     /// a rigid body keep the pose they had at the moment of death.
     /// </param>
     /// <returns>The ragdoll entity, or null when it could not be created.</returns>
-    public static Entity? CreateRagdollFor(
+    public static unsafe Entity? CreateRagdollFor(
         Entity originalEntity,
         string? modelName,
         ReadOnlySpan<Matrix3x4> initialPose,
@@ -44,7 +101,12 @@ public static class RagdollHelper
         foreach (var bone in originPhysics.PhysicsBones)
             clonedBones.Add(EntityCloner.Clone(bone));
 
-        // 2. Create the temp entity.
+        // A cloned joint still refers to the bodies it was cloned from: the body on the other end of a
+        // joint lives on a different entity, which cloning does not copy. Left as they are, the
+        // ragdoll is a pile of bodies whose joints hold on to a skeleton that has stopped simulating.
+        RemapConstraints(originPhysics.PhysicsBones, clonedBones);
+
+        // 2. Create the entity.
         var entindex = originalEntity.Get<Components.ClEntityComponent>()?.Index ?? -1;
         var ragdollEntity = modelName is null
             ? new Entity($"Ragdoll@{entindex}")
@@ -64,10 +126,505 @@ public static class RagdollHelper
         ragdollPhysics.SetPose(initialPose);
         ragdollPhysics.ApplyPoseSnapshot(poseSnapshot);
 
-        // 5. Lightweight behavior that keeps the entity transform in sync with the pivot bone.
+        // 5. The behavior that keeps the entity transform in sync and counts the lifetime down.
         ragdollEntity.Components.Add(new RagdollBehavior());
 
+        // 6. Give it a client entity to be drawn through, and link the two together.
+        var source = originalEntity.Get<Components.ClEntityComponent>()?.NativeEntity;
+        if (source != null && source->model != null)
+        {
+            // Loading the model by name pins it for the corpse's lifetime.
+            LoadStudioModel(EngineApi.PClient, source->model, out _);
+
+            var clEntity = CreateRagdollTempEntFromTemplate(source, &source->curstate);
+            if (clEntity != null)
+                Associate(ragdollEntity, clEntity);
+        }
+
         return ragdollEntity;
+    }
+
+    /// <summary>
+    /// Creates a standalone ragdoll of <paramref name="modelName"/> at <paramref name="origin"/>: the
+    /// simple form, with no entity to clone - the skeleton starts in the model's bind pose.
+    /// </summary>
+    /// <remarks>
+    /// This is what the console command uses. The services are where the content manager and the root
+    /// scene come from, so no game instance has to be threaded through.
+    /// </remarks>
+    /// <param name="services">Service registry to resolve the content manager and the root scene from.</param>
+    /// <param name="modelName">Engine path of the model, e.g. <c>models/scientist.mdl</c>.</param>
+    /// <param name="origin">Where to put the body, in world coordinates.</param>
+    /// <returns>The ragdoll entity, or null when the model has no usable physics data.</returns>
+    public static unsafe Entity? CreateRagdoll(IServiceRegistry services, string modelName, GoldsrcVector3 origin)
+    {
+        if (services is null || string.IsNullOrEmpty(modelName))
+            return null;
+
+        var content = services.GetService<IContentManager>();
+        var scene = services.GetService<GoldsrcSceneSystem>()?.RootScene;
+        var engine = EngineApi.PClient;
+        if (content is null || scene is null || engine is null)
+            return null;
+
+        var key = StudioPhysicsKey(modelName);
+        if (key is null || !content.IsExist(key))
+            return null;
+
+        var model = LoadModelByName(engine, modelName, out _);
+        if (model == null || model->type != modtype_t.mod_studio)
+            return null;
+
+        var prefab = content.Load<Prefab>(key);
+        if (prefab is null)
+            return null;
+
+        var entity = new Entity($"Ragdoll(\"{modelName}\")");
+        var physics = new PhysicsController { MotionType = PhysicsMotionType.Dynamic };
+        entity.Components.Add(physics);
+
+        // The bones carry the bind pose relative to the model root, so placing the root places the
+        // whole skeleton - no explicit pose is needed.
+        entity.Transform.Position = new StrideVector3(origin.X, origin.Y, origin.Z);
+
+        scene.Entities.Add(entity);
+
+        physics.LoadSkeleton(prefab.Instantiate(), BoneParents(content, key));
+        physics.Enable();
+        entity.Components.Add(new RagdollBehavior());
+
+        var spawn = origin;
+        var clEntity = CreateRagdollTempEnt(&spawn, model);
+        if (clEntity != null)
+            Associate(entity, clEntity);
+
+        return entity;
+    }
+
+    /// <summary>
+    /// Destroys a ragdoll: the client entity it is drawn through is handed back to the engine, the
+    /// link is torn down, and the entity leaves the scene.
+    /// </summary>
+    /// <remarks>
+    /// The GCHandle is freed by <see cref="RagdollBehavior.OnExit"/>, which the scene removal runs.
+    /// </remarks>
+    public static unsafe void Release(Entity? ragdoll)
+    {
+        if (ragdoll is null)
+            return;
+
+        var clEntity = ragdoll.Get<Components.ClEntityComponent>()?.NativeEntity;
+        if (clEntity != null)
+        {
+            clEntity->curstate.iuser4 = 0;
+            ReleaseClientEntity(clEntity);
+        }
+
+        ragdoll.Scene?.Entities.Remove(ragdoll);
+    }
+
+    // ── Linking ───────────────────────────────────────────────────────────────
+
+    /// <summary>Links a ragdoll to the client entity it is drawn through.</summary>
+    private static unsafe void Associate(Entity ragdoll, cl_entity_t* clEntity)
+    {
+        var handle = GCHandle.Alloc(ragdoll, GCHandleType.Normal);
+        var raw = unchecked((int)GCHandle.ToIntPtr(handle));
+
+        clEntity->curstate.renderfx = kRenderFxRagdoll;
+        clEntity->curstate.iuser4 = raw;
+
+        // The behavior owns the handle: it is what frees it, and it must not go through the client
+        // entity to do so - the engine frees every temp entity when a map goes away, which happens
+        // before the ECS is told to forget them.
+        ragdoll.Get<RagdollBehavior>()?.TakeHandle(raw);
+
+        ragdoll.Components.Add(new Components.ClEntityComponent(clEntity));
+    }
+
+    /// <summary>
+    /// The behavior that can produce a pose for <paramref name="entity"/>, if it is a ragdoll.
+    /// </summary>
+    /// <remarks>
+    /// The <c>renderfx</c> marker is checked first and is what makes reading <c>iuser4</c> safe: an
+    /// entity that is not a ragdoll may well have an <c>iuser</c> value of its own.
+    /// </remarks>
+    internal static unsafe bool TryGetBehavior(cl_entity_t* entity, out RagdollBehavior? behavior)
+    {
+        behavior = null;
+
+        if (entity == null || entity->curstate.renderfx != kRenderFxRagdoll)
+            return false;
+
+        var raw = entity->curstate.iuser4;
+        if (raw == 0)
+            return false;
+
+        try
+        {
+            if (GCHandle.FromIntPtr((nint)raw).Target is Entity ragdoll)
+                behavior = ragdoll.Get<RagdollBehavior>();
+        }
+        catch
+        {
+            return false;
+        }
+
+        return behavior is not null;
+    }
+
+    /// <summary>
+    /// Keeps the client entity where the ragdoll is. The engine adds a temp entity to the render list
+    /// by its own bounds test around <c>origin</c>, so a corpse that slides away from where it was
+    /// created would stop being drawn.
+    /// </summary>
+    internal static unsafe void MoveClientEntity(Components.ClEntityComponent? clEntity, in StrideVector3 position)
+    {
+        var entity = clEntity?.NativeEntity;
+        if (entity == null)
+            return;
+
+        entity->origin = new GoldsrcVector3(position.X, position.Y, position.Z);
+    }
+
+    /// <summary>How long a corpse stays, read live from <c>phys_corpsestay</c> so it can be tuned.</summary>
+    internal static unsafe float CorpseStaySeconds()
+    {
+        var engine = EngineApi.PClient;
+        if (engine == null || engine->GetCvarPointer == null)
+            return DefaultCorpseStaySeconds;
+
+        Span<byte> name = stackalloc byte[32];
+        WriteAscii(CorpseStayCvar, name);
+
+        fixed (byte* namePointer = name)
+        {
+            var cvar = engine->GetCvarPointer(NCharPtr.From(namePointer));
+            return cvar != null && cvar->value > 0f ? cvar->value : DefaultCorpseStaySeconds;
+        }
+    }
+
+    /// <summary>Seconds the client has been running, or 0 when the engine will not say.</summary>
+    internal static unsafe float ClientTime()
+    {
+        var engine = EngineApi.PClient;
+        return engine != null && engine->GetClientTime != null ? engine->GetClientTime() : 0.0f;
+    }
+
+    /// <summary>
+    /// Writes one diagnostic line to the engine console.
+    /// </summary>
+    /// <remarks>
+    /// Drawing a corpse spans the engine's temp entity list, the client's studio interface and the
+    /// ECS: when a body does not appear there is nothing to look at, so the chain says what it did
+    /// here. One line per corpse, never per frame.
+    /// </remarks>
+    internal static unsafe void Log(string message)
+    {
+        var engine = EngineApi.PClient;
+        if (engine == null || engine->Con_Printf == null)
+            return;
+
+        Span<byte> buffer = stackalloc byte[192];
+        buffer.Clear();
+
+        var written = Encoding.ASCII.GetBytes(message, buffer);
+        if (written <= 0 || written >= buffer.Length)
+            return;
+
+        buffer[written] = 0;
+
+        fixed (byte* line = buffer)
+            engine->Con_Printf((NChar*)line);
+    }
+
+    // ── Temp entity ───────────────────────────────────────────────────────────
+
+    private static unsafe cl_entity_t* CreateRagdollTempEnt(Vector3* origin, model_t* model)
+    {
+        if (origin == null || model == null)
+            return null;
+
+        var engine = EngineApi.PClient;
+        if (engine == null || engine->pEfxAPI == null || engine->pEfxAPI->CL_TentEntAllocCustom == null)
+            return null;
+
+        var tempEntity = engine->pEfxAPI->CL_TentEntAllocCustom(origin, model, 0, null);
+        if (tempEntity == null)
+            return null;
+
+        tempEntity->flags |= TempEntityPersist;
+        tempEntity->die = float.MaxValue;
+
+        var ragdollEnt = &tempEntity->entity;
+        return ragdollEnt;
+    }
+
+    private static unsafe cl_entity_t* CreateRagdollTempEntFromTemplate(
+        cl_entity_t* tmplEnt, entity_state_t* tmplState)
+    {
+        if (tmplEnt == null)
+            return null;
+
+        var drawModel = tmplEnt->model;
+        if (drawModel == null || drawModel->type != modtype_t.mod_studio)
+            return null;
+
+        // The death position: prefer the state that triggered the ragdoll, fall back to the entity.
+        var origin = tmplState != null ? tmplState->origin : tmplEnt->origin;
+
+        var ragdollEnt = CreateRagdollTempEnt(&origin, drawModel);
+        if (ragdollEnt == null)
+            return null;
+
+        // Copy the death render state so the corpse shows the death pose until physics takes over.
+        CopyDeathState(tmplEnt, tmplState, ragdollEnt);
+
+        return ragdollEnt;
+    }
+
+    private static unsafe void CopyDeathState(
+        cl_entity_t* tmplEnt, entity_state_t* tmplState, cl_entity_t* ragdollEnt)
+    {
+        var srcState = tmplState != null ? tmplState : &tmplEnt->curstate;
+        var ragdollState = &ragdollEnt->curstate;
+
+        ragdollEnt->origin = tmplEnt->origin;
+        ragdollEnt->angles = tmplEnt->angles;
+
+        ragdollState->modelindex = srcState->modelindex;
+        ragdollState->sequence = srcState->sequence;
+        ragdollState->frame = srcState->frame;
+        ragdollState->skin = srcState->skin;
+        ragdollState->body = srcState->body;
+        ragdollState->colormap = srcState->colormap;
+        ragdollState->angles = srcState->angles;
+        ragdollState->effects = srcState->effects;
+        ragdollState->scale = srcState->scale;
+        ragdollState->rendermode = srcState->rendermode;
+        ragdollState->rendercolor = srcState->rendercolor;
+        ragdollState->renderamt = srcState->renderamt;
+        ragdollState->renderfx = kRenderFxRagdoll;
+        ragdollState->gaitsequence = srcState->gaitsequence;
+        ragdollState->controller = srcState->controller;
+        ragdollState->blending = srcState->blending;
+    }
+
+    /// <summary>Hands a client entity back to the engine, which recycles it once the time is up.</summary>
+    private static unsafe void ReleaseClientEntity(cl_entity_t* clEntity)
+    {
+        var tempEntity = ContainerOf(clEntity);
+        tempEntity->die = ClientTime();
+        tempEntity->flags = TempEntityNoModel;
+    }
+
+    /// <summary>
+    /// The temp entity a client entity belongs to.
+    /// </summary>
+    /// <remarks>
+    /// <c>entity</c> is the last field of <c>TEMPENTITY</c>, and neither it nor <c>cl_entity_t</c> has
+    /// trailing padding, so the offset is simply the difference of the two sizes.
+    /// </remarks>
+    private static unsafe TEMPENTITY* ContainerOf(cl_entity_t* entity)
+        => (TEMPENTITY*)((byte*)entity - (sizeof(TEMPENTITY) - sizeof(cl_entity_t)));
+
+    // ── Skeleton ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Studio bone hierarchy of the model behind <paramref name="key"/>: for every studio bone its
+    /// parent bone index, -1 for a root bone.
+    /// </summary>
+    /// <remarks>
+    /// A brush model - or any model without a studio header - has a single implicit root bone, so
+    /// <c>[-1]</c>.
+    /// </remarks>
+    internal static unsafe int[] BoneParents(IContentManager content, string key)
+    {
+        var studioModel = content.Load<StudioModel>(key);
+        if (studioModel is null || studioModel.Header->numbones <= 0)
+            return [-1];
+
+        var bones = studioModel.Header->GetBones();
+        var parents = new int[studioModel.Header->numbones];
+        for (var i = 0; i < parents.Length; i++)
+            parents[i] = bones[i].parent;
+
+        return parents;
+    }
+
+    /// <summary>
+    /// Loads a studio model by its engine name, returning the precached <c>model_t*</c> and its index.
+    /// Mirrors gsphysics' <c>CL_LoadModel(modname, &amp;index)</c> used to pin a ragdoll's model.
+    /// </summary>
+    private static unsafe model_t* LoadStudioModel(ClientEngineFuncs* engine, model_t* model, out int modelIndex)
+    {
+        modelIndex = 0;
+
+        if (engine == null || engine->CL_LoadModel == null)
+            return null;
+
+        Span<byte> name = stackalloc byte[MaxModelNameLength];
+        name.Clear();
+
+        var length = 0;
+        while (length < MaxModelNameLength - 1 && (byte)model->name[length] != 0)
+        {
+            name[length] = (byte)model->name[length];
+            length++;
+        }
+
+        if (length == 0)
+            return null;
+        name[length] = 0;
+
+        fixed (byte* namePointer = name)
+        {
+            var index = 0;
+            var loaded = engine->CL_LoadModel((NChar*)namePointer, &index);
+            modelIndex = index;
+            return loaded;
+        }
+    }
+
+    /// <summary>Loads a model by engine path, which also yields the index the engine refers to it by.</summary>
+    private static unsafe model_t* LoadModelByName(ClientEngineFuncs* engine, string path, out int modelIndex)
+    {
+        modelIndex = 0;
+
+        if (engine == null || engine->CL_LoadModel == null || path.Length >= MaxModelNameLength)
+            return null;
+
+        Span<byte> name = stackalloc byte[MaxModelNameLength];
+        name.Clear();
+
+        var length = Encoding.ASCII.GetBytes(path, name);
+        if (length >= name.Length)
+            return null;
+        name[length] = 0;
+
+        fixed (byte* namePointer = name)
+        {
+            var index = 0;
+            var loaded = engine->CL_LoadModel((NChar*)namePointer, &index);
+            modelIndex = index;
+            return loaded;
+        }
+    }
+
+    /// <summary>
+    /// Physics resource key of a studio model path: its name with the extension replaced by
+    /// <c>.gpd</c>, e.g. <c>models/barney.mdl</c> to <c>models/barney.gpd</c>.
+    /// </summary>
+    private static string? StudioPhysicsKey(string modelName)
+    {
+        if (modelName.Length < 5 || !modelName.EndsWith(".mdl", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        return string.Concat(modelName.AsSpan(0, modelName.Length - 4), ".gpd");
+    }
+
+    /// <summary>Writes <paramref name="value"/> as null-terminated ASCII into <paramref name="buffer"/>.</summary>
+    private static void WriteAscii(string value, Span<byte> buffer)
+    {
+        buffer.Clear();
+        var written = Encoding.ASCII.GetBytes(value, buffer);
+        if (written < buffer.Length)
+            buffer[written] = 0;
+    }
+
+    // ── Constraints ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Re-points every cloned joint at the cloned bodies it should hold together, and copies the
+    /// description the clone drops.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A joint is a component on body A's entity and refers to both ends by instance. Cloning copies
+    /// the components of the entities in the clone, and the body on the other end lives on a different
+    /// entity, so the copied joint keeps pointing at the original skeleton - whose bodies are about to
+    /// be disabled and, being kinematic, were never going to produce motion anyway. That is why a
+    /// ragdoll built without this step falls apart into separate bodies with no joints at all.
+    /// </para>
+    /// <para>
+    /// The two skeletons are in the same order (the bones are cloned in the order they were loaded),
+    /// and cloning preserves the order of an entity's components, so the n-th joint of a bone stays
+    /// its n-th joint.
+    /// </para>
+    /// </remarks>
+    private static void RemapConstraints(IReadOnlyList<Entity> skeletons, IReadOnlyList<Entity> clones)
+    {
+        var bodies = new Dictionary<BodyComponent, BodyComponent>();
+
+        for (var i = 0; i < skeletons.Count && i < clones.Count; i++)
+        {
+            if (skeletons[i].Get<BodyComponent>() is { } source && clones[i].Get<BodyComponent>() is { } clone)
+                bodies[source] = clone;
+        }
+
+        if (bodies.Count == 0)
+            return;
+
+        for (var i = 0; i < skeletons.Count && i < clones.Count; i++)
+        {
+            var source = ConstraintsOf(skeletons[i]);
+            var clone = ConstraintsOf(clones[i]);
+
+            for (var j = 0; j < source.Count && j < clone.Count; j++)
+            {
+                var from = (ITwoBody)source[j];
+                var to = (ITwoBody)clone[j];
+
+                if (from.A is { } a && bodies.TryGetValue(a, out var mappedA))
+                    to.A = mappedA;
+
+                if (from.B is { } b && bodies.TryGetValue(b, out var mappedB))
+                    to.B = mappedB;
+
+                // Cloning goes through the Stride binary serializer, which only carries [DataMember]
+                // members. A joint's description (LocalOffset, axes, spring settings) lives in the
+                // internal BepuConstraint field, which is not a data member, so the clone comes out
+                // with every anchor at zero. Copy the real values over from the original joint.
+                CopyConstraintDescription(source[j], clone[j]);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Copies a joint's description from an original joint to its clone.
+    /// </summary>
+    /// <remarks>
+    /// Only the bodies are re-pointed by <see cref="RemapConstraints"/>; the description (the anchor
+    /// offsets above all) is dropped by the clone because it lives in the joint's internal Bepu
+    /// constraint, which the serializer skips. A joint cloned without this step keeps both anchors at
+    /// the collider's center of mass - the middle of a limb - and the solver drags every bone toward
+    /// those midpoints, which reads as the whole ragdoll being hurled sideways.
+    /// </remarks>
+    private static void CopyConstraintDescription(ConstraintComponentBase source, ConstraintComponentBase clone)
+    {
+        // v1: every joint is a ball socket. When hinge/cone get their own angle-limit components back,
+        // those descriptions are copied here too.
+        if (source is BallSocketConstraintComponent sourceBall && clone is BallSocketConstraintComponent cloneBall)
+        {
+            cloneBall.LocalOffsetA = sourceBall.LocalOffsetA;
+            cloneBall.LocalOffsetB = sourceBall.LocalOffsetB;
+            cloneBall.SpringFrequency = sourceBall.SpringFrequency;
+            cloneBall.SpringDampingRatio = sourceBall.SpringDampingRatio;
+        }
+    }
+
+    /// <summary>The joint components of an entity, in component order.</summary>
+    private static List<ConstraintComponentBase> ConstraintsOf(Entity entity)
+    {
+        var constraints = new List<ConstraintComponentBase>();
+
+        foreach (var component in entity.Components)
+        {
+            if (component is ConstraintComponentBase constraint)
+                constraints.Add(constraint);
+        }
+
+        return constraints;
     }
 
     private static Scene? GetRootScene(Entity entity)

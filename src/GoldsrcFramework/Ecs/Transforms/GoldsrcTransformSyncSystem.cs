@@ -58,6 +58,7 @@ internal sealed class GoldsrcTransformSyncSystem : GameSystemBase
 
             link.Entity.Transform.Position = origin;
             link.Entity.Transform.Rotation = GoldsrcTransformConverter.ToStrideRotation(angles);
+            link.Entity.Transform.UpdateWorldMatrix(); // It will first call UpdateLocalMatrix on self, and because this is root entity (no parent), the local matrix is equals to world matrix.        
             link.LastAngles = angles;
             link.HasLastAngles = true;
         }
@@ -76,7 +77,7 @@ internal sealed class GoldsrcTransformSyncSystem : GameSystemBase
                     out Quaternion rotation,
                     out Vector3 position))
                 continue;
-
+                    
             Vector3? previousAngles = link.HasLastAngles ? link.LastAngles : null;
             var angles = GoldsrcTransformConverter.ToGoldsrcAngles(rotation, previousAngles);
             if (!link.Binding.TryWrite(position, angles))
