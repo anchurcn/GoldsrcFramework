@@ -1,10 +1,11 @@
-using System.Reflection;
+using GoldsrcFramework.Content;
 using GoldsrcFramework.Ecs.Diagnostics;
 using Stride.BepuPhysics;
 using Stride.Core;
 using Stride.Core.Mathematics;
 using Stride.Engine;
 using Stride.Games;
+using System.Reflection;
 
 namespace GoldsrcFramework.Ecs;
 
@@ -24,6 +25,7 @@ public sealed class GoldsrcClientGame : IDisposable
     public GoldsrcClientGame()
     {
         Services = new ServiceRegistry();
+        Services.AddService<IContentManager>(new GoldsrcContentManager());
         GameSystems = new GameSystemCollection(Services);
         Services.AddService<IGameSystemCollection>(GameSystems);
         Services.ServiceAdded += OnServiceAdded;

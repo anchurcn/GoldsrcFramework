@@ -125,31 +125,9 @@ public static class RagdollHelper
         var ragdollPhysics = new PhysicsController { MotionType = PhysicsMotionType.Dynamic };
         ragdollEntity.Components.Add(ragdollPhysics);
 
-        //    Attach the transform link while the entity is still out of the scene: the sync system
-        //    only looks an entity's link component up when the entity is added, so one attached
-        //    afterwards would never be registered. Its authority is Stride - the simulation owns the
-        //    transform and the Draw pass writes it back to the client entity the corpse is drawn
-        //    through. The binding starts empty because that client entity does not exist yet;
-        //    Associate points it at one once the corpse has it.
-        var transformLink = new ClEntityTransformBinding(null);
-        ragdollEntity.Components.Add(
-            new GoldsrcTransformLinkComponent(transformLink, TransformAuthority.Stride));
-
-        // 3. Bring it into the scene first so the bodies land in the same simulation.
-        rootScene.Entities.Add(ragdollEntity);
-
-        // 4. Load and attach the cloned skeleton, reusing the original's bone hierarchy, then
-        //    initialize its pose. Enable() must come before SetPose so the bodies exist in the
-        //    simulation and Teleport actually writes into them.
-        ragdollPhysics.LoadSkeleton(clonedBones, originPhysics.StudioBoneParents.Span);
-        ragdollPhysics.Enable();
-        ragdollPhysics.SetPose(initialPose);
-        ragdollPhysics.ApplyPoseSnapshot(poseSnapshot);
-
-        // 5. The behavior that keeps the entity transform in sync and counts the lifetime down.
-        ragdollEntity.Components.Add(new RagdollBehavior());
-
-        // 6. Give it a client entity to be drawn through, and link the two together.
+        // 3. Give it the client entity the corpse is drawn through, before anything points at it. The
+        //    temp entity depends on the model, not on the skeleton, so it can be allocated this early,
+        //    and every component that carries it is then built with it already in place.
         var source = originalEntity.Get<Components.ClEntityComponent>()?.NativeEntity;
         if (source != null && source->model != null)
         {
@@ -158,8 +136,22 @@ public static class RagdollHelper
 
             var clEntity = CreateRagdollTempEntFromTemplate(source, &source->curstate);
             if (clEntity != null)
-                Associate(ragdollEntity, clEntity);
+                AttachClientEntity(ragdollEntity, clEntity);
         }
+
+        // 4. Bring it into the scene first so the bodies land in the same simulation.
+        rootScene.Entities.Add(ragdollEntity);
+
+        // 5. Load and attach the cloned skeleton, reusing the original's bone hierarchy, then
+        //    initialize its pose. Enable() must come before SetPose so the bodies exist in the
+        //    simulation and Teleport actually writes into them.
+        ragdollPhysics.LoadSkeleton(clonedBones, originPhysics.StudioBoneParents.Span);
+        ragdollPhysics.Enable();
+        ragdollPhysics.SetPose(initialPose);
+        ragdollPhysics.ApplyPoseSnapshot(poseSnapshot);
+
+        // 6. The behavior that keeps the entity transform in sync and counts the lifetime down.
+        ragdollEntity.Components.Add(new RagdollBehavior());
 
         return ragdollEntity;
     }
@@ -203,13 +195,13 @@ public static class RagdollHelper
         var physics = new PhysicsController { MotionType = PhysicsMotionType.Dynamic };
         entity.Components.Add(physics);
 
-        // Attach the transform link while the entity is still out of the scene: the sync system only
-        // looks an entity's link component up when the entity is added, so one attached afterwards
-        // would never be registered. Its authority is Stride - the simulation owns the transform and
-        // the Draw pass writes it back to the client entity the corpse is drawn through. The binding
-        // starts empty because that client entity does not exist yet; Associate points it at one.
-        var transformLink = new ClEntityTransformBinding(null);
-        entity.Components.Add(new GoldsrcTransformLinkComponent(transformLink, TransformAuthority.Stride));
+        // Give it the client entity the corpse is drawn through before anything points at it: the temp
+        // entity depends on the model, not on the skeleton, so it can be allocated this early, and every
+        // component that carries it is then built with it already in place.
+        var spawn = origin;
+        var clEntity = CreateRagdollTempEnt(&spawn, model);
+        if (clEntity != null)
+            AttachClientEntity(entity, clEntity);
 
         // The bones carry the bind pose relative to the model root, so placing the root places the
         // whole skeleton - no explicit pose is needed.
@@ -228,11 +220,6 @@ public static class RagdollHelper
         ApplyBindPoseSnapshot(content, key, physics);
 
         entity.Components.Add(new RagdollBehavior());
-
-        var spawn = origin;
-        var clEntity = CreateRagdollTempEnt(&spawn, model);
-        if (clEntity != null)
-            Associate(entity, clEntity);
 
         return entity;
     }
@@ -264,19 +251,25 @@ public static class RagdollHelper
 
     // ── Linking ───────────────────────────────────────────────────────────────
 
-    /// <summary>Links a ragdoll to the client entity it is drawn through.</summary>
-    private static unsafe void Associate(Entity ragdoll, cl_entity_t* clEntity)
+    /// <summary>
+    /// Links a ragdoll to the client entity it is drawn through, in both directions at once.
+    /// </summary>
+    /// <remarks>
+    /// The corpse is assembled around the client entity instead of being patched afterwards to point at
+    /// one: the binding and the reference both exist the first time they are seen, so no component is
+    /// ever handed an entity it was not built with.
+    /// </remarks>
+    private static unsafe void AttachClientEntity(Entity ragdoll, cl_entity_t* clEntity)
     {
         var handle = GCHandle.Alloc(ragdoll, GCHandleType.Normal);
-        var raw = unchecked((int)GCHandle.ToIntPtr(handle));
 
-        clEntity->curstate.iuser4 = raw;
+        clEntity->curstate.iuser4 = unchecked((int)GCHandle.ToIntPtr(handle));
         ragdoll.Components.Add(new Components.ClEntityComponent(clEntity));
 
-        // The transform link went on before the entity joined the scene, while the client entity it
-        // writes back to did not exist yet. Point it at the one that does now.
-        if (ragdoll.Get<GoldsrcTransformLinkComponent>()?.Binding is ClEntityTransformBinding binding)
-            binding.SetEntity(clEntity);
+        // Authority is Stride: the simulation owns the transform, and the Draw pass writes it back to
+        // the client entity the corpse is drawn through.
+        ragdoll.Components.Add(new GoldsrcTransformLinkComponent(
+            new ClEntityTransformBinding(clEntity), TransformAuthority.Stride));
     }
 
     /// <summary>

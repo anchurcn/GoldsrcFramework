@@ -16,18 +16,6 @@ public sealed unsafe class ClEntityTransformBinding : IGoldsrcTransformBinding
         this.clEntity = clEntity;
     }
 
-    /// <summary>
-    /// Points the binding at another client entity.
-    /// </summary>
-    /// <remarks>
-    /// A ragdoll's link is attached before the temp entity the corpse is drawn through is allocated,
-    /// so its binding starts empty and is given its entity once that one exists.
-    /// </remarks>
-    public void SetEntity(cl_entity_t* clEntity)
-    {
-        this.clEntity = clEntity;
-    }
-
     public bool TryRead(out Vector3 origin, out Vector3 angles)
     {
         if (clEntity == null)

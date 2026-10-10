@@ -1,12 +1,19 @@
 using Stride.Core;
 using Stride.Core.Mathematics;
 using Stride.Engine;
+using Stride.Engine.Design;
 
 namespace GoldsrcFramework.Ecs;
 
 /// <summary>
 /// Links a root Stride entity to a GoldSrc entity and declares pose ownership.
 /// </summary>
+/// <remarks>
+/// <see cref="GoldsrcTransformSyncProcessor"/> is declared here as the component's default processor, so
+/// the scene's entity manager creates it on demand and keeps its set of links in step - no matter when a
+/// link is attached, including to an entity that is already in the scene.
+/// </remarks>
+[DefaultEntityComponentProcessor(typeof(GoldsrcTransformSyncProcessor), ExecutionMode = ExecutionMode.Runtime)]
 public sealed class GoldsrcTransformLinkComponent : EntityComponent
 {
     public GoldsrcTransformLinkComponent()

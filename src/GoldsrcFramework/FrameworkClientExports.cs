@@ -73,17 +73,8 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         LegacyClientInterop.HUD_Init();
 
         var game = new GoldsrcClientGame();
-
-        // The content manager is a service: registered once here, at the composition root, and taken
-        // from the registry by every consumer (the scene management system, the physics behaviors).
-        game.Services.AddService<IContentManager>(new GoldsrcContentManager());
-
-        // RagdollHelper is what the studio renderer asks about corpses - whether an entity is one, and
-        // what pose it carries - so it is handed the game that owns the scene the corpses are found
-        // in: the renderer is called straight from the engine's draw loop, which has no registry.
-        RagdollHelper.AttachGame(game);
-
         clientGame = game;
+        RagdollHelper.AttachGame(game);
         currentGame = game;
         RegisterDebugDrawCvar();
         RegisterPhysicsDepthTestCvar();

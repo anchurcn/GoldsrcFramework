@@ -1,6 +1,4 @@
-using System.Collections.Specialized;
 using Stride.Core;
-using Stride.Core.Collections;
 using Stride.Core.Mathematics;
 using Stride.Engine;
 using Stride.Games;
@@ -10,7 +8,6 @@ namespace GoldsrcFramework.Ecs;
 internal sealed class GoldsrcTransformSyncSystem : GameSystemBase
 {
     private readonly GoldsrcSceneSystem sceneSystem;
-    private readonly List<GoldsrcTransformLinkComponent> linkedComponents = [];
 
     public GoldsrcTransformSyncSystem(IServiceRegistry services)
         : base(services)
@@ -22,36 +19,15 @@ internal sealed class GoldsrcTransformSyncSystem : GameSystemBase
         DrawOrder = 1_000;
     }
 
-    public override void Initialize()
-    {
-        base.Initialize();
-        foreach (var entity in sceneSystem.RootScene.Entities)
-        {
-            if (entity.Get<GoldsrcTransformLinkComponent>() is { } link)
-                linkedComponents.Add(link);
-        }
-
-        sceneSystem.RootScene.Entities.CollectionChanged += OnEntitiesChanged;
-    }
-
-    private void OnEntitiesChanged(object? sender, TrackingCollectionChangedEventArgs e)
-    {
-        if (e.Item is not Entity entity)
-            return;
-
-        var component = entity.Get<GoldsrcTransformLinkComponent>();
-        if (component is null)
-            return;
-
-        if (e.Action == NotifyCollectionChangedAction.Add)
-            linkedComponents.Add(component);
-        else if (e.Action == NotifyCollectionChangedAction.Remove)
-            linkedComponents.Remove(component);
-    }
-
     public override void Update(GameTime gameTime)
     {
-        foreach (var link in linkedComponents)
+        // The set of links belongs to the scene: the processor owns it and the entity manager keeps it in
+        // step as links are attached and detached. Until a link has been in the scene there is no
+        // processor at all - and nothing to read either.
+        if (sceneSystem.SceneInstance.GetProcessor<GoldsrcTransformSyncProcessor>() is not { } processor)
+            return;
+
+        foreach (var link in processor.Links)
         {
             if (link.Authority != TransformAuthority.Goldsrc || !link.Binding.TryRead(out var origin, out var angles))
                 continue;
@@ -66,7 +42,10 @@ internal sealed class GoldsrcTransformSyncSystem : GameSystemBase
 
     public override void Draw(GameTime gameTime)
     {
-        foreach (var link in linkedComponents)
+        if (sceneSystem.SceneInstance.GetProcessor<GoldsrcTransformSyncProcessor>() is not { } processor)
+            return;
+
+        foreach (var link in processor.Links)
         {
             if (link.Authority != TransformAuthority.Stride)
                 continue;
