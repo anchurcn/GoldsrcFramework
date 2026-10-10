@@ -674,8 +674,11 @@ public static class RagdollHelper
     /// </para>
     /// <para>
     /// The two skeletons are in the same order (the bones are cloned in the order they were loaded),
-    /// and cloning preserves the order of an entity's components, so the n-th joint of a bone stays
-    /// its n-th joint.
+    /// and cloning preserves the order of an entity's components, so the n-th joint component of a
+    /// bone stays its n-th. A joint is one to three components (a ball socket; a hinge and its twist
+    /// limit; a cone's ball socket, swing limit and twist limit), and they are added to body A's
+    /// entity in a fixed order by the factory, so pairing by position still lines every one of them
+    /// up with its clone.
     /// </para>
     /// </remarks>
     private static void RemapConstraints(IReadOnlyList<Entity> skeletons, IReadOnlyList<Entity> clones)
@@ -721,21 +724,55 @@ public static class RagdollHelper
     /// </summary>
     /// <remarks>
     /// Only the bodies are re-pointed by <see cref="RemapConstraints"/>; the description (the anchor
-    /// offsets above all) is dropped by the clone because it lives in the joint's internal Bepu
-    /// constraint, which the serializer skips. A joint cloned without this step keeps both anchors at
-    /// the collider's center of mass - the middle of a limb - and the solver drags every bone toward
-    /// those midpoints, which reads as the whole ragdoll being hurled sideways.
+    /// offsets, the axes and the limits above all) is dropped by the clone because it lives in the
+    /// joint's internal Bepu constraint, which the serializer skips. A joint cloned without this step
+    /// keeps both anchors at the collider's center of mass - the middle of a limb - and the solver
+    /// drags every bone toward those midpoints, which reads as the whole ragdoll being hurled
+    /// sideways.
+    /// <para>
+    /// Every kind a joint can be built from is covered: the ball sockets, the hinge and its twist
+    /// limit, and the cone's swing and twist limits - see
+    /// <c>StudioPhysicsPrefabFactory.TryCreateConstraint</c> for what a joint is made of. A kind
+    /// that is missed here comes out with its axes and angles at zero, which for a twist limit means
+    /// the joint is welded at its rest pose rather than merely missing its range.
+    /// </para>
     /// </remarks>
     private static void CopyConstraintDescription(ConstraintComponentBase source, ConstraintComponentBase clone)
     {
-        // v1: every joint is a ball socket. When hinge/cone get their own angle-limit components back,
-        // those descriptions are copied here too.
-        if (source is BallSocketConstraintComponent sourceBall && clone is BallSocketConstraintComponent cloneBall)
+        switch (source, clone)
         {
-            cloneBall.LocalOffsetA = sourceBall.LocalOffsetA;
-            cloneBall.LocalOffsetB = sourceBall.LocalOffsetB;
-            cloneBall.SpringFrequency = sourceBall.SpringFrequency;
-            cloneBall.SpringDampingRatio = sourceBall.SpringDampingRatio;
+            case (BallSocketConstraintComponent from, BallSocketConstraintComponent to):
+                to.LocalOffsetA = from.LocalOffsetA;
+                to.LocalOffsetB = from.LocalOffsetB;
+                to.SpringFrequency = from.SpringFrequency;
+                to.SpringDampingRatio = from.SpringDampingRatio;
+                break;
+
+            case (HingeConstraintComponent from, HingeConstraintComponent to):
+                to.LocalOffsetA = from.LocalOffsetA;
+                to.LocalHingeAxisA = from.LocalHingeAxisA;
+                to.LocalOffsetB = from.LocalOffsetB;
+                to.LocalHingeAxisB = from.LocalHingeAxisB;
+                to.SpringFrequency = from.SpringFrequency;
+                to.SpringDampingRatio = from.SpringDampingRatio;
+                break;
+
+            case (SwingLimitConstraintComponent from, SwingLimitConstraintComponent to):
+                to.AxisLocalA = from.AxisLocalA;
+                to.AxisLocalB = from.AxisLocalB;
+                to.MinimumDot = from.MinimumDot;
+                to.SpringFrequency = from.SpringFrequency;
+                to.SpringDampingRatio = from.SpringDampingRatio;
+                break;
+
+            case (TwistLimitConstraintComponent from, TwistLimitConstraintComponent to):
+                to.LocalBasisA = from.LocalBasisA;
+                to.LocalBasisB = from.LocalBasisB;
+                to.MinimumAngle = from.MinimumAngle;
+                to.MaximumAngle = from.MaximumAngle;
+                to.SpringFrequency = from.SpringFrequency;
+                to.SpringDampingRatio = from.SpringDampingRatio;
+                break;
         }
     }
 

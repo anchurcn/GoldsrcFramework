@@ -137,7 +137,7 @@ public unsafe class DemoClientExports : FrameworkClientExports
 
         var origin = GetSpawnOrigin();
         Vector3* originPtr = &origin;
-        TEMPENTITY* temp = EngineApi.PClient->pEfxAPI->CL_TempEntAlloc((float*)originPtr, model);
+        TEMPENTITY* temp = EngineApi.PClient->pEfxAPI->CL_TempEntAlloc(originPtr, model);
 
         if (temp == null)
         {

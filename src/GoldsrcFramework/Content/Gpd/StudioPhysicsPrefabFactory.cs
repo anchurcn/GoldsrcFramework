@@ -43,9 +43,10 @@ namespace GoldsrcFramework.Content.Gpd;
 /// what lets a dynamic ragdoll drive the root entity again.
 /// </para>
 /// <para>
-/// <b>Joint limits.</b> The angular limits of hinge and cone joints are parsed and kept on the
-/// asset, but this revision does not apply them - the documented v1 behaviour, so a ragdoll's joints
-/// are currently free. Applying them is a later change confined to this factory.
+/// <b>Joint limits.</b> The angular limits of hinge and cone joints are parsed and applied: a hinge
+/// carries its low/high range, a cone its swing span and its symmetric twist span. Neither maps onto
+/// a single Bepu constraint, so a joint becomes a small set of them - see
+/// <see cref="TryCreateConstraint"/> for the mapping and its derivation.
 /// </para>
 /// </remarks>
 internal static class StudioPhysicsPrefabFactory
@@ -133,15 +134,18 @@ internal static class StudioPhysicsPrefabFactory
         // ── Joints ────────────────────────────────────────────────────────────
         foreach (var constraint in asset.Constraints)
         {
-            var component = TryCreateConstraint(constraint, asset.RigidBodies, bodies, centersOfMass);
-            if (component is null)
+            var components = TryCreateConstraint(constraint, asset.RigidBodies, bodies, centersOfMass);
+            if (components is null)
             {
                 error = $"constraint between rigidbody {constraint.BodyA} and {constraint.BodyB} cannot be represented";
                 return null;
             }
 
             // The joint lives on body A's entity, like every other physics component of the skeleton.
-            entities[constraint.BodyA].Components.Add(component);
+            // A joint is one to three components, always added in the same order so that a later clone
+            // of the bone - which copies components in order - can pair them back up one for one.
+            foreach (var component in components)
+                entities[constraint.BodyA].Components.Add(component);
         }
 
         var prefab = new Prefab();
@@ -262,20 +266,43 @@ internal static class StudioPhysicsPrefabFactory
 
     // ── Joints ────────────────────────────────────────────────────────────────
 
+    /// <summary>Degrees to radians, the conversion every legacy angular limit needs.</summary>
+    private const float DegreesToRadians = MathF.PI / 180.0f;
+
     /// <summary>
-    /// Converts one legacy joint into the Stride Bepu component that represents it.
+    /// Converts one legacy joint into the Stride Bepu components that represent it.
     /// </summary>
     /// <remarks>
     /// <para>
+    /// Bepu has no hinge-with-limits and no cone twist, so both are built out of smaller pieces -
+    /// the same composition the Bepu ragdoll demo uses for its shoulders and hips:
+    /// </para>
     /// <list type="bullet">
-    /// <item><c>spherical</c> (Bullet point to point) becomes a ball socket.</item>
-    /// <item><c>hinge</c> becomes a ball socket for now: its hinge axis (the frame's third basis
-    /// column) and low/high limits are not applied yet.</item>
-    /// <item><c>cone</c> (Bullet cone twist) becomes a ball socket. Its twist axis (the frame's first
-    /// basis column) is collinear on both sides - which a swivel hinge forbids (its two axes must be
-    /// perpendicular) - and its twist/swing spans are not applied yet.</item>
+    /// <item><c>spherical</c> (Bullet point to point) is one ball socket.</item>
+    /// <item><c>hinge</c> is a <see cref="HingeConstraintComponent"/> (point + axis alignment, which
+    /// leaves one rotational degree of freedom) plus a <see cref="TwistLimitConstraintComponent"/>
+    /// around that same free axis to hold the legacy low/high range. The hinge axis is the frame's
+    /// third basis column.</item>
+    /// <item><c>cone</c> (Bullet cone twist) is a ball socket, a
+    /// <see cref="SwingLimitConstraintComponent"/> around the frame's first basis column, and a
+    /// <see cref="TwistLimitConstraintComponent"/> about that same column. (The two twist axes are
+    /// collinear, so this can never be a swivel hinge, whose axes must be perpendicular.)</item>
     /// </list>
-    /// So in this revision every joint reduces to a plain ball socket: same anchor, free rotation.
+    /// <para>
+    /// <b>Why the twist bases are reshuffled.</b> Bullet and Bepu both measure a twist with an
+    /// <c>atan2</c> of two dot products, but not of the same two, in the same order. Feeding a joint
+    /// frame in unchanged would put the measured zero a quarter turn away from the pose the limits
+    /// were authored around, so the basis re-labels the frame's columns to line the two formulas up;
+    /// <see cref="Basis"/> spells out the mapping and how it was verified. Get this wrong and a knee
+    /// bends the wrong way, which is why the shipped models are checked rather than the identity
+    /// assumed.
+    /// </para>
+    /// <para>
+    /// <b>A cone swing is an ellipse, and Bepu only has a circle.</b> Bullet allows a different swing
+    /// half-angle along two perpendicular directions (<c>swingSpan1</c> and <c>swingSpan2</c>), while
+    /// <see cref="SwingLimitConstraintComponent"/> constrains a single angle between two axes. The
+    /// larger span is used, so the swing stays permissive rather than being clipped short; every
+    /// shipped model has <c>swingSpan1 &gt;= swingSpan2</c>, so that is <c>swingSpan1</c>.
     /// </para>
     /// <para>
     /// <b>What a joint frame is measured from.</b> Bepu documents <c>LocalOffsetA</c> as the "offset
@@ -289,7 +316,7 @@ internal static class StudioPhysicsPrefabFactory
     /// translation and never turns the body, so a direction is the same seen from either point.
     /// </para>
     /// </remarks>
-    private static ConstraintComponentBase? TryCreateConstraint(
+    private static ConstraintComponentBase[]? TryCreateConstraint(
         GpdConstraint constraint,
         GpdRigidBody[] rigidBodies,
         BodyComponent[] bodies,
@@ -309,35 +336,123 @@ internal static class StudioPhysicsPrefabFactory
         var localOffsetA = RelativeTo(frameA.Origin, centerA);
         var localOffsetB = RelativeTo(frameB.Origin, centerB);
 
-        ConstraintComponentBase component;
+        ConstraintComponentBase[] components;
         switch (constraint.Type)
         {
             case GpdConstraintType.Spherical:
+                components = [CreateBallSocket(localOffsetA, localOffsetB)];
+                break;
+
             case GpdConstraintType.Hinge:
+                components =
+                [
+                    new HingeConstraintComponent
+                    {
+                        LocalOffsetA = localOffsetA,
+                        LocalHingeAxisA = Axis(frameA, 2),
+                        LocalOffsetB = localOffsetB,
+                        LocalHingeAxisB = Axis(frameB, 2),
+                    },
+                    new TwistLimitConstraintComponent
+                    {
+                        // (fA1, fA0, -fA2): swapping X and Y and flipping Z is what makes Bepu's
+                        // measured angle identical to Bullet's, so low/high carry over unchanged.
+                        LocalBasisA = Basis(frameA, columnX: 1, columnY: 0, columnZ: 2, flipZ: true),
+                        LocalBasisB = Basis(frameB, columnX: 1, columnY: 0, columnZ: 2, flipZ: true),
+                        MinimumAngle = constraint.Low * DegreesToRadians,
+                        MaximumAngle = constraint.High * DegreesToRadians,
+                    },
+                ];
+                break;
+
             case GpdConstraintType.Cone:
-                // v1: every joint reduces to a plain ball socket. The legacy joint's angular limits
-                // (hinge low/high, cone twist/swing spans) are parsed and kept on the asset but not
-                // applied yet. Restoring them is a later change confined to this switch: hinge gets a
-                // Hinge (or BallSocket + SwingLimit/TwistLimit), cone gets BallSocket + SwingLimit +
-                // TwistLimit - the composition the Bepu ragdoll demo uses for its joints. (A cone's
-                // twist axes are collinear, so it can never be a SwivelHinge, whose two axes must be
-                // perpendicular.)
-                component = new BallSocketConstraintComponent
-                {
-                    LocalOffsetA = localOffsetA,
-                    LocalOffsetB = localOffsetB,
-                };
+                components =
+                [
+                    CreateBallSocket(localOffsetA, localOffsetB),
+                    new SwingLimitConstraintComponent
+                    {
+                        // The cone axis is the frame's first basis column, the same one the twist
+                        // turns about. swingSpan2 (the ellipse's other half-angle) is dropped - see
+                        // the remarks.
+                        AxisLocalA = Axis(frameA, 0),
+                        AxisLocalB = Axis(frameB, 0),
+                        MaximumSwingAngle = constraint.SwingSpan1 * DegreesToRadians,
+                    },
+                    new TwistLimitConstraintComponent
+                    {
+                        // (fA1, fA2, fA0): the twist axis stays in the Z column and the other two
+                        // just follow it round. The range is symmetric, so no sign can be wrong.
+                        LocalBasisA = Basis(frameA, columnX: 1, columnY: 2, columnZ: 0, flipZ: false),
+                        LocalBasisB = Basis(frameB, columnX: 1, columnY: 2, columnZ: 0, flipZ: false),
+                        MinimumAngle = -constraint.TwistSpan * DegreesToRadians,
+                        MaximumAngle = constraint.TwistSpan * DegreesToRadians,
+                    },
+                ];
                 break;
 
             default:
                 return null;
         }
 
-        // Every mapped joint relates exactly two bodies.
-        var twoBody = (ITwoBody)component;
-        twoBody.A = bodies[constraint.BodyA];
-        twoBody.B = bodies[constraint.BodyB];
-        return component;
+        foreach (var component in components)
+        {
+            // Every mapped joint relates exactly two bodies.
+            var twoBody = (ITwoBody)component;
+            twoBody.A = bodies[constraint.BodyA];
+            twoBody.B = bodies[constraint.BodyB];
+        }
+
+        return components;
+    }
+
+    /// <summary>A ball socket holding the two given anchor points together.</summary>
+    private static BallSocketConstraintComponent CreateBallSocket(StrideVector3 offsetA, StrideVector3 offsetB)
+        => new()
+        {
+            LocalOffsetA = offsetA,
+            LocalOffsetB = offsetB,
+        };
+
+    /// <summary>
+    /// A rotation whose three axes are selected from the columns of a joint frame, for the Bepu
+    /// constraints that measure an angle through a basis.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The selection is not free. Bullet's hinge angle is
+    /// <c>atan2(dot(swing, fA0), dot(swing, fA1))</c> with <c>swing</c> body B's <c>fB1</c>
+    /// (<c>btHingeConstraint.cpp:649</c>), and Bepu's twist angle is
+    /// <c>atan2(dot(alignedBX, basisA.Y), dot(alignedBX, basisA.X))</c> with <c>alignedBX</c> body B's
+    /// basis X axis (<c>TwistServo.cs:117</c>). The two agree only when body A's basis is
+    /// <c>(fA1, fA0, -fA2)</c> and body B's is <c>(fB1, fB0, -fB2)</c>. The Z axis is the one to
+    /// flip, not X or Y: Bepu rotates body B's basis Z axis onto body A's before measuring, so the
+    /// two Z axes have to point the same way at rest for the measured angle to sit at zero. Swapping
+    /// X and Y and negating Z is the one such re-labelling that is still a proper rotation.
+    /// </para>
+    /// <para>
+    /// This is checked rather than assumed - <c>artifacts/_verify_joint_basis.py</c> reproduces both
+    /// formulas and sweeps every shipped model through a range of poses, confirming the mapping
+    /// matches Bullet to zero and that the naive one is a quarter turn out.
+    /// </para>
+    /// </remarks>
+    private static StrideQuaternion Basis(in Matrix3x4 frame, int columnX, int columnY, int columnZ, bool flipZ)
+    {
+        var x = Axis(frame, columnX);
+        var y = Axis(frame, columnY);
+        var z = Axis(frame, columnZ);
+        if (flipZ)
+            z = -z;
+
+        // In Stride's row-vector convention the rows of a rotation are the images of X, Y and Z, so
+        // the selected frame columns go in as rows - the same shape AlignCapsuleAxisToX builds.
+        var basis = new StrideMatrix(
+            x.X, x.Y, x.Z, 0,
+            y.X, y.Y, y.Z, 0,
+            z.X, z.Y, z.Z, 0,
+            0, 0, 0, 1);
+
+        basis.Decompose(out StrideVector3 _, out StrideQuaternion rotation, out StrideVector3 _);
+        return StrideQuaternion.Normalize(rotation);
     }
 
     /// <summary>
