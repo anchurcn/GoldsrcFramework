@@ -13,7 +13,7 @@ namespace GoldsrcFramework.Ecs;
 /// Hosts Stride game systems inside a GoldSrc client or server module.
 /// GoldSrc owns the outer loop; this class owns the Stride runtime lifetime.
 /// </summary>
-public sealed class GoldsrcClientGame : IDisposable
+public sealed partial class GoldsrcClientGame : IDisposable
 {
     private static readonly Action<GameTime, TimeSpan, TimeSpan, bool> UpdateGameTime =
         CreateGameTimeUpdater();

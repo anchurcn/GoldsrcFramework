@@ -1,13 +1,7 @@
-using GoldsrcFramework.Content;
 using GoldsrcFramework.Ecs;
-using GoldsrcFramework.Ecs.Diagnostics;
-using GoldsrcFramework.Graphics;
 using GoldsrcFramework.LinearMath;
 using GoldsrcFramework.Rendering;
 using NativeInterop;
-using Stride.Engine;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Text;
 
 
@@ -20,26 +14,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
 {
     private const int MaxLevelNameLength = 260;
 
-    /// <summary>Console command that spawns a ragdoll, for looking at the ragdoll rendering.</summary>
-    private const string RagdollCommandName = "gsf_ragdoll";
-
-    /// <summary>Console variable holding how long a corpse stays, in seconds.</summary>
-    private const string CorpseStayCvarName = "phys_corpsestay";
-
-    /// <summary>Model the ragdoll command spawns.</summary>
-    private const string RagdollModelPath = "models/scientist.mdl";
-
     private GoldsrcClientGame? clientGame;
-
-    /// <summary>
-    /// The game the console commands act on.
-    /// </summary>
-    /// <remarks>
-    /// The engine invokes console commands through function pointers and passes no user data, so what a
-    /// command has to reach cannot come from the call - only from here. Set while the client is being
-    /// initialised, which is also when the commands are registered.
-    /// </remarks>
-    private static GoldsrcClientGame? currentGame;
 
     /// <summary>
     /// True when <see cref="HUD_VidInit"/> announced a (potential) map change and the
@@ -74,16 +49,10 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
 
         var game = new GoldsrcClientGame();
         clientGame = game;
-        RagdollHelper.AttachGame(game);
-        currentGame = game;
-        RegisterDebugDrawCvar();
-        RegisterPhysicsDepthTestCvar();
-        RegisterCorpseStayCvar();
-        RegisterRagdollCommand();
 
-        // The physics gun attaches itself to the local player's entity when that entity appears;
-        // this only hands it the game and registers its console variables.
-        PhysicsGunScript.Initialize(game);
+        // Everything from here on - the console variables and the ragdoll command included - is the
+        // runtime's own setup, so it belongs to the game rather than to this layer.
+        game.HUD_Init();
     }
 
     public virtual int HUD_VidInit()
@@ -183,24 +152,11 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
     {
         var result = LegacyClientInterop.HUD_AddEntity((int)type, ent, modelname);
 
-        // Mark this entity as visible for the ClientSceneManagementSystem.
-        // Only normal entities and players are tracked. The engine calls this for brush
-        // model entities too, so doors, platforms and func_wall come through here as well.
-        if (type is EntityType.NORMAL)
-        {
-            clientGame?.SceneManagement.MarkEntityVisible(ent, false, null);
-        }
-        else if (type is EntityType.PLAYER)
-        {
-            clientGame?.SceneManagement.MarkEntityVisible(ent, true, EngineApi.PStudio->PlayerInfo(ent->index - 1));
+        // The engine calls this for brush model entities too, so doors, platforms and func_wall come
+        // through here as well; the game decides which of them it tracks.
+        clientGame?.HUD_AddEntity(type, ent);
 
-            // Cheap and idempotent, and the one place that is guaranteed to run while the local
-            // player's entity exists: it is what tells the physics gun it can move in.
-            if (clientGame is not null)
-                PhysicsGunScript.EnsureAttached(clientGame.SceneManagement, ent);
-        }
-
-            return result;
+        return result;
     }
 
     public virtual void HUD_CreateEntities()
@@ -217,11 +173,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
     {
         LegacyClientInterop.HUD_DrawTransparentTriangles();
 
-        if (IsDebugDrawEnabled() && clientGame?.SceneSystem.PhysicsDebug is { } debug)
-            TriApiLineDraw.DrawLineVertices(debug.Commands.LineVertices, IsPhysicsDepthTestEnabled());
-
-        // The gun's own overlay, drawn in the same pass so the two can be compared directly.
-        PhysicsGunScript.DrawOverlay(IsPhysicsDepthTestEnabled());
+        clientGame?.HUD_DrawTransparentTriangles();
     }
 
     public virtual void HUD_StudioEvent(mstudioevent_t* @event, cl_entity_t* entity)
@@ -238,7 +190,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
     {
         isNewMapPending = false;
         CurrentLevelName = null;
-        clientGame?.Dispose();
+        clientGame?.HUD_Shutdown();
         LegacyClientInterop.HUD_Shutdown();
     }
 
@@ -290,10 +242,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         if (clientGame is not { } game)
             return;
 
-        game.SyncGravity(cl_gravity);
-        game.SceneManagement?.MarkWorldSpawnVisible(EngineApi.PClient->GetEntityByIndex(0));
-        game.Tick(TimeSpan.FromSeconds(client_time), TimeSpan.FromSeconds(Math.Min(frametime, 0.1)));
-
+        game.HUD_TempEntUpdate(frametime, client_time, cl_gravity);
     }
 
     public virtual cl_entity_t* HUD_GetUserEntity(int index)
@@ -357,8 +306,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         
         // Drop the previous map's physics resources and entities, then warm the new map's brush
         // prefabs so the first visible brush entity does not pay for triangulation.
-        clientGame?.Reset();
-        clientGame?.SceneManagement.ContentManager?.PreloadBrushModels();
+        clientGame?.HUD_NewMap();
 
         if (NewMapLoaded is null)
             return;
@@ -402,10 +350,11 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         }
         else
         {
-            // Should not happen: the engine is in a map but reports no level name.
-            // Bail out instead of running with stale per-map state.
-            ExecuteClientCommand("disconnect\n");
-            PrintConsole("GoldsrcFramework: couldn't get map name from level name!\n");
+            // Should not happen: the engine is in a map but reports no level name. Bail out instead
+            // of running with stale per-map state. Con_Printf is printf-style, so the message must
+            // not contain a '%'.
+            EngineApi.PClient->ClientCmd("disconnect\n"u8.GetNCharPtr());
+            EngineApi.PClient->Con_Printf("GoldsrcFramework: couldn't get map name from level name!\n"u8.GetNCharPtr());
         }
     }
 
@@ -417,11 +366,8 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
     private static bool TryReadLevelName(Span<byte> buffer, out int length)
     {
         length = 0;
-        ClientEngineFuncs* engine = EngineApi.PClient;
-        if (engine == null || engine->GetLevelName == null)
-            return false;
 
-        NCharPtr levelName = engine->GetLevelName();
+        NCharPtr levelName = EngineApi.PClient->GetLevelName();
         if (levelName.IsNull)
             return false;
 
@@ -432,253 +378,6 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         name[..length].CopyTo(buffer);
 
         return length > 0;
-    }
-
-    /// <summary>
-    /// Registers the <c>gsf_debugdraw</c> console variable (default "1") if it is
-    /// not already registered. Idempotent across re-init. Reading the value is done
-    /// per-frame via <see cref="IsDebugDrawEnabled"/> so a stale cached pointer is
-    /// never used.
-    /// </summary>
-    private static void RegisterDebugDrawCvar()
-    {
-        ClientEngineFuncs* engine = EngineApi.PClient;
-        if (engine == null || engine->RegisterVariable == null || engine->GetCvarPointer == null)
-            return;
-
-        Span<byte> name = stackalloc byte[32];
-        WriteAscii("gsf_debugdraw", name);
-
-        fixed (byte* namePointer = name)
-        {
-            if (engine->GetCvarPointer(NCharPtr.From(namePointer)) != null)
-                return; // already registered (e.g. on re-init)
-
-            Span<byte> value = stackalloc byte[8];
-            WriteAscii("1", value);
-            fixed (byte* valuePointer = value)
-                engine->RegisterVariable(NCharPtr.From(namePointer), NCharPtr.From(valuePointer), 0);
-        }
-    }
-
-    /// <summary>
-    /// Returns true when the <c>gsf_debugdraw</c> cvar is non-zero. Looks the cvar
-    /// up by name each call; cheap and never caches a pointer.
-    /// </summary>
-    private static bool IsDebugDrawEnabled()
-    {
-        ClientEngineFuncs* engine = EngineApi.PClient;
-        if (engine == null || engine->GetCvarPointer == null)
-            return false;
-
-        Span<byte> name = stackalloc byte[32];
-        WriteAscii("gsf_debugdraw", name);
-
-        fixed (byte* namePointer = name)
-        {
-            cvar_t* cvar = engine->GetCvarPointer(NCharPtr.From(namePointer));
-            return cvar != null && cvar->value != 0f;
-        }
-    }
-
-    /// <summary>
-    /// Registers the <c>gsf_physdtest</c> console variable (default "1") if it is
-    /// not already registered. Idempotent across re-init. A non-zero value keeps GL
-    /// depth testing enabled while drawing physics debug lines (lines get occluded
-    /// by world geometry); zero forces depth testing off so the lines always draw
-    /// on top. Mirrors the <c>phys_dtest</c> flag from the GoldSrc phys debugger.
-    /// </summary>
-    private static void RegisterPhysicsDepthTestCvar()
-    {
-        ClientEngineFuncs* engine = EngineApi.PClient;
-        if (engine == null || engine->RegisterVariable == null || engine->GetCvarPointer == null)
-            return;
-
-        Span<byte> name = stackalloc byte[32];
-        WriteAscii("gsf_physdtest", name);
-
-        fixed (byte* namePointer = name)
-        {
-            if (engine->GetCvarPointer(NCharPtr.From(namePointer)) != null)
-                return; // already registered (e.g. on re-init)
-
-            Span<byte> value = stackalloc byte[8];
-            WriteAscii("1", value);
-            fixed (byte* valuePointer = value)
-                engine->RegisterVariable(NCharPtr.From(namePointer), NCharPtr.From(valuePointer), 0);
-        }
-    }
-
-    /// <summary>
-    /// Returns true when depth testing should remain enabled for physics debug draw
-    /// (i.e. the <c>gsf_physdtest</c> cvar is non-zero). Looks the cvar up by name
-    /// each call; cheap and never caches a pointer. Returns true when the cvar is
-    /// missing so the default behavior is depth testing on.
-    /// </summary>
-    private static bool IsPhysicsDepthTestEnabled()
-    {
-        ClientEngineFuncs* engine = EngineApi.PClient;
-        if (engine == null || engine->GetCvarPointer == null)
-            return true;
-
-        Span<byte> name = stackalloc byte[32];
-        WriteAscii("gsf_physdtest", name);
-
-        fixed (byte* namePointer = name)
-        {
-            cvar_t* cvar = engine->GetCvarPointer(NCharPtr.From(namePointer));
-            return cvar == null || cvar->value != 0f;
-        }
-    }
-
-    /// <summary>
-    /// Registers the <c>phys_corpsestay</c> console variable (default "30"): how long a ragdoll corpse
-    /// stays before it is released, in seconds. Idempotent across re-init. Read live by
-    /// <see cref="RagdollBehavior"/>, so it can be tuned at runtime.
-    /// </summary>
-    private static void RegisterCorpseStayCvar()
-    {
-        ClientEngineFuncs* engine = EngineApi.PClient;
-        if (engine == null || engine->RegisterVariable == null || engine->GetCvarPointer == null)
-            return;
-
-        Span<byte> name = stackalloc byte[32];
-        WriteAscii(CorpseStayCvarName, name);
-
-        fixed (byte* namePointer = name)
-        {
-            if (engine->GetCvarPointer(NCharPtr.From(namePointer)) != null)
-                return; // already registered (e.g. on re-init)
-
-            Span<byte> value = stackalloc byte[8];
-            WriteAscii("30", value);
-            fixed (byte* valuePointer = value)
-                engine->RegisterVariable(NCharPtr.From(namePointer), NCharPtr.From(valuePointer), 0);
-        }
-    }
-
-    /// <summary>
-    /// Registers the <c>gsf_ragdoll</c> console command: it spawns a scientist ragdoll in front of the
-    /// player, which is the quickest way to look at the ragdoll rendering. Idempotent across re-init.
-    /// </summary>
-    private static unsafe void RegisterRagdollCommand()
-    {
-        ClientEngineFuncs* engine = EngineApi.PClient;
-        if (engine == null || engine->AddCommand == null)
-            return;
-
-        Span<byte> name = stackalloc byte[32];
-        WriteAscii(RagdollCommandName, name);
-
-        fixed (byte* namePointer = name)
-            engine->AddCommand((NChar*)namePointer, &SpawnRagdollCommand);
-    }
-
-    /// <summary>Spawns the body the <c>gsf_ragdoll</c> command asks for.</summary>
-    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
-    private static unsafe void SpawnRagdollCommand()
-    {
-        try
-        {
-            if (currentGame is not { } game)
-                return;
-
-            GetRagdollSpawnPose(out var origin);
-            var entity = RagdollHelper.CreateRagdoll(game.Services, RagdollModelPath, origin);
-
-            EngineApi.DrawStringCenter(entity is null
-                ? $"{RagdollCommandName}: cannot load {RagdollModelPath}"
-                : $"{RagdollCommandName}: spawned {RagdollModelPath}");
-
-            System.Diagnostics.Debug.WriteLine($"[gsf] {RagdollCommandName} spawn point at {origin}");
-        }
-        catch (Exception exception)
-        {
-            System.Diagnostics.Debug.WriteLine($"[gsf] {RagdollCommandName} failed: {exception}");
-        }
-    }
-
-    /// <summary>
-    /// Where a spawned body goes: a little in front of the local player and off the ground, so that it
-    /// lands in view instead of inside the player or at the world origin.
-    /// </summary>
-    private static unsafe void GetRagdollSpawnPose(out Vector3 origin)
-    {
-        origin = new Vector3(0, 0, 64);
-
-        ClientEngineFuncs* engine = EngineApi.PClient;
-        if (engine == null)
-            return;
-
-        var localPlayer = engine->GetLocalPlayer != null ? engine->GetLocalPlayer() : null;
-        if (localPlayer != null)
-            origin = localPlayer->origin;
-
-        var forward = new Vector3(1, 0, 0);
-        if (engine->GetViewAngles != null && engine->AngleVectors != null)
-        {
-            var viewAngles = default(Vector3);
-            engine->GetViewAngles((float*)&viewAngles);
-            engine->AngleVectors((float*)&viewAngles, (float*)&forward, null, null);
-        }
-
-        origin += forward * 48.0f;
-        origin.Z += 24.0f;
-    }
-
-    /// <summary>
-    /// Writes <paramref name="value"/> as null-terminated ASCII into
-    /// <paramref name="buffer"/>. Throws if the buffer is too small.
-    /// </summary>
-    private static void WriteAscii(string value, Span<byte> buffer)
-    {
-        buffer.Clear();
-        int written = Encoding.ASCII.GetBytes(value, buffer);
-        if (written >= buffer.Length)
-            throw new ArgumentException("The native string buffer is too small.", nameof(value));
-
-        buffer[written] = 0;
-    }
-
-    /// <summary>
-    /// Executes a console command on the client (e.g. "disconnect\n").
-    /// </summary>
-    private static void ExecuteClientCommand(string command)
-    {
-        ClientEngineFuncs* engine = EngineApi.PClient;
-        if (engine == null || engine->ClientCmd == null)
-            return;
-
-        if (command.Length >= 128)
-            command = command[..127];
-
-        Span<byte> buffer = stackalloc byte[128];
-        int length = Encoding.ASCII.GetBytes(command, buffer);
-        buffer[length] = 0;
-
-        fixed (byte* pointer = buffer)
-            engine->ClientCmd(NCharPtr.From(pointer));
-    }
-
-    /// <summary>
-    /// Prints a message to the client console via <c>Con_Printf</c>.
-    /// The message must not contain printf format specifiers.
-    /// </summary>
-    private static void PrintConsole(string message)
-    {
-        ClientEngineFuncs* engine = EngineApi.PClient;
-        if (engine == null || engine->Con_Printf == null)
-            return;
-
-        if (message.Length >= 512)
-            message = message[..511];
-
-        Span<byte> buffer = stackalloc byte[512];
-        int length = Encoding.ASCII.GetBytes(message, buffer);
-        buffer[length] = 0;
-
-        fixed (byte* pointer = buffer)
-            engine->Con_Printf(NCharPtr.From(pointer));
     }
 
 }
