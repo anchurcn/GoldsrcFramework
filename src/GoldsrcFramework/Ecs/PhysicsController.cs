@@ -2,6 +2,7 @@ using GoldsrcFramework.LinearMath;
 using Stride.BepuPhysics;
 using Stride.BepuPhysics.Constraints;
 using Stride.Engine;
+using System.Diagnostics.CodeAnalysis;
 using StrideMatrix = Stride.Core.Mathematics.Matrix;
 using StrideQuaternion = Stride.Core.Mathematics.Quaternion;
 using StrideVector3 = Stride.Core.Mathematics.Vector3;
@@ -45,7 +46,7 @@ public sealed class PhysicsController : EntityComponent
     private readonly List<ConstraintComponentBase> regularConstraints = [];
     private readonly List<ConstraintComponentBase> addonConstraints = [];
 
-    private PhysicsBoneData? pivotPhysicsBone;
+    private PhysicsBoneData? PivotPhysicsBone { get; set; }
     private StrideMatrix modelRootOffset = StrideMatrix.Identity;
     private bool[]? settingMasks = null;
     private PhysicsMotionType motionType = PhysicsMotionType.Kinematic;
@@ -100,6 +101,8 @@ public sealed class PhysicsController : EntityComponent
     /// <summary>
     /// True when no physics skeleton is loaded (e.g. the model has no .gpd). Every operation is a no-op.
     /// </summary>
+    [MemberNotNullWhen(false, nameof(PivotPhysicsBone))]
+    
     public bool IsNullSkeleton => physicsBonesInternal.Count == 0;
 
     /// <summary>The physics bone entities, in the order they were accepted by <see cref="LoadSkeleton"/>.</summary>
@@ -138,7 +141,7 @@ public sealed class PhysicsController : EntityComponent
         boneEntities.Clear();
         regularConstraints.Clear();
         addonConstraints.Clear();
-        pivotPhysicsBone = null;
+        PivotPhysicsBone = null;
         modelRootOffset = StrideMatrix.Identity;
         localPose = null;
         IsEnabled = false;
@@ -171,11 +174,13 @@ public sealed class PhysicsController : EntityComponent
         // is what GetModelRootTransform() derives the model root from.
         var pivot = physicsBonesInternal.MinBy(bone => bone.StudioBoneIndex)!;
 
-        pivotPhysicsBone = pivot;
+        PivotPhysicsBone = pivot;
 
         // ModelRootOffset is expressed in the root entity's local space, i.e. it is the inverse of the
         // pivot bone's T-pose transform relative to the model root:
-        //     modelRoot = pivotWorld * modelRootOffset,  modelRootOffset = Invert(pivotLocal)
+        //     modelRoot = modelRootOffset * pivotWorld,  modelRootOffset = Invert(pivotLocal)
+        // The inverse goes on the left because Stride matrices are row-vector
+        // (World = Local * ParentWorld), the opposite of GoldSrc's column-vector Matrix3x4.
         // Deriving it from the bone's *local* matrix (instead of world matrices) keeps it valid no
         // matter where the root entity happens to be when the skeleton is loaded, and it does not
         // depend on the bones being attached yet - LoadSkeleton deliberately leaves them detached.
@@ -260,16 +265,19 @@ public sealed class PhysicsController : EntityComponent
 
     public void SetPivotBonePoseByRootTransform(Stride.Core.Mathematics.Matrix rootTransformMatrix)
     {
-        if (!IsEnabled || IsNullSkeleton || pivotPhysicsBone is null)
+        if (!IsEnabled || IsNullSkeleton || PivotPhysicsBone is null)
             return;
 
-        // LoadSkeleton established:  modelRoot = pivotWorld * modelRootOffset
+        // LoadSkeleton established:  modelRoot = modelRootOffset * pivotWorld
         //                           modelRootOffset = Invert(pivotLocal)
-        // Given the model root, reconstruct the pivot bone's world transform and drive it.
+        // Given the model root, reconstruct the pivot bone's world transform and drive it:
+        //     pivotWorld = Invert(modelRootOffset) * modelRoot
+        // The inverse goes on the left, the same way round as the derivation above: Stride matrices
+        // are row-vector (World = Local * ParentWorld).
         StrideMatrix.Invert(ref modelRootOffset, out var inverseOffset);
-        StrideMatrix.Multiply(ref rootTransformMatrix, ref inverseOffset, out var pivotWorld);
+        StrideMatrix.Multiply(ref inverseOffset, ref rootTransformMatrix, out var pivotWorld);
 
-        SetPhysicsBonePose(pivotPhysicsBone, pivotWorld);
+        SetPhysicsBonePose(PivotPhysicsBone, pivotWorld);
     }
 
     /// <summary>
@@ -329,9 +337,12 @@ public sealed class PhysicsController : EntityComponent
             if (mask is not null && boneIndex < mask.Length && !mask[boneIndex])
                 continue;
 
+            // The snapshot holds the bone's pose relative to its anchor, so replaying it is that local
+            // transform followed by the anchor's *new* world matrix. Stride matrices are row-vector
+            // (World = Local * ParentWorld), so the local transform goes on the left.
             var anchorWorld = pose[anchorIndex].ToStrideMatrix();
             var local = localPose[boneIndex];
-            StrideMatrix.Multiply(ref anchorWorld, ref local, out var world);
+            StrideMatrix.Multiply(ref local, ref anchorWorld, out var world);
             pose[boneIndex] = world.ToMatrix3x4();
         }
     }
@@ -344,8 +355,10 @@ public sealed class PhysicsController : EntityComponent
     /// <remarks>
     /// Typically called right before a character is turned into a ragdoll, so that the ragdoll keeps
     /// the pose of bones that have no rigid body - a fist stays clenched instead of relaxing into the
-    /// bind pose. Capture is a deliberate, one-off operation: it is the only way to produce a
-    /// <see cref="PoseSnapshot"/>, and nothing caches poses implicitly.
+    /// bind pose. A ragdoll created on its own has no animated pose to hand over, so what it captures
+    /// is the model's bind pose: the pose its skeleton is already in. Capture is a deliberate, one-off
+    /// operation: it is the only way to produce a <see cref="PoseSnapshot"/>, and nothing caches poses
+    /// implicitly.
     /// </remarks>
     public PoseSnapshot CapturePoseSnapshot(ReadOnlySpan<Matrix3x4> pose)
     {
@@ -366,7 +379,10 @@ public sealed class PhysicsController : EntityComponent
             var anchorWorld = pose[anchorIndex].ToStrideMatrix();
             var boneWorld = pose[boneIndex].ToStrideMatrix();
             StrideMatrix.Invert(ref anchorWorld, out var inverseAnchorWorld);
-            StrideMatrix.Multiply(ref inverseAnchorWorld, ref boneWorld, out var local);
+            // Anchor-relative transform: boneWorld = local * anchorWorld (Stride is row-vector), so the
+            // local transform is the bone's world matrix with the anchor's inverse on the *right* -
+            // the mirror of the composition SetupBones replays it with.
+            StrideMatrix.Multiply(ref boneWorld, ref inverseAnchorWorld, out var local);
             locals[boneIndex] = local.ToMatrix3x4();
         }
 
@@ -410,15 +426,16 @@ public sealed class PhysicsController : EntityComponent
     /// </remarks>
     public StrideMatrix GetModelRootTransform()
     {
-        if (!IsEnabled || pivotPhysicsBone is not { } pivot)
+        if (IsNullSkeleton)
         {
-            Entity.Transform.UpdateWorldMatrix();
-            return Entity.Transform.WorldMatrix;
+            throw new InvalidOperationException("No physics skeleton avalable on this controller.");
         }
-
-        var pivotWorld = GetBoneWorldMatrix(pivot);
-        StrideMatrix.Multiply(ref pivotWorld, ref modelRootOffset, out var rootWorld);
-        return rootWorld;
+        else
+        {
+            var pivotWorld = GetBoneWorldMatrix(PivotPhysicsBone);
+            StrideMatrix.Multiply(ref modelRootOffset, ref pivotWorld, out var rootWorld);
+            return rootWorld;
+        }
     }
 
     // ── Internals ─────────────────────────────────────────────────────────

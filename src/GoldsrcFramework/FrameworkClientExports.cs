@@ -1,9 +1,13 @@
 using GoldsrcFramework.Content;
 using GoldsrcFramework.Ecs;
+using GoldsrcFramework.Ecs.Diagnostics;
 using GoldsrcFramework.Graphics;
 using GoldsrcFramework.LinearMath;
 using GoldsrcFramework.Rendering;
 using NativeInterop;
+using Stride.Engine;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 
 
@@ -16,7 +20,26 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
 {
     private const int MaxLevelNameLength = 260;
 
+    /// <summary>Console command that spawns a ragdoll, for looking at the ragdoll rendering.</summary>
+    private const string RagdollCommandName = "gsf_ragdoll";
+
+    /// <summary>Console variable holding how long a corpse stays, in seconds.</summary>
+    private const string CorpseStayCvarName = "phys_corpsestay";
+
+    /// <summary>Model the ragdoll command spawns.</summary>
+    private const string RagdollModelPath = "models/scientist.mdl";
+
     private GoldsrcClientGame? clientGame;
+
+    /// <summary>
+    /// The game the console commands act on.
+    /// </summary>
+    /// <remarks>
+    /// The engine invokes console commands through function pointers and passes no user data, so what a
+    /// command has to reach cannot come from the call - only from here. Set while the client is being
+    /// initialised, which is also when the commands are registered.
+    /// </remarks>
+    private static GoldsrcClientGame? currentGame;
 
     /// <summary>
     /// True when <see cref="HUD_VidInit"/> announced a (potential) map change and the
@@ -55,9 +78,21 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         // from the registry by every consumer (the scene management system, the physics behaviors).
         game.Services.AddService<IContentManager>(new GoldsrcContentManager());
 
+        // RagdollHelper is what the studio renderer asks about corpses - whether an entity is one, and
+        // what pose it carries - so it is handed the game that owns the scene the corpses are found
+        // in: the renderer is called straight from the engine's draw loop, which has no registry.
+        RagdollHelper.AttachGame(game);
+
         clientGame = game;
+        currentGame = game;
         RegisterDebugDrawCvar();
         RegisterPhysicsDepthTestCvar();
+        RegisterCorpseStayCvar();
+        RegisterRagdollCommand();
+
+        // The physics gun attaches itself to the local player's entity when that entity appears;
+        // this only hands it the game and registers its console variables.
+        PhysicsGunScript.Initialize(game);
     }
 
     public virtual int HUD_VidInit()
@@ -167,6 +202,11 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         else if (type is EntityType.PLAYER)
         {
             clientGame?.SceneManagement.MarkEntityVisible(ent, true, EngineApi.PStudio->PlayerInfo(ent->index - 1));
+
+            // Cheap and idempotent, and the one place that is guaranteed to run while the local
+            // player's entity exists: it is what tells the physics gun it can move in.
+            if (clientGame is not null)
+                PhysicsGunScript.EnsureAttached(clientGame.SceneManagement, ent);
         }
 
             return result;
@@ -188,6 +228,9 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
 
         if (IsDebugDrawEnabled() && clientGame?.SceneSystem.PhysicsDebug is { } debug)
             TriApiLineDraw.DrawLineVertices(debug.Commands.LineVertices, IsPhysicsDepthTestEnabled());
+
+        // The gun's own overlay, drawn in the same pass so the two can be compared directly.
+        PhysicsGunScript.DrawOverlay(IsPhysicsDepthTestEnabled());
     }
 
     public virtual void HUD_StudioEvent(mstudioevent_t* @event, cl_entity_t* entity)
@@ -495,6 +538,101 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
             cvar_t* cvar = engine->GetCvarPointer(NCharPtr.From(namePointer));
             return cvar == null || cvar->value != 0f;
         }
+    }
+
+    /// <summary>
+    /// Registers the <c>phys_corpsestay</c> console variable (default "30"): how long a ragdoll corpse
+    /// stays before it is released, in seconds. Idempotent across re-init. Read live by
+    /// <see cref="RagdollBehavior"/>, so it can be tuned at runtime.
+    /// </summary>
+    private static void RegisterCorpseStayCvar()
+    {
+        ClientEngineFuncs* engine = EngineApi.PClient;
+        if (engine == null || engine->RegisterVariable == null || engine->GetCvarPointer == null)
+            return;
+
+        Span<byte> name = stackalloc byte[32];
+        WriteAscii(CorpseStayCvarName, name);
+
+        fixed (byte* namePointer = name)
+        {
+            if (engine->GetCvarPointer(NCharPtr.From(namePointer)) != null)
+                return; // already registered (e.g. on re-init)
+
+            Span<byte> value = stackalloc byte[8];
+            WriteAscii("30", value);
+            fixed (byte* valuePointer = value)
+                engine->RegisterVariable(NCharPtr.From(namePointer), NCharPtr.From(valuePointer), 0);
+        }
+    }
+
+    /// <summary>
+    /// Registers the <c>gsf_ragdoll</c> console command: it spawns a scientist ragdoll in front of the
+    /// player, which is the quickest way to look at the ragdoll rendering. Idempotent across re-init.
+    /// </summary>
+    private static unsafe void RegisterRagdollCommand()
+    {
+        ClientEngineFuncs* engine = EngineApi.PClient;
+        if (engine == null || engine->AddCommand == null)
+            return;
+
+        Span<byte> name = stackalloc byte[32];
+        WriteAscii(RagdollCommandName, name);
+
+        fixed (byte* namePointer = name)
+            engine->AddCommand((NChar*)namePointer, &SpawnRagdollCommand);
+    }
+
+    /// <summary>Spawns the body the <c>gsf_ragdoll</c> command asks for.</summary>
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static unsafe void SpawnRagdollCommand()
+    {
+        try
+        {
+            if (currentGame is not { } game)
+                return;
+
+            GetRagdollSpawnPose(out var origin);
+            var entity = RagdollHelper.CreateRagdoll(game.Services, RagdollModelPath, origin);
+
+            EngineApi.DrawStringCenter(entity is null
+                ? $"{RagdollCommandName}: cannot load {RagdollModelPath}"
+                : $"{RagdollCommandName}: spawned {RagdollModelPath}");
+
+            System.Diagnostics.Debug.WriteLine($"[gsf] {RagdollCommandName} spawn point at {origin}");
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Debug.WriteLine($"[gsf] {RagdollCommandName} failed: {exception}");
+        }
+    }
+
+    /// <summary>
+    /// Where a spawned body goes: a little in front of the local player and off the ground, so that it
+    /// lands in view instead of inside the player or at the world origin.
+    /// </summary>
+    private static unsafe void GetRagdollSpawnPose(out Vector3 origin)
+    {
+        origin = new Vector3(0, 0, 64);
+
+        ClientEngineFuncs* engine = EngineApi.PClient;
+        if (engine == null)
+            return;
+
+        var localPlayer = engine->GetLocalPlayer != null ? engine->GetLocalPlayer() : null;
+        if (localPlayer != null)
+            origin = localPlayer->origin;
+
+        var forward = new Vector3(1, 0, 0);
+        if (engine->GetViewAngles != null && engine->AngleVectors != null)
+        {
+            var viewAngles = default(Vector3);
+            engine->GetViewAngles((float*)&viewAngles);
+            engine->AngleVectors((float*)&viewAngles, (float*)&forward, null, null);
+        }
+
+        origin += forward * 48.0f;
+        origin.Z += 24.0f;
     }
 
     /// <summary>

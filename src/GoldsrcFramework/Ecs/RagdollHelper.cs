@@ -1,5 +1,4 @@
-using System.Runtime.InteropServices;
-using System.Text;
+using GoldsrcFramework.Content.Gpd;
 using GoldsrcFramework.Engine.Native;
 using GoldsrcFramework.LinearMath;
 using NativeInterop;
@@ -8,6 +7,8 @@ using Stride.BepuPhysics.Constraints;
 using Stride.Core;
 using Stride.Engine;
 using Stride.Engine.Design;
+using System.Runtime.InteropServices;
+using System.Text;
 using GoldsrcVector3 = GoldsrcFramework.LinearMath.Vector3;
 using StrideVector3 = Stride.Core.Mathematics.Vector3;
 
@@ -66,6 +67,15 @@ public static class RagdollHelper
 
     private const int MaxModelNameLength = 64; // MAX_MODEL_NAME
 
+    /// <summary>
+    /// The game whose scene holds the entities a corpse can replace. Set once while the client
+    /// initialises - see <see cref="AttachGame"/>.
+    /// </summary>
+    private static GoldsrcClientGame? game;
+
+    /// <summary>Whether the one-off "a corpse reached the renderer" line has been printed.</summary>
+    private static bool reportedCorpseDraw;
+
     // ── Creation ──────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -114,6 +124,16 @@ public static class RagdollHelper
 
         var ragdollPhysics = new PhysicsController { MotionType = PhysicsMotionType.Dynamic };
         ragdollEntity.Components.Add(ragdollPhysics);
+
+        //    Attach the transform link while the entity is still out of the scene: the sync system
+        //    only looks an entity's link component up when the entity is added, so one attached
+        //    afterwards would never be registered. Its authority is Stride - the simulation owns the
+        //    transform and the Draw pass writes it back to the client entity the corpse is drawn
+        //    through. The binding starts empty because that client entity does not exist yet;
+        //    Associate points it at one once the corpse has it.
+        var transformLink = new ClEntityTransformBinding(null);
+        ragdollEntity.Components.Add(
+            new GoldsrcTransformLinkComponent(transformLink, TransformAuthority.Stride));
 
         // 3. Bring it into the scene first so the bodies land in the same simulation.
         rootScene.Entities.Add(ragdollEntity);
@@ -183,6 +203,14 @@ public static class RagdollHelper
         var physics = new PhysicsController { MotionType = PhysicsMotionType.Dynamic };
         entity.Components.Add(physics);
 
+        // Attach the transform link while the entity is still out of the scene: the sync system only
+        // looks an entity's link component up when the entity is added, so one attached afterwards
+        // would never be registered. Its authority is Stride - the simulation owns the transform and
+        // the Draw pass writes it back to the client entity the corpse is drawn through. The binding
+        // starts empty because that client entity does not exist yet; Associate points it at one.
+        var transformLink = new ClEntityTransformBinding(null);
+        entity.Components.Add(new GoldsrcTransformLinkComponent(transformLink, TransformAuthority.Stride));
+
         // The bones carry the bind pose relative to the model root, so placing the root places the
         // whole skeleton - no explicit pose is needed.
         entity.Transform.Position = new StrideVector3(origin.X, origin.Y, origin.Z);
@@ -191,6 +219,14 @@ public static class RagdollHelper
 
         physics.LoadSkeleton(prefab.Instantiate(), BoneParents(content, key));
         physics.Enable();
+
+        // Bones without a rigid body (fingers, face) have no entity of their own: SetupBones rebuilds
+        // them from a snapshot taken relative to their nearest simulated ancestor, and without one
+        // they would be left at identity - pinned to the world origin instead of riding along with
+        // the skeleton. A standalone ragdoll has no animation pose to hand over, so the pose to keep
+        // is the model's bind pose.
+        ApplyBindPoseSnapshot(content, key, physics);
+
         entity.Components.Add(new RagdollBehavior());
 
         var spawn = origin;
@@ -213,9 +249,12 @@ public static class RagdollHelper
         if (ragdoll is null)
             return;
 
+        // TODO*:ensure ragdoll behavior exist.
+
         var clEntity = ragdoll.Get<Components.ClEntityComponent>()?.NativeEntity;
         if (clEntity != null)
         {
+            GCHandle.FromIntPtr(clEntity->curstate.iuser4).Free();
             clEntity->curstate.iuser4 = 0;
             ReleaseClientEntity(clEntity);
         }
@@ -231,15 +270,13 @@ public static class RagdollHelper
         var handle = GCHandle.Alloc(ragdoll, GCHandleType.Normal);
         var raw = unchecked((int)GCHandle.ToIntPtr(handle));
 
-        clEntity->curstate.renderfx = kRenderFxRagdoll;
         clEntity->curstate.iuser4 = raw;
-
-        // The behavior owns the handle: it is what frees it, and it must not go through the client
-        // entity to do so - the engine frees every temp entity when a map goes away, which happens
-        // before the ECS is told to forget them.
-        ragdoll.Get<RagdollBehavior>()?.TakeHandle(raw);
-
         ragdoll.Components.Add(new Components.ClEntityComponent(clEntity));
+
+        // The transform link went on before the entity joined the scene, while the client entity it
+        // writes back to did not exist yet. Point it at the one that does now.
+        if (ragdoll.Get<GoldsrcTransformLinkComponent>()?.Binding is ClEntityTransformBinding binding)
+            binding.SetEntity(clEntity);
     }
 
     /// <summary>
@@ -274,17 +311,86 @@ public static class RagdollHelper
     }
 
     /// <summary>
-    /// Keeps the client entity where the ragdoll is. The engine adds a temp entity to the render list
-    /// by its own bounds test around <c>origin</c>, so a corpse that slides away from where it was
-    /// created would stop being drawn.
+    /// Hands this helper the game it looks entity state up in.
     /// </summary>
-    internal static unsafe void MoveClientEntity(Components.ClEntityComponent? clEntity, in StrideVector3 position)
-    {
-        var entity = clEntity?.NativeEntity;
-        if (entity == null)
-            return;
+    /// <remarks>
+    /// Called once, at the composition root. Everything else here works from the entity it is given;
+    /// only <see cref="IsReplacedByCorpse"/> has to reach into the scene, and only because the caller
+    /// that needs it - the renderer, from the engine's draw loop - has no registry to ask.
+    /// </remarks>
+    internal static void AttachGame(GoldsrcClientGame clientGame) => game = clientGame;
 
-        entity->origin = new GoldsrcVector3(position.X, position.Y, position.Z);
+    /// <summary>
+    /// Fills <paramref name="modelRoot"/> and <paramref name="bones"/> with the pose of the physics
+    /// skeleton a corpse is drawn from, when <paramref name="entity"/> is one of ours.
+    /// </summary>
+    /// <param name="entity">The client entity the engine is asking to draw.</param>
+    /// <param name="modelRoot">The renderer's rotation matrix, to receive the model root pose.</param>
+    /// <param name="bones">The renderer's bone buffer, to receive the pose, in studio bone order.</param>
+    /// <param name="boneCapacity">How many matrices <paramref name="bones"/> can hold.</param>
+    /// <returns>
+    /// True when <paramref name="entity"/> is a ragdoll corpse and it wrote the pose. False for every
+    /// other entity, and for a corpse whose skeleton is gone or does not match the model, which is
+    /// then left to be drawn the ordinary way rather than blanked out.
+    /// </returns>
+    /// <remarks>
+    /// Writing straight into the renderer's own buffers is the point: returning a pose instead would
+    /// be a per-entity, per-frame allocation of several kilobytes. The ragdoll's <c>renderfx</c>
+    /// marker is what tells the caller which entity to ask about, and <see cref="TryGetBehavior"/>
+    /// re-checks it before reading <c>iuser4</c>.
+    /// </remarks>
+    internal static unsafe bool TryFillPhysicsPose(
+        cl_entity_t* entity, Matrix3x4* modelRoot, Matrix3x4* bones, int boneCapacity)
+    {
+        if (entity == null || modelRoot == null || bones == null || boneCapacity <= 0)
+            return false;
+
+        if (!TryGetBehavior(entity, out var behavior))
+            return false;
+
+        var posed = behavior!.TryFillPhysicsPose(modelRoot, bones, boneCapacity);
+
+        // Printed once: whether a corpse reaches the renderer at all is the question this whole
+        // chain turns on, and there is no other way to see it from outside the engine's draw loop.
+        // The root position comes with it because "reached the renderer" and "visible" are not the
+        // same thing - a body flung away from where it was spawned is drawn exactly where physics
+        // put it, which is nowhere near the camera.
+        if (!reportedCorpseDraw)
+        {
+            reportedCorpseDraw = true;
+
+            if (posed)
+            {
+                var root = modelRoot->Origin;
+                Log($"ragdoll: corpse drawn from physics, model root at {root.X:F0} {root.Y:F0} {root.Z:F0}");
+            }
+            else
+            {
+                Log("ragdoll: the corpse reached the renderer but had no pose to draw");
+            }
+        }
+
+        return posed;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="entity"/> is a client entity that a corpse has replaced, and so must
+    /// not be drawn any more.
+    /// </summary>
+    /// <remarks>
+    /// While an entity is <see cref="HalfLifeBehavior.RagdollRigged"/> its skeleton belongs to the
+    /// ragdoll, and the engine would otherwise draw its death animation standing next to the body.
+    /// The state is read live from the scene rather than remembered here, so nothing has to be
+    /// cleared when an entity respawns or a map goes away.
+    /// </remarks>
+    internal static unsafe bool IsReplacedByCorpse(cl_entity_t* entity)
+    {
+        // Only a server entity has an ECS counterpart to ask. A corpse - or anything else the engine
+        // keeps outside its entity list - has no index to look up.
+        if (entity == null || entity->index <= 0)
+            return false;
+
+        return game?.SceneManagement.GetEntity(entity->index)?.Get<HalfLifeBehavior>() is { RagdollRigged: true };
     }
 
     /// <summary>How long a corpse stays, read live from <c>phys_corpsestay</c> so it can be tuned.</summary>
@@ -357,6 +463,7 @@ public static class RagdollHelper
         tempEntity->die = float.MaxValue;
 
         var ragdollEnt = &tempEntity->entity;
+        ragdollEnt->curstate.renderfx = kRenderFxRagdoll;
         return ragdollEnt;
     }
 
@@ -404,7 +511,6 @@ public static class RagdollHelper
         ragdollState->rendermode = srcState->rendermode;
         ragdollState->rendercolor = srcState->rendercolor;
         ragdollState->renderamt = srcState->renderamt;
-        ragdollState->renderfx = kRenderFxRagdoll;
         ragdollState->gaitsequence = srcState->gaitsequence;
         ragdollState->controller = srcState->controller;
         ragdollState->blending = srcState->blending;
@@ -450,6 +556,26 @@ public static class RagdollHelper
             parents[i] = bones[i].parent;
 
         return parents;
+    }
+
+    /// <summary>
+    /// Seeds <paramref name="physics"/> with the model's bind pose, taken relative to each bone's
+    /// anchor, so that the bones without a rigid body follow the simulated ancestor they hang off.
+    /// </summary>
+    /// <remarks>
+    /// The bind pose is stored relative to the model root, and that root cancels out of an
+    /// anchor-relative transform, so this works without knowing where the ragdoll will be placed.
+    /// Both the bone hierarchy and the anchor mapping come from
+    /// <see cref="PhysicsController.LoadSkeleton"/>, so this has to run after it.
+    /// </remarks>
+    private static unsafe void ApplyBindPoseSnapshot(IContentManager content, string key, PhysicsController physics)
+    {
+        var studioModel = content.Load<StudioModel>(key);
+        if (studioModel is null || studioModel.Header->numbones <= 0)
+            return;
+
+        var bindPose = StudioPhysicsPrefabFactory.BuildBindPose(studioModel.Header, studioModel.Header->numbones);
+        physics.ApplyPoseSnapshot(physics.CapturePoseSnapshot(bindPose));
     }
 
     /// <summary>

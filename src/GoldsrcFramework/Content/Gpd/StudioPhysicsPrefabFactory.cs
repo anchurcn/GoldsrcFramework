@@ -3,6 +3,7 @@ using GoldsrcFramework.Engine.Native;
 using GoldsrcFramework.LinearMath;
 using Stride.BepuPhysics;
 using Stride.BepuPhysics.Constraints;
+using Stride.BepuPhysics.Definitions;
 using Stride.BepuPhysics.Definitions.Colliders;
 using Stride.Engine;
 using GoldsrcQuaternion = GoldsrcFramework.LinearMath.Quaternion;
@@ -30,7 +31,9 @@ namespace GoldsrcFramework.Content.Gpd;
 /// its joint frames relative to that rigid body. This framework has no rigid-body offset - the body
 /// <i>is</i> the bone (<see cref="PhysicsController.SetPose"/> teleports a bone body straight onto
 /// the bone's animated pose), so every sub-shape pose and joint frame is re-expressed in the bone's
-/// frame as <c>local = offset * frame</c>.
+/// frame as <c>local = offset * frame</c>. A sub-shape's pose ends there, being relative to the bone;
+/// a joint frame takes one more step, because Bepu measures it from the body's center of mass rather
+/// than from the body's origin - see <see cref="TryCreateConstraint"/>.
 /// </para>
 /// <para>
 /// <b>Bind pose.</b> Each bone entity's local transform is its <b>T-pose</b> transform relative to
@@ -85,6 +88,7 @@ internal static class StudioPhysicsPrefabFactory
         // ── Bodies ────────────────────────────────────────────────────────────
         var bodies = new BodyComponent[asset.RigidBodies.Length];
         var entities = new Entity[asset.RigidBodies.Length];
+        var centersOfMass = new GoldsrcVector3[asset.RigidBodies.Length];
 
         for (int i = 0; i < asset.RigidBodies.Length; i++)
         {
@@ -95,7 +99,7 @@ internal static class StudioPhysicsPrefabFactory
                 return null;
             }
 
-            if (!TryBuildCollider(asset.Shapes[rigidBody.ShapeIndex], rigidBody.BoneToRigid, out var collider, out error))
+            if (!TryBuildCollider(asset.Shapes[rigidBody.ShapeIndex], rigidBody.BoneToRigid, out var collider, out centersOfMass[i], out error))
                 return null;
 
             var body = new BodyComponent
@@ -104,6 +108,13 @@ internal static class StudioPhysicsPrefabFactory
                 // Kinematic while the entity is alive; PhysicsController switches the addon bodies and
                 // the whole skeleton for a ragdoll.
                 Kinematic = true,
+                // Every bone of a skeleton shares one collision group, which makes Bepu skip contact
+                // generation between bones of the same skeleton. The capsule of one limb overlaps the
+                // capsule of the next by several units at each joint (the limb capsules model the same
+                // continuous flesh the joints sit inside), so without this the solver would read those
+                // overlaps as deep penetrations and blast the ragdoll apart. Bones still collide with
+                // the world: brush geometry keeps the default id of zero, a different group.
+                CollisionGroup = new CollisionGroup { Id = 1 },
             };
 
             var entity = new Entity($"PhysicsBone_{rigidBody.BoneIndex}");
@@ -122,7 +133,7 @@ internal static class StudioPhysicsPrefabFactory
         // ── Joints ────────────────────────────────────────────────────────────
         foreach (var constraint in asset.Constraints)
         {
-            var component = TryCreateConstraint(constraint, asset.RigidBodies, bodies);
+            var component = TryCreateConstraint(constraint, asset.RigidBodies, bodies, centersOfMass);
             if (component is null)
             {
                 error = $"constraint between rigidbody {constraint.BodyA} and {constraint.BodyB} cannot be represented";
@@ -146,20 +157,31 @@ internal static class StudioPhysicsPrefabFactory
     /// Converts one collision shape into a compound collider whose children are posed relative to
     /// the bone instead of the legacy rigid body.
     /// </summary>
+    /// <param name="centerOfMass">
+    /// Where the compound's center of mass ends up, in bone local space. A joint frame is measured
+    /// from that center rather than from the bone, so the joint code needs it - see
+    /// <see cref="TryCreateConstraint"/>. Exact for the single sub-shape every collision shape block
+    /// in the wild holds, because with one child its weight cancels out of Bepu's average; with
+    /// several it is the plain centroid, the weights Bepu assigns not being knowable from here.
+    /// </param>
     private static bool TryBuildCollider(
         GpdShape shape,
         in Matrix3x4 boneToRigid,
         out CompoundCollider collider,
+        out GoldsrcVector3 centerOfMass,
         out string error)
     {
         error = string.Empty;
         collider = new CompoundCollider();
+        centerOfMass = default;
 
         if (shape.SubShapes.Length == 0)
         {
             error = "a collision shape holds no sub-shape";
             return false;
         }
+
+        float centerX = 0.0f, centerY = 0.0f, centerZ = 0.0f;
 
         for (int i = 0; i < shape.SubShapes.Length; i++)
         {
@@ -169,6 +191,10 @@ internal static class StudioPhysicsPrefabFactory
             // bone pose, so the legacy rigid-body offset has to be folded into the child pose.
             Matrix3x4.ConcatTransforms(boneToRigid, subShape.LocalTransform, out var local);
             var (position, rotation) = Decompose(local);
+
+            centerX += position.X;
+            centerY += position.Y;
+            centerZ += position.Z;
 
             switch (subShape.ShapeType)
             {
@@ -200,6 +226,9 @@ internal static class StudioPhysicsPrefabFactory
                     return false;
             }
         }
+
+        float inverseCount = 1.0f / shape.SubShapes.Length;
+        centerOfMass = new GoldsrcVector3(centerX * inverseCount, centerY * inverseCount, centerZ * inverseCount);
 
         return true;
     }
@@ -237,56 +266,66 @@ internal static class StudioPhysicsPrefabFactory
     /// Converts one legacy joint into the Stride Bepu component that represents it.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// <list type="bullet">
     /// <item><c>spherical</c> (Bullet point to point) becomes a ball socket.</item>
-    /// <item><c>hinge</c> becomes a hinge. Bullet's hinge axis is the frame's third basis column, so
-    /// that is what the hinge axis is read from.</item>
-    /// <item><c>cone</c> (Bullet cone twist) becomes a swivel hinge: its twist axis is the frame's
-    /// first basis column, which becomes the swivel axis of A and the hinge axis of B.</item>
+    /// <item><c>hinge</c> becomes a ball socket for now: its hinge axis (the frame's third basis
+    /// column) and low/high limits are not applied yet.</item>
+    /// <item><c>cone</c> (Bullet cone twist) becomes a ball socket. Its twist axis (the frame's first
+    /// basis column) is collinear on both sides - which a swivel hinge forbids (its two axes must be
+    /// perpendicular) - and its twist/swing spans are not applied yet.</item>
     /// </list>
-    /// No angular limits are applied yet, see the type remarks.
+    /// So in this revision every joint reduces to a plain ball socket: same anchor, free rotation.
+    /// </para>
+    /// <para>
+    /// <b>What a joint frame is measured from.</b> Bepu documents <c>LocalOffsetA</c> as the "offset
+    /// from the center of body A", and that center is the one its compound builder computed - the
+    /// weighted average of the collider's children, which lands where the legacy rigid body is. A
+    /// bone body puts the bone at its origin instead, so the legacy offset is folded into the frame
+    /// <i>and</i> that center is then taken back out. Folding alone leaves each side of a joint
+    /// reaching for a point one rigid-body offset away, and the solver spends the whole simulation
+    /// closing a gap that was never there - a ragdoll built that way gets thrown across the room
+    /// instead of held together. Axes need no such correction: Bepu recenters children by a
+    /// translation and never turns the body, so a direction is the same seen from either point.
+    /// </para>
     /// </remarks>
     private static ConstraintComponentBase? TryCreateConstraint(
         GpdConstraint constraint,
         GpdRigidBody[] rigidBodies,
-        BodyComponent[] bodies)
+        BodyComponent[] bodies,
+        GoldsrcVector3[] centersOfMass)
     {
         var bodyA = rigidBodies[constraint.BodyA];
         var bodyB = rigidBodies[constraint.BodyB];
+        var centerA = centersOfMass[constraint.BodyA];
+        var centerB = centersOfMass[constraint.BodyB];
 
-        // The legacy frames are relative to the rigid bodies; the offset is baked away, so they are
-        // re-expressed relative to the bones first.
+        // The legacy frames are relative to the rigid bodies, whose offset is baked away: they are
+        // re-expressed relative to the bones first, and then relative to the center a joint is
+        // actually measured from.
         Matrix3x4.ConcatTransforms(bodyA.BoneToRigid, constraint.FrameInA, out var frameA);
         Matrix3x4.ConcatTransforms(bodyB.BoneToRigid, constraint.FrameInB, out var frameB);
+
+        var localOffsetA = RelativeTo(frameA.Origin, centerA);
+        var localOffsetB = RelativeTo(frameB.Origin, centerB);
 
         ConstraintComponentBase component;
         switch (constraint.Type)
         {
             case GpdConstraintType.Spherical:
+            case GpdConstraintType.Hinge:
+            case GpdConstraintType.Cone:
+                // v1: every joint reduces to a plain ball socket. The legacy joint's angular limits
+                // (hinge low/high, cone twist/swing spans) are parsed and kept on the asset but not
+                // applied yet. Restoring them is a later change confined to this switch: hinge gets a
+                // Hinge (or BallSocket + SwingLimit/TwistLimit), cone gets BallSocket + SwingLimit +
+                // TwistLimit - the composition the Bepu ragdoll demo uses for its joints. (A cone's
+                // twist axes are collinear, so it can never be a SwivelHinge, whose two axes must be
+                // perpendicular.)
                 component = new BallSocketConstraintComponent
                 {
-                    LocalOffsetA = ToStride(frameA.Origin),
-                    LocalOffsetB = ToStride(frameB.Origin),
-                };
-                break;
-
-            case GpdConstraintType.Hinge:
-                component = new HingeConstraintComponent
-                {
-                    LocalOffsetA = ToStride(frameA.Origin),
-                    LocalHingeAxisA = Axis(frameA, 2),
-                    LocalOffsetB = ToStride(frameB.Origin),
-                    LocalHingeAxisB = Axis(frameB, 2),
-                };
-                break;
-
-            case GpdConstraintType.Cone:
-                component = new SwivelHingeConstraintComponent
-                {
-                    LocalOffsetA = ToStride(frameA.Origin),
-                    LocalSwivelAxisA = Axis(frameA, 0),
-                    LocalOffsetB = ToStride(frameB.Origin),
-                    LocalHingeAxisB = Axis(frameB, 0),
+                    LocalOffsetA = localOffsetA,
+                    LocalOffsetB = localOffsetB,
                 };
                 break;
 
@@ -323,6 +362,20 @@ internal static class StudioPhysicsPrefabFactory
         return Vector3Normalize(axis);
     }
 
+    /// <summary>
+    /// A point given in bone local space, re-expressed relative to the bone's collider center of mass.
+    /// </summary>
+    /// <remarks>
+    /// Translation only. The center Bepu reports after building a compound is a position, not a pose:
+    /// the children are shifted by it and the body keeps its orientation, so a direction is unchanged
+    /// by the move and only offsets - the things a joint frame is anchored by - are affected.
+    /// </remarks>
+    private static StrideVector3 RelativeTo(in GoldsrcVector3 boneLocal, in GoldsrcVector3 centerOfMass)
+        => ToStride(new GoldsrcVector3(
+            boneLocal.X - centerOfMass.X,
+            boneLocal.Y - centerOfMass.Y,
+            boneLocal.Z - centerOfMass.Z));
+
     // ── Bind pose ─────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -332,8 +385,13 @@ internal static class StudioPhysicsPrefabFactory
     /// The studio bone table stores each bone's default pose relative to its parent, so the transform
     /// relative to the model root is the product along the parent chain. Parents are followed with a
     /// cycle guard: a malformed hierarchy resolves to identity instead of hanging.
+    /// <para>
+    /// Reading it does not depend on a prefab: a ragdoll created without an entity to clone uses it
+    /// to seed the anchors of the bones that get no rigid body - see
+    /// <c>RagdollHelper.CreateRagdoll</c>.
+    /// </para>
     /// </remarks>
-    private static unsafe Matrix3x4[] BuildBindPose(studiohdr_t* header, int boneCount)
+    internal static unsafe Matrix3x4[] BuildBindPose(studiohdr_t* header, int boneCount)
     {
         var bones = header->GetBones();
         var result = new Matrix3x4[boneCount];

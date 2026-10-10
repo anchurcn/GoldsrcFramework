@@ -1,3 +1,4 @@
+using GoldsrcFramework.Ecs;
 using GoldsrcFramework.Engine.Native;
 using GoldsrcFramework.Graphics;
 using GoldsrcFramework.LinearMath;
@@ -266,6 +267,26 @@ public unsafe class StudioModelRenderer
         IEngineStudio->StudioSetHeader(m_pStudioHeader);
         IEngineStudio->SetRenderModel(m_pRenderModel);
 
+        // A ragdoll corpse carries its pose in the physics skeleton its client entity was linked to,
+        // so it is drawn from there instead of from its animation. Asked before the animation
+        // transform on purpose: that is exactly the work being skipped. An entity a corpse has
+        // replaced is not drawn at all - the engine would otherwise draw its death animation next to
+        // the body. Both questions go to RagdollHelper, the only thing here that knows what a ragdoll
+        // is.
+        if (m_pStudioHeader != null)
+        {
+            var boneCapacity = Math.Min(m_pStudioHeader->numbones, StudioConstants.MAXSTUDIOBONES);
+
+            if (RagdollHelper.TryFillPhysicsPose(m_pCurrentEntity, m_protationmatrix, m_pbonetransform, boneCapacity))
+            {
+                *m_protationmatrix = Matrix3x4.Identity;
+                m_protationmatrix->Origin = m_pCurrentEntity->curstate.origin;
+                return StudioDrawPhysicsModel(flags);
+            }
+            if (RagdollHelper.IsReplacedByCorpse(m_pCurrentEntity))
+                return false;
+        }
+
         StudioSetUpTransform(false);
 
         if ((flags & STUDIO_RENDER) != 0)
@@ -326,6 +347,7 @@ public unsafe class StudioModelRenderer
 
         return true;
     }
+
 
     /// <summary>
     /// Draw a player model
@@ -497,6 +519,64 @@ public unsafe class StudioModelRenderer
     }
 
     #endregion
+    internal bool StudioDrawPhysicsModel(int flags)
+    {
+        alight_t lighting;
+        Vector3 dir;
+
+        if ((flags & STUDIO_RENDER) != 0)
+        {
+            // see if the bounding box lets us trivially reject, also sets
+            if (IEngineStudio->StudioCheckBBox() == 0)
+                return false;
+
+            (*_s->m_pModelsDrawn)++;
+            (*_s->m_pStudioModelCount)++; // render data cache cookie
+
+            if (m_pStudioHeader->numbodyparts == 0)
+                return true;
+        }
+
+        StudioSaveBones();
+
+        // Lighting reads the light transform, so it has to carry the pose the bones carry.
+        for (var i = 0; i < m_pStudioHeader->numbones; i++)
+            m_plighttransform[i] = m_pbonetransform[i];
+
+        if ((flags & STUDIO_EVENTS) != 0)
+        {
+            StudioCalcAttachments();
+            IEngineStudio->StudioClientEvents();
+            // copy attachments into global entity array
+            if (m_pCurrentEntity->index > 0)
+            {
+                cl_entity_t* ent = EngineApi.PClient->GetEntityByIndex(m_pCurrentEntity->index);
+
+                ent->attachment = m_pCurrentEntity->attachment;
+            }
+        }
+
+        if ((flags & STUDIO_RENDER) != 0)
+        {
+            lighting.plightvec = (float*)&dir;
+            IEngineStudio->StudioDynamicLight(m_pCurrentEntity, &lighting);
+
+            IEngineStudio->StudioEntityLight(&lighting);
+
+            // model and frame independant
+            IEngineStudio->StudioSetupLighting(&lighting);
+
+            // get remap colors
+            m_nTopColor = m_pCurrentEntity->curstate.colormap & 0xFF;
+            m_nBottomColor = (m_pCurrentEntity->curstate.colormap & 0xFF00) >> 8;
+
+            IEngineStudio->StudioSetRemapColors(m_nTopColor, m_nBottomColor);
+
+            StudioRenderModel();
+        }
+
+        return true;
+    }
 
     #region Bone Calculation Methods
 
