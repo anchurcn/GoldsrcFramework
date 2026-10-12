@@ -120,6 +120,15 @@ public static class RagdollHelper
         var ragdollPhysics = new PhysicsController { MotionType = PhysicsMotionType.Dynamic };
         ragdollEntity.Components.Add(ragdollPhysics);
 
+        // The behavior that keeps the entity transform in sync, counts the lifetime down, and is the
+        // corpse's pose source. It is built before the client entity, which is pointed back at the
+        // handle the behavior holds - see AttachClientEntity. The death pose goes to it rather than to
+        // the controller, which keeps no pose of its own: the controller is handed it again on every
+        // read.
+        var behavior = new RagdollBehavior();
+        behavior.SetDeathPose(initialPose);
+        ragdollEntity.Components.Add(behavior);
+
         // 3. Give it the client entity the corpse is drawn through, before anything points at it. The
         //    temp entity depends on the model, not on the skeleton, so it can be allocated this early,
         //    and every component that carries it is then built with it already in place.
@@ -131,7 +140,7 @@ public static class RagdollHelper
 
             var clEntity = CreateRagdollTempEntFromTemplate(source, &source->curstate);
             if (clEntity != null)
-                AttachClientEntity(ragdollEntity, clEntity);
+                AttachClientEntity(ragdollEntity, behavior, clEntity);
         }
 
         // 4. Bring it into the scene first so the bodies land in the same simulation.
@@ -143,13 +152,6 @@ public static class RagdollHelper
         ragdollPhysics.LoadSkeleton(clonedBones, originPhysics.StudioBoneParents.Span);
         ragdollPhysics.Enable();
         ragdollPhysics.SetPose(initialPose);
-
-        // 6. The behavior that keeps the entity transform in sync, counts the lifetime down, and is the
-        //    corpse's pose source. The death pose goes to it rather than to the controller, which keeps
-        //    no pose of its own - the controller is handed it again on every read.
-        var behavior = new RagdollBehavior();
-        behavior.SetDeathPose(initialPose);
-        ragdollEntity.Components.Add(behavior);
 
         return ragdollEntity;
     }
@@ -193,13 +195,24 @@ public static class RagdollHelper
         var physics = new PhysicsController { MotionType = PhysicsMotionType.Dynamic };
         entity.Components.Add(physics);
 
+        // The behavior that keeps the entity transform in sync, counts the lifetime down, and is the
+        // corpse's pose source. It is built before the client entity, which is pointed back at the
+        // handle the behavior holds - see AttachClientEntity. Bones without a rigid body (fingers,
+        // face) have no entity of their own: the read-back places them relative to their nearest
+        // simulated ancestor, and without a pose to place them by they would be left wherever the
+        // buffer had them. A standalone ragdoll has no animation pose to hand over, so the pose to keep
+        // is the model's bind pose.
+        var behavior = new RagdollBehavior();
+        behavior.SetDeathPose(BindPose(content, key));
+        entity.Components.Add(behavior);
+
         // Give it the client entity the corpse is drawn through before anything points at it: the temp
         // entity depends on the model, not on the skeleton, so it can be allocated this early, and every
         // component that carries it is then built with it already in place.
         var spawn = origin;
         var clEntity = CreateRagdollTempEnt(&spawn, model);
         if (clEntity != null)
-            AttachClientEntity(entity, clEntity);
+            AttachClientEntity(entity, behavior, clEntity);
 
         // The bones carry the bind pose relative to the model root, so placing the root places the
         // whole skeleton - no explicit pose is needed.
@@ -209,14 +222,6 @@ public static class RagdollHelper
 
         physics.LoadSkeleton(prefab.Instantiate(), BoneParents(content, key));
         physics.Enable();
-
-        // Bones without a rigid body (fingers, face) have no entity of their own: the read-back places
-        // them relative to their nearest simulated ancestor, and without a pose to place them by they
-        // would be left wherever the buffer had them. A standalone ragdoll has no animation pose to
-        // hand over, so the pose to keep is the model's bind pose.
-        var behavior = new RagdollBehavior();
-        behavior.SetDeathPose(BindPose(content, key));
-        entity.Components.Add(behavior);
 
         return entity;
     }
@@ -264,11 +269,13 @@ public static class RagdollHelper
     /// one: the binding and the reference both exist the first time they are seen, so no component is
     /// ever handed an entity it was not built with.
     /// </remarks>
-    private static unsafe void AttachClientEntity(Entity ragdoll, cl_entity_t* clEntity)
+    private static unsafe void AttachClientEntity(Entity ragdoll, RagdollBehavior behavior, cl_entity_t* clEntity)
     {
-        var handle = GCHandle.Alloc(ragdoll, GCHandleType.Normal);
+        // The engine's slot is only a pointer back at the corpse, and the corpse - the behavior - is
+        // what holds the handle it names: unlinking happens from an entity's exit, where the engine may
+        // already have given the slot to somebody else, so the handle has to live on this side.
+        clEntity->curstate.iuser4 = unchecked((int)behavior.AttachOwner(ragdoll));
 
-        clEntity->curstate.iuser4 = unchecked((int)GCHandle.ToIntPtr(handle));
         ragdoll.Components.Add(new Components.ClEntityComponent(clEntity));
 
         // Authority is Stride: the simulation owns the transform, and the Draw pass writes it back to

@@ -45,6 +45,14 @@ public sealed class RagdollBehavior : ScriptComponentBase, ILateUpdate, IPhysics
     /// </remarks>
     private bool releaseRequested;
 
+    /// <summary>
+    /// Strong handle to the corpse's own entity - the object the engine's <c>iuser4</c> slot points at,
+    /// so the renderer can get from a client entity back to the skeleton that poses it. The corpse's
+    /// own record of a resource it took, and managed state only: it is given back without the client
+    /// entity ever being read.
+    /// </summary>
+    private GCHandle owner;
+
     public override void Start()
     {
         physics = Entity.Get<PhysicsController>();
@@ -171,40 +179,55 @@ public sealed class RagdollBehavior : ScriptComponentBase, ILateUpdate, IPhysics
         Entity.Transform.UpdateWorldMatrix();
     }
 
+    /// <summary>
+    /// Takes hold of the entity this corpse is drawn through, and returns the raw handle the engine's
+    /// <c>iuser4</c> slot is to carry for it.
+    /// </summary>
+    /// <remarks>
+    /// Called once, while the corpse is being built and against a client entity the engine has just
+    /// handed out - the only moment that slot is known to be the corpse's. The handle is kept here
+    /// rather than on the temp entity it is pointed at with, because unlinking happens from an entity's
+    /// exit, where the engine may already have given the slot to somebody else.
+    /// </remarks>
+    internal nint AttachOwner(Entity ragdoll)
+    {
+        owner = GCHandle.Alloc(ragdoll, GCHandleType.Normal);
+        return GCHandle.ToIntPtr(owner);
+    }
+
+    /// <summary>Gives the handle back, if there is one to give.</summary>
+    /// <remarks>Idempotent: the handle is cleared as it is freed, so it cannot be freed twice.</remarks>
+    private void ReleaseOwner()
+    {
+        if (!owner.IsAllocated)
+            return;
+
+        owner.Free();
+        owner = default;
+    }
+
     /// <inheritdoc/>
     void IEnterExitCallable.OnEnter()
     {
     }
 
     /// <summary>
-    /// Unlinks the corpse from the client entity the engine draws it through, freeing the handle that
-    /// holds the entity.
+    /// Gives back the handle that holds this corpse, so the entity can be collected once it has left
+    /// the scene.
     /// </summary>
     /// <remarks>
     /// <para>
     /// Leaving the scene is the one point every way a corpse can end passes through: the walk retiring
-    /// it, and <see cref="GoldsrcClientGame.Reset"/> clearing the root scene on a map change. A map
-    /// change is why this cannot be the walk's teardown instead: it empties the temp entity pool without
-    /// calling back, so a corpse that only unlinked itself there would keep its handle, and with it its
-    /// entity and skeleton, for the rest of the client's life.
+    /// it, and <see cref="GoldsrcClientGame.Reset"/> clearing the root scene on a map change.
     /// </para>
     /// <para>
-    /// The marker plus a live handle is what tells a corpse apart from a slot the engine has since
-    /// recycled, whose <c>iuser4</c> then belongs to whatever took it - and the handle is cleared before
-    /// it is freed, so leaving twice cannot free one that is already gone.
+    /// Only managed state is touched. The client entity the corpse was drawn through is deliberately
+    /// left alone: an exit is the same event a map change runs through, and the temp entity behind
+    /// that pointer belongs to the engine and may already have been recycled by then, so reading or
+    /// writing it is a way to crash the client rather than to unlink anything. What becomes of the
+    /// engine's own temp entities is the engine's to manage. A corpse that never had a client entity
+    /// owns no handle, and leaving is then just leaving.
     /// </para>
     /// </remarks>
-    unsafe void IEnterExitCallable.OnExit()
-    {
-        var clEntity = Entity.Get<Components.ClEntityComponent>()?.NativeEntity;
-        if (clEntity == null)
-            return;
-
-        var handle = clEntity->curstate.iuser4;
-        if (handle == 0 || !RagdollHelper.IsRagdoll(clEntity))
-            return;
-
-        clEntity->curstate.iuser4 = 0;
-        GCHandle.FromIntPtr((nint)handle).Free();
-    }
+    void IEnterExitCallable.OnExit() => ReleaseOwner();
 }
