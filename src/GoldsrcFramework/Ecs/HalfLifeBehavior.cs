@@ -14,12 +14,17 @@ namespace GoldsrcFramework.Ecs;
 /// changes and writes the current animation pose into it every frame.
 /// </para>
 /// <para>
+/// It also serves the renderer as the <see cref="IPhysicsPoseSource"/> of a living entity: the pose it
+/// drives the skeleton with is on hand, so the pose the skeleton ends up in can be read back out of it
+/// without a second sampling of the animation.
+/// </para>
+/// <para>
 /// Runs inside <see cref="GoldsrcScriptSystem"/> (UpdateOrder -90), which is scheduled after
 /// <see cref="GoldsrcSceneSystem"/> and before <c>PhysicsGameSystem</c>, so anything written here
 /// takes effect in the same physics step.
 /// </para>
 /// </summary>
-public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
+public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable, IPhysicsPoseSource
 {
     /// <summary>The physics controller for this entity, created during <see cref="OnEnter"/>.</summary>
     public PhysicsController PhysicsController { get; private set; }
@@ -177,7 +182,7 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
             {
                 RagdollRigged = false;
                 physics.Enable();
-                RagdollHelper.Release(ragdollEntity);
+                RagdollHelper.RequestRelease(ragdollEntity);
                 ragdollEntity = null;
             }
             return;
@@ -197,15 +202,11 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
             var deathPose = Rendering.PreStudioModelRenderer.SetupBones(clEntity.NativeEntity, studioPose.Value) > 0
                 ? studioPose.Value
                 : null;
-            if (deathPose is not null)
+            if (deathPose is not null && RagdollHelper.CreateRagdollFor(Entity, ModelKey, deathPose) is { } ragdoll)
             {
-                var snapshot = physics.CapturePoseSnapshot(deathPose);
-                if (RagdollHelper.CreateRagdollFor(Entity, ModelKey, deathPose, snapshot) is { } ragdoll)
-                {
-                    physics.Disable();
-                    RagdollRigged = true;
-                    ragdollEntity = ragdoll;
-                }
+                physics.Disable();
+                RagdollRigged = true;
+                ragdollEntity = ragdoll;
             }
             return;
         }
@@ -310,7 +311,8 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
         if (clEntity.NativeEntity->model->type == modtype_t.mod_brush)
         {
             Entity.Transform.UpdateWorldMatrix();
-            PhysicsController.SetPivotBonePoseByRootTransform(Entity.Transform.WorldMatrix);
+            Span<Matrix3x4> pose = stackalloc Matrix3x4[1] { Entity.Transform.WorldMatrix.ToMatrix3x4() };
+            PhysicsController.SetPose(pose);
             return;
         }
 
@@ -323,7 +325,36 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
         PhysicsController.SetPose(posedBoneCount > 0 ? studioPose.Value : null);
     }
 
+    /// <summary>
+    /// The skeleton this entity keeps in step with the animation, or null when there is nothing to
+    /// read back from it.
+    /// </summary>
+    /// <remarks>
+    /// The pose the read-back folds is this frame's animation pose, so an entity the animation did not
+    /// drive this frame has no pose source either - the two conditions are the very ones
+    /// <see cref="UpdateSkeletonPose"/> needed to write the skeleton in the first place.
+    /// </remarks>
+    PhysicsController? IPhysicsPoseSource.Physics
+        => posedBoneCount > 0 && PhysicsController is { IsEnabled: true, IsNullSkeleton: false }
+            ? PhysicsController
+            : null;
 
+    /// <inheritdoc/>
+    ReadOnlySpan<Matrix3x4> IPhysicsPoseSource.BasePose => StudioPose;
+
+    /// <summary>
+    /// Where the model sits in the world. The bones are already in world space, so the model root
+    /// carries no rotation of its own - only where the entity is.
+    /// </summary>
+    unsafe Matrix3x4 IPhysicsPoseSource.ModelRoot
+    {
+        get
+        {
+            var root = Matrix3x4.Identity;
+            root.Origin = clEntity.NativeEntity->curstate.origin;
+            return root;
+        }
+    }
 
     /// <summary>
     /// Physics resource key of an entity, or null when the entity has no physics data.

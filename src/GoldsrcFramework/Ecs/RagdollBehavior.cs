@@ -1,95 +1,158 @@
-using System.Runtime.InteropServices;
+using GoldsrcFramework.Engine.Native;
 using GoldsrcFramework.LinearMath;
 using Stride.Engine;
 using Stride.Games;
+using System.Runtime.InteropServices;
 using StrideVector3 = Stride.Core.Mathematics.Vector3;
 using StrideQuaternion = Stride.Core.Mathematics.Quaternion;
-using GoldsrcFramework.Ecs.Components;
 
 namespace GoldsrcFramework.Ecs;
 
 /// <summary>
 /// Script attached to a ragdoll entity: keeps the entity (and the client entity the engine draws it
-/// through) where the physics skeleton is, and ends the corpse's life when its time is up.
+/// through) where the physics skeleton is, decides when the corpse has lived long enough, and unlinks
+/// it when it leaves the scene.
+/// <para>
+/// It is also the corpse's <see cref="IPhysicsPoseSource"/>: the ragdoll is drawn from the pose its
+/// own skeleton holds, with the bones that have no rigid body kept where the pose frozen at death put
+/// them.
+/// </para>
 /// </summary>
 /// <remarks>
 /// Death/respawn logic stays on the original entity's <see cref="HalfLifeBehavior"/>.
 /// </remarks>
-public sealed class RagdollBehavior : ScriptComponentBase, ILateUpdate
+public sealed class RagdollBehavior : ScriptComponentBase, ILateUpdate, IPhysicsPoseSource, IEnterExitCallable
 {
     private PhysicsController? physics;
-    private ClEntityComponent? clEntity;
 
     /// <summary>
-    /// Bone matrices of the pose last read from the simulation. Reused as the base pose
-    /// <see cref="PhysicsController.SetupBones"/> reconstructs the bones without a rigid body on top
-    /// of, and reused between frames because it carries no state of its own.
+    /// The pose the character died in, handed over at creation, or null when none was - which leaves
+    /// the bones without a rigid body wherever the caller's buffer had them.
     /// </summary>
-    private Matrix3x4[]? physicsPose;
+    private Matrix3x4[]? deathPose;
 
     /// <summary>Client time the corpse was created at, or 0 when it is not yet known.</summary>
     private float bornAt;
 
+    /// <summary>
+    /// Whether the corpse has asked to be retired, with the teardown still to come.
+    /// </summary>
+    /// <remarks>
+    /// Set by the two things that can end a corpse's life - <see cref="Update"/> when the stay time has
+    /// run out, and <see cref="RagdollHelper.RequestRelease"/> when the entity that died comes back -
+    /// and acted on by <see cref="CompleteRelease"/>, which the engine's temp entity walk reaches
+    /// through the same helper.
+    /// </remarks>
+    private bool releaseRequested;
+
     public override void Start()
     {
         physics = Entity.Get<PhysicsController>();
-        clEntity = Entity.Get<ClEntityComponent>();
         bornAt = RagdollHelper.ClientTime();
     }
 
     /// <summary>
-    /// Ends the corpse's life once it has been around long enough.
+    /// Hands the corpse the pose its bones without a rigid body are to keep - the pose the character
+    /// died in.
+    /// </summary>
+    /// <param name="pose">
+    /// Studio bone world-space matrices, the same form the read-back hands the controller as its
+    /// <c>basePose</c>: the fold into anchor-relative form is the controller's job, so nothing has to
+    /// be converted here.
+    /// </param>
+    /// <remarks>
+    /// Called once, at creation, before the corpse is ever drawn. The array is copied: the caller's
+    /// buffer is the live animation pose of the entity that died, and keeps changing.
+    /// </remarks>
+    internal void SetDeathPose(ReadOnlySpan<Matrix3x4> pose) => deathPose = pose.IsEmpty ? null : pose.ToArray();
+
+    /// <summary>
+    /// Ends the corpse's life once it has been around long enough - as a request, which the engine's
+    /// temp entity walk carries out on its next pass.
     /// </summary>
     /// <remarks>
-    /// Deliberately not in <see cref="LateUpdate"/>: releasing removes the entity, which unregisters
-    /// this script from the systems immediately, and the late-update system walks its set without
-    /// deferring that. This system defers removals, so it is the safe place for it.
+    /// The lifetime is decided here because the runtime's own clock and console variable are what define
+    /// it; the corpse is retired from the walk because the walk runs early enough in the frame to keep
+    /// it out of the frame it is retired on. Deliberately not <see cref="LateUpdate"/> either: what this
+    /// can lead to is the entity leaving the scene, and the late-update system walks its set without
+    /// deferring that.
     /// </remarks>
     public override void Update(GameTime gameTime)
     {
         if (bornAt > 0f && RagdollHelper.ClientTime() - bornAt >= RagdollHelper.CorpseStaySeconds())
-            RagdollHelper.Release(Entity);
+            RequestRelease();
     }
 
     /// <summary>
-    /// Writes the ragdoll's simulated pose where the studio renderer expects to find the one it draws:
-    /// <paramref name="modelRoot"/> becomes the model root (the renderer's rotation matrix) and
-    /// <paramref name="bones"/> the full bone array, in studio bone order.
+    /// Asks for the corpse to be retired, which the engine's temp entity walk carries out on its next
+    /// pass - see <see cref="CompleteRelease"/>.
     /// </summary>
-    /// <param name="modelRoot">The renderer's rotation matrix.</param>
-    /// <param name="bones">The renderer's bone buffer.</param>
-    /// <param name="boneCapacity">How many matrices <paramref name="bones"/> can hold.</param>
-    /// <returns>
-    /// False when this ragdoll cannot supply a pose, which leaves the caller to draw the entity the
-    /// ordinary way. That covers a skeleton that is not loaded or no longer enabled, and a model whose
-    /// bone count does not match the skeleton's - drawing a mismatched pose would be worse than
-    /// drawing an animated one.
-    /// </returns>
-    internal unsafe bool TryFillPhysicsPose(Matrix3x4* modelRoot, Matrix3x4* bones, int boneCapacity)
+    /// <remarks>
+    /// Idempotent, and the only place a corpse is asked to go: deciding here and tearing down there
+    /// keeps the lifetime in one place, so nothing else has to know the clock, the console variable or
+    /// the frame order the two depend on. A corpse the walk cannot reach - one that has no client entity
+    /// to be reached through - ends its own life on the spot instead of waiting for a pass that will
+    /// never come.
+    /// </remarks>
+    internal unsafe void RequestRelease()
     {
-        if (physics is null || !physics.IsEnabled || physics.IsNullSkeleton)
-            return false;
+        releaseRequested = true;
 
-        var boneCount = physics.StudioBoneParents.Length;
-        if (boneCount <= 0 || boneCount > boneCapacity)
-            return false;
-
-        // Identity rather than zero: this is the pose bones without a rigid body are rebuilt on top
-        // of when no snapshot was applied, and a zeroed matrix would collapse them.
-        if (physicsPose is null)
-        {
-            physicsPose = new Matrix3x4[StudioConstants.MAXSTUDIOBONES];
-            Array.Fill(physicsPose, Matrix3x4.Identity);
-        }
-
-        physics.SetupBones(physicsPose);
-        *modelRoot = physics.GetModelRootTransform().ToMatrix3x4();
-
-        for (var i = 0; i < boneCount; i++)
-            bones[i] = physicsPose[i];
-
-        return true;
+        // Nothing comes round to act on the request when the corpse has no client entity of its own -
+        // the walk is only reached through one - so such a corpse ends its own life instead of waiting
+        // for a pass that will never come.
+        if (Entity.Get<Components.ClEntityComponent>()?.NativeEntity == null)
+            CompleteRelease();
     }
+
+    /// <summary>Whether the corpse has asked to be retired and is waiting for the walk to act on it.</summary>
+    internal bool ReleaseRequested => releaseRequested;
+
+    /// <summary>
+    /// Ends the corpse's life: it leaves the scene, and leaving the scene is what unlinks it from the
+    /// client entity the engine draws it through - see <see cref="IEnterExitCallable.OnExit"/>.
+    /// </summary>
+    /// <remarks>
+    /// Normally called by the engine's temp entity walk, and that is what makes the teardown safe from
+    /// there: the walk runs before the frame's systems are iterated, so removing the entity cannot pull
+    /// it out from under one of them. The path that does not come through the walk reaches it from a
+    /// script update instead, where the script system defers removals until it is done with its own set.
+    /// Idempotent, since an entity that has already left has no scene to leave.
+    /// </remarks>
+    internal void CompleteRelease() => Entity.Scene?.Entities.Remove(Entity);
+
+    /// <summary>
+    /// Keeps the client entity the engine draws this corpse through where the simulation put it.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="LateUpdate"/> writes the Stride transform, and that reaches the client entity
+    /// through the transform sync pass at the end of the frame - after the engine has already culled
+    /// the temp entity against the position it held then, which is a frame old. Writing the origin
+    /// here instead puts the position in place before that cull, so a corpse that is moving fast is
+    /// culled where it is rather than where it was. Angles are left alone: the corpse is drawn from
+    /// the pose the skeleton carries, not from the orientation of its client entity.
+    /// </remarks>
+    internal unsafe void DriveClientEntity(cl_entity_t* entity)
+    {
+        if (entity == null || physics is null || !physics.IsEnabled || physics.IsNullSkeleton)
+            return;
+
+        var position = physics.GetModelRootTransform().TranslationVector;
+        entity->origin = new Vector3(position.X, position.Y, position.Z);
+    }
+
+    /// <summary>
+    /// Whether this is a physics pose source at all: for a corpse that is the same question as whether
+    /// its skeleton can produce one, since the corpse has no animation to fall back to.
+    /// </summary>
+    PhysicsController? IPhysicsPoseSource.Physics
+        => physics is { IsEnabled: true, IsNullSkeleton: false } ? physics : null;
+
+    /// <inheritdoc/>
+    ReadOnlySpan<Matrix3x4> IPhysicsPoseSource.BasePose => deathPose;
+
+    /// <inheritdoc/>
+    Matrix3x4 IPhysicsPoseSource.ModelRoot => physics!.GetModelRootTransform().ToMatrix3x4();
 
     public void LateUpdate()
     {
@@ -106,5 +169,42 @@ public sealed class RagdollBehavior : ScriptComponentBase, ILateUpdate
         Entity.Transform.Position = position;
         Entity.Transform.Rotation = rotation;
         Entity.Transform.UpdateWorldMatrix();
+    }
+
+    /// <inheritdoc/>
+    void IEnterExitCallable.OnEnter()
+    {
+    }
+
+    /// <summary>
+    /// Unlinks the corpse from the client entity the engine draws it through, freeing the handle that
+    /// holds the entity.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Leaving the scene is the one point every way a corpse can end passes through: the walk retiring
+    /// it, and <see cref="GoldsrcClientGame.Reset"/> clearing the root scene on a map change. A map
+    /// change is why this cannot be the walk's teardown instead: it empties the temp entity pool without
+    /// calling back, so a corpse that only unlinked itself there would keep its handle, and with it its
+    /// entity and skeleton, for the rest of the client's life.
+    /// </para>
+    /// <para>
+    /// The marker plus a live handle is what tells a corpse apart from a slot the engine has since
+    /// recycled, whose <c>iuser4</c> then belongs to whatever took it - and the handle is cleared before
+    /// it is freed, so leaving twice cannot free one that is already gone.
+    /// </para>
+    /// </remarks>
+    unsafe void IEnterExitCallable.OnExit()
+    {
+        var clEntity = Entity.Get<Components.ClEntityComponent>()?.NativeEntity;
+        if (clEntity == null)
+            return;
+
+        var handle = clEntity->curstate.iuser4;
+        if (handle == 0 || !RagdollHelper.IsRagdoll(clEntity))
+            return;
+
+        clEntity->curstate.iuser4 = 0;
+        GCHandle.FromIntPtr((nint)handle).Free();
     }
 }

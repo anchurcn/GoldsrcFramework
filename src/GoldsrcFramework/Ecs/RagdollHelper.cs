@@ -7,6 +7,7 @@ using Stride.BepuPhysics.Constraints;
 using Stride.Core;
 using Stride.Engine;
 using Stride.Engine.Design;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using GoldsrcVector3 = GoldsrcFramework.LinearMath.Vector3;
@@ -73,9 +74,6 @@ public static class RagdollHelper
     /// </summary>
     private static GoldsrcClientGame? game;
 
-    /// <summary>Whether the one-off "a corpse reached the renderer" line has been printed.</summary>
-    private static bool reportedCorpseDraw;
-
     // ── Creation ──────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -85,18 +83,15 @@ public static class RagdollHelper
     /// <param name="originalEntity">The entity whose physics skeleton is cloned.</param>
     /// <param name="modelName">Optional model name, only used to name the entity.</param>
     /// <param name="initialPose">
-    /// Studio bone world-space matrices used to place the ragdoll's simulated bones.
-    /// </param>
-    /// <param name="poseSnapshot">
-    /// Pose captured from <paramref name="initialPose"/>, applied to the ragdoll so that bones without
-    /// a rigid body keep the pose they had at the moment of death.
+    /// Studio bone world-space matrices used to place the ragdoll's simulated bones, and kept as the
+    /// pose its bones without a rigid body are drawn at, so they stay where they were at the moment of
+    /// death.
     /// </param>
     /// <returns>The ragdoll entity, or null when it could not be created.</returns>
     public static unsafe Entity? CreateRagdollFor(
         Entity originalEntity,
         string? modelName,
-        ReadOnlySpan<Matrix3x4> initialPose,
-        PoseSnapshot poseSnapshot)
+        ReadOnlySpan<Matrix3x4> initialPose)
     {
         var originPhysics = originalEntity.Get<PhysicsController>();
         if (originPhysics is null || originPhysics.IsNullSkeleton || !originPhysics.IsEnabled)
@@ -148,10 +143,13 @@ public static class RagdollHelper
         ragdollPhysics.LoadSkeleton(clonedBones, originPhysics.StudioBoneParents.Span);
         ragdollPhysics.Enable();
         ragdollPhysics.SetPose(initialPose);
-        ragdollPhysics.ApplyPoseSnapshot(poseSnapshot);
 
-        // 6. The behavior that keeps the entity transform in sync and counts the lifetime down.
-        ragdollEntity.Components.Add(new RagdollBehavior());
+        // 6. The behavior that keeps the entity transform in sync, counts the lifetime down, and is the
+        //    corpse's pose source. The death pose goes to it rather than to the controller, which keeps
+        //    no pose of its own - the controller is handed it again on every read.
+        var behavior = new RagdollBehavior();
+        behavior.SetDeathPose(initialPose);
+        ragdollEntity.Components.Add(behavior);
 
         return ragdollEntity;
     }
@@ -212,41 +210,48 @@ public static class RagdollHelper
         physics.LoadSkeleton(prefab.Instantiate(), BoneParents(content, key));
         physics.Enable();
 
-        // Bones without a rigid body (fingers, face) have no entity of their own: SetupBones rebuilds
-        // them from a snapshot taken relative to their nearest simulated ancestor, and without one
-        // they would be left at identity - pinned to the world origin instead of riding along with
-        // the skeleton. A standalone ragdoll has no animation pose to hand over, so the pose to keep
-        // is the model's bind pose.
-        ApplyBindPoseSnapshot(content, key, physics);
-
-        entity.Components.Add(new RagdollBehavior());
+        // Bones without a rigid body (fingers, face) have no entity of their own: the read-back places
+        // them relative to their nearest simulated ancestor, and without a pose to place them by they
+        // would be left wherever the buffer had them. A standalone ragdoll has no animation pose to
+        // hand over, so the pose to keep is the model's bind pose.
+        var behavior = new RagdollBehavior();
+        behavior.SetDeathPose(BindPose(content, key));
+        entity.Components.Add(behavior);
 
         return entity;
     }
 
     /// <summary>
-    /// Destroys a ragdoll: the client entity it is drawn through is handed back to the engine, the
-    /// link is torn down, and the entity leaves the scene.
+    /// Asks a ragdoll to end its life, which the engine's temp entity walk then carries out on its
+    /// next pass.
     /// </summary>
     /// <remarks>
-    /// The GCHandle is freed by <see cref="RagdollBehavior.OnExit"/>, which the scene removal runs.
+    /// <para>
+    /// The request is only a request: the corpse is still drawn, from its skeleton, until the walk
+    /// comes round - see <see cref="RagdollTempEntUpdate"/> for why the teardown has to happen there
+    /// rather than here, and <see cref="RagdollBehavior.CompleteRelease"/> for what it does. A caller
+    /// that tears a corpse down itself runs after the walk has already put it into the frame, and can
+    /// only watch the renderer draw it once more - from the animation pipeline, the pose source having
+    /// just been taken away.
+    /// </para>
+    /// <para>
+    /// Asking instead of doing is also what makes a corpse's two endings the same one: the stay timer
+    /// running out and the entity that died coming back are both just a request, and the two corpses
+    /// go on to look alike.
+    /// </para>
     /// </remarks>
-    public static unsafe void Release(Entity? ragdoll)
+    public static void RequestRelease(Entity? ragdoll)
     {
         if (ragdoll is null)
             return;
 
-        // TODO*:ensure ragdoll behavior exist.
-
-        var clEntity = ragdoll.Get<Components.ClEntityComponent>()?.NativeEntity;
-        if (clEntity != null)
-        {
-            GCHandle.FromIntPtr(clEntity->curstate.iuser4).Free();
-            clEntity->curstate.iuser4 = 0;
-            ReleaseClientEntity(clEntity);
-        }
-
-        ragdoll.Scene?.Entities.Remove(ragdoll);
+        // The behaviour is what the walk looks a corpse up by, so asking it to retire is the whole of
+        // the request. One without a behaviour - which creation never makes - cannot be reached by the
+        // walk at all, so it leaves the scene here rather than waiting for a pass that will never come.
+        if (ragdoll.Get<RagdollBehavior>() is { } behavior)
+            behavior.RequestRelease();
+        else
+            ragdoll.Scene?.Entities.Remove(ragdoll);
     }
 
     // ── Linking ───────────────────────────────────────────────────────────────
@@ -313,59 +318,6 @@ public static class RagdollHelper
     /// that needs it - the renderer, from the engine's draw loop - has no registry to ask.
     /// </remarks>
     internal static void AttachGame(GoldsrcClientGame clientGame) => game = clientGame;
-
-    /// <summary>
-    /// Fills <paramref name="modelRoot"/> and <paramref name="bones"/> with the pose of the physics
-    /// skeleton a corpse is drawn from, when <paramref name="entity"/> is one of ours.
-    /// </summary>
-    /// <param name="entity">The client entity the engine is asking to draw.</param>
-    /// <param name="modelRoot">The renderer's rotation matrix, to receive the model root pose.</param>
-    /// <param name="bones">The renderer's bone buffer, to receive the pose, in studio bone order.</param>
-    /// <param name="boneCapacity">How many matrices <paramref name="bones"/> can hold.</param>
-    /// <returns>
-    /// True when <paramref name="entity"/> is a ragdoll corpse and it wrote the pose. False for every
-    /// other entity, and for a corpse whose skeleton is gone or does not match the model, which is
-    /// then left to be drawn the ordinary way rather than blanked out.
-    /// </returns>
-    /// <remarks>
-    /// Writing straight into the renderer's own buffers is the point: returning a pose instead would
-    /// be a per-entity, per-frame allocation of several kilobytes. The ragdoll's <c>renderfx</c>
-    /// marker is what tells the caller which entity to ask about, and <see cref="TryGetBehavior"/>
-    /// re-checks it before reading <c>iuser4</c>.
-    /// </remarks>
-    internal static unsafe bool TryFillPhysicsPose(
-        cl_entity_t* entity, Matrix3x4* modelRoot, Matrix3x4* bones, int boneCapacity)
-    {
-        if (entity == null || modelRoot == null || bones == null || boneCapacity <= 0)
-            return false;
-
-        if (!TryGetBehavior(entity, out var behavior))
-            return false;
-
-        var posed = behavior!.TryFillPhysicsPose(modelRoot, bones, boneCapacity);
-
-        // Printed once: whether a corpse reaches the renderer at all is the question this whole
-        // chain turns on, and there is no other way to see it from outside the engine's draw loop.
-        // The root position comes with it because "reached the renderer" and "visible" are not the
-        // same thing - a body flung away from where it was spawned is drawn exactly where physics
-        // put it, which is nowhere near the camera.
-        if (!reportedCorpseDraw)
-        {
-            reportedCorpseDraw = true;
-
-            if (posed)
-            {
-                var root = modelRoot->Origin;
-                Log($"ragdoll: corpse drawn from physics, model root at {root.X:F0} {root.Y:F0} {root.Z:F0}");
-            }
-            else
-            {
-                Log("ragdoll: the corpse reached the renderer but had no pose to draw");
-            }
-        }
-
-        return posed;
-    }
 
     /// <summary>
     /// Whether <paramref name="entity"/> is a client entity that a corpse has replaced, and so must
@@ -438,6 +390,41 @@ public static class RagdollHelper
             engine->Con_Printf((NChar*)line);
     }
 
+    /// <summary>
+    /// Writes the numbers that say where a corpse stood when it was retired.
+    /// </summary>
+    /// <remarks>
+    /// This prints the temp entity's own origin, the state the engine copied out of it, the Stride root
+    /// transform the sync pass writes from, the physics model root the pose is taken at, and how many
+    /// transform links the sync processor owns - one line per corpse, never per frame. The origin is
+    /// written from the model root just before this, so the two agreeing is what tells a corpse whose
+    /// client entity is being driven apart from one that was only ever left at its spawn point, and the
+    /// state is a frame older than both, having been copied when the walk last added it to a frame.
+    /// </remarks>
+    private static unsafe void LogReleaseState(Entity ragdoll, cl_entity_t* clEntity)
+    {
+        var origin = clEntity->origin;
+        var state = &clEntity->curstate;
+
+        var stridePosition = ragdoll.Transform.WorldMatrix.TranslationVector;
+
+        var controller = ragdoll.Get<PhysicsController>();
+        var rootPosition = controller is not null
+            ? controller.GetModelRootTransform().TranslationVector
+            : default(StrideVector3);
+
+        var links = game?.SceneInstance.GetProcessor<GoldsrcTransformSyncProcessor>()?.Links.Count;
+
+        Log("[gsf] release origin=" + Point(origin.X, origin.Y, origin.Z)
+            + " curstate=" + Point(state->origin.X, state->origin.Y, state->origin.Z)
+            + " stride=" + Point(stridePosition.X, stridePosition.Y, stridePosition.Z)
+            + " root=" + (controller is not null ? Point(rootPosition.X, rootPosition.Y, rootPosition.Z) : "(none)")
+            + " links=" + (links?.ToString() ?? "(none)"));
+    }
+
+    /// <summary>Formats a position for the diagnostic line above.</summary>
+    private static string Point(float x, float y, float z) => $"({x:F1},{y:F1},{z:F1})";
+
     // ── Temp entity ───────────────────────────────────────────────────────────
 
     private static unsafe cl_entity_t* CreateRagdollTempEnt(Vector3* origin, model_t* model)
@@ -449,15 +436,25 @@ public static class RagdollHelper
         if (engine == null || engine->pEfxAPI == null || engine->pEfxAPI->CL_TentEntAllocCustom == null)
             return null;
 
-        var tempEntity = engine->pEfxAPI->CL_TentEntAllocCustom(origin, model, 0, null);
+        // The callback is the entity's lifetime, and where it is called from is what it is for: the
+        // engine runs it from inside its temp entity walk, before the same walk decides whether the
+        // entity may be drawn. Retiring an expired corpse there is the only place from which the frame
+        // it expires on can be kept from drawing it - code that tears the corpse down runs after that
+        // decision has already been made, and can only watch it be drawn once more.
+        var tempEntity = engine->pEfxAPI->CL_TentEntAllocCustom(origin, model, 0, &RagdollTempEntUpdate);
         if (tempEntity == null)
             return null;
 
         tempEntity->flags |= TempEntityPersist;
+
+        // Allocating with a callback leaves die at the current client time, which would have the walk
+        // recycle the entity on the very next frame; the callback owns the lifetime instead.
         tempEntity->die = float.MaxValue;
 
         var ragdollEnt = &tempEntity->entity;
         ragdollEnt->curstate.renderfx = kRenderFxRagdoll;
+
+        Log("[gsf] tent born origin=" + Point(origin->X, origin->Y, origin->Z));
         return ragdollEnt;
     }
 
@@ -510,23 +507,74 @@ public static class RagdollHelper
         ragdollState->blending = srcState->blending;
     }
 
-    /// <summary>Hands a client entity back to the engine, which recycles it once the time is up.</summary>
-    private static unsafe void ReleaseClientEntity(cl_entity_t* clEntity)
+    /// <summary>
+    /// The corpse's side of the engine's temp entity walk: keeps the client entity where the
+    /// simulation put it, and retires it once the corpse has asked to go.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Installed through <c>CL_TentEntAllocCustom</c>, so the engine calls it once per frame, from
+    /// inside the walk that also decides whether the entity is drawn. That order is the whole point:
+    /// retiring the entity here keeps it out of the frame it is retired on, whereas tearing the corpse
+    /// down from the runtime's own update runs <em>after</em> the decision, by which time the entity is
+    /// already part of the frame and is drawn once more - from the animation pipeline, since the pose
+    /// source is what the teardown just removed.
+    /// </para>
+    /// <para>
+    /// So this is where every corpse's life ends, and it only ever carries out what the corpse has
+    /// already decided - see <see cref="RagdollBehavior.ReleaseRequested"/>. Nothing is decided here,
+    /// which is what keeps the lifetime in one place: no clock and no cvar is read from inside the
+    /// engine's walk.
+    /// </para>
+    /// </remarks>
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static unsafe void RagdollTempEntUpdate(TEMPENTITY* tempEntity, float frametime, float clientTime)
     {
-        var tempEntity = ContainerOf(clEntity);
-        tempEntity->die = ClientTime();
-        tempEntity->flags = TempEntityNoModel;
+        if (tempEntity == null)
+            return;
+
+        try
+        {
+            // A corpse that can no longer be resolved has been taken out of the scene by a path that did
+            // not go through the walk - a map change. Nothing is left to drive it or to retire it, so it
+            // is retired here rather than left holding its slot for ever.
+            if (!TryGetBehavior(&tempEntity->entity, out var behavior) || behavior is null)
+            {
+                RetireTempEntity(tempEntity, clientTime);
+                return;
+            }
+            if (!behavior.ReleaseRequested)
+                return;
+
+            LogReleaseState(behavior.Entity, &tempEntity->entity);
+
+            // Retire first, then take the corpse down: the walk reads FTENT_NOMODEL as soon as this
+            // returns, so the corpse is out of the frame it goes away on, and the walk drops it at its
+            // head on the next pass, where the die written above has come to pass.
+            RetireTempEntity(tempEntity, clientTime);
+            behavior.CompleteRelease();
+        }
+        catch
+        {
+            // No managed exception may cross back into the engine's walk, and a corpse that cannot be
+            // driven must not be left in front of the player: retire it and let the engine have it back.
+            RetireTempEntity(tempEntity, clientTime);
+        }
     }
 
     /// <summary>
-    /// The temp entity a client entity belongs to.
+    /// Takes a corpse's client entity out of the walking order: the rest of the walk skips it, and the
+    /// next one finds <c>die</c> in the past and moves it back to the free list.
     /// </summary>
     /// <remarks>
-    /// <c>entity</c> is the last field of <c>TEMPENTITY</c>, and neither it nor <c>cl_entity_t</c> has
-    /// trailing padding, so the offset is simply the difference of the two sizes.
+    /// <c>FTENT_NOMODEL</c> is what the walk reads before it adds an entity to the frame, and leaving
+    /// the other flags alone keeps the entity recognisable as a corpse for the remainder of its life.
     /// </remarks>
-    private static unsafe TEMPENTITY* ContainerOf(cl_entity_t* entity)
-        => (TEMPENTITY*)((byte*)entity - (sizeof(TEMPENTITY) - sizeof(cl_entity_t)));
+    private static unsafe void RetireTempEntity(TEMPENTITY* tempEntity, float clientTime)
+    {
+        tempEntity->die = clientTime;
+        tempEntity->flags |= TempEntityNoModel;
+    }
 
     // ── Skeleton ──────────────────────────────────────────────────────────────
 
@@ -553,23 +601,22 @@ public static class RagdollHelper
     }
 
     /// <summary>
-    /// Seeds <paramref name="physics"/> with the model's bind pose, taken relative to each bone's
-    /// anchor, so that the bones without a rigid body follow the simulated ancestor they hang off.
+    /// The model's bind pose, in the form the corpse is handed its death pose: studio bone world-space
+    /// matrices indexed by studio bone.
     /// </summary>
     /// <remarks>
-    /// The bind pose is stored relative to the model root, and that root cancels out of an
-    /// anchor-relative transform, so this works without knowing where the ragdoll will be placed.
-    /// Both the bone hierarchy and the anchor mapping come from
-    /// <see cref="PhysicsController.LoadSkeleton"/>, so this has to run after it.
+    /// The pose is stored relative to the model root, and that root cancels out of the anchor-relative
+    /// transform the controller folds out of it, so this works without knowing where the ragdoll will
+    /// be placed. A model with no studio header yields an empty pose, which leaves the bones without a
+    /// rigid body wherever the buffer has them.
     /// </remarks>
-    private static unsafe void ApplyBindPoseSnapshot(IContentManager content, string key, PhysicsController physics)
+    private static unsafe Matrix3x4[] BindPose(IContentManager content, string key)
     {
         var studioModel = content.Load<StudioModel>(key);
         if (studioModel is null || studioModel.Header->numbones <= 0)
-            return;
+            return [];
 
-        var bindPose = StudioPhysicsPrefabFactory.BuildBindPose(studioModel.Header, studioModel.Header->numbones);
-        physics.ApplyPoseSnapshot(physics.CapturePoseSnapshot(bindPose));
+        return StudioPhysicsPrefabFactory.BuildBindPose(studioModel.Header, studioModel.Header->numbones);
     }
 
     /// <summary>

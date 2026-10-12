@@ -16,8 +16,10 @@ namespace GoldsrcFramework.Ecs;
 /// <para>
 /// A studio model has many <b>studio bones</b>, but only a subset of them - the <b>simulated
 /// bones</b> - carry a rigid body. The rest (<b>non-simulated bones</b> such as fingers) are placed
-/// relative to their nearest simulated ancestor, and are only reconstructed when a
-/// <see cref="PoseSnapshot"/> has been applied to the controller.
+/// relative to their nearest simulated ancestor, and are reconstructed on every read from the
+/// base pose the caller hands <see cref="SetupBones"/>, with the anchor-relative part of it folded
+/// in on the spot. The controller keeps no pose of its own: both directions are pure transfers
+/// between the caller's buffers and the simulation.
 /// </para>
 /// <para>
 /// Entity level concerns such as model identity tracking and ragdoll state belong to
@@ -48,7 +50,6 @@ public sealed class PhysicsController : EntityComponent
 
     private PhysicsBoneData? PivotPhysicsBone { get; set; }
     private StrideMatrix modelRootOffset = StrideMatrix.Identity;
-    private bool[]? settingMasks = null;
     private PhysicsMotionType motionType = PhysicsMotionType.Kinematic;
 
     /// <summary>Parent studio bone index per studio bone; -1 for a root bone.</summary>
@@ -63,13 +64,6 @@ public sealed class PhysicsController : EntityComponent
     /// simulated bone, which means its world transform is always available from the simulation.
     /// </summary>
     private int[] anchorBoneIndices = [];
-
-    /// <summary>
-    /// Anchor-relative pose captured by <see cref="ApplyPoseSnapshot"/>. Null when no snapshot is
-    /// applied, in which case non-simulated bones are left to the caller of <see cref="SetupBones"/>.
-    /// Nothing else ever writes this field: <see cref="SetPose"/> has no side effects.
-    /// </summary>
-    private StrideMatrix[]? localPose;
 
     /// <summary>
     /// Motion type applied to the skeleton bones. Only <see cref="PhysicsMotionType.Kinematic"/> and
@@ -143,7 +137,6 @@ public sealed class PhysicsController : EntityComponent
         addonConstraints.Clear();
         PivotPhysicsBone = null;
         modelRootOffset = StrideMatrix.Identity;
-        localPose = null;
         IsEnabled = false;
 
         foreach (var entity in physicsBoneEntities)
@@ -233,20 +226,14 @@ public sealed class PhysicsController : EntityComponent
     /// Studio bone world-space matrices (Matrix3x4) indexed by studio bone index. This is the raw bone
     /// array of the model; entry 0 is the first studio bone, <b>not</b> the model origin.
     /// </param>
-    /// <param name="settingMask">
-    /// Optional per-studio-bone mask; bones whose entry is false are skipped.
-    /// When null, the controller level <c>settingMasks</c> is used instead.
-    /// </param>
     /// <remarks>
     /// Addon (jiggle) bones are never written: they stay dynamic so the simulation can drag them
     /// along with their kinematic neighbours.
     /// </remarks>
-    public void SetPose(ReadOnlySpan<Matrix3x4> pose, bool[]? settingMask = null)
+    public void SetPose(ReadOnlySpan<Matrix3x4> pose)
     {
         if (!IsEnabled || IsNullSkeleton)
             return;
-
-        var mask = settingMask ?? settingMasks;
 
         foreach (var bone in physicsBonesInternal)
         {
@@ -256,55 +243,60 @@ public sealed class PhysicsController : EntityComponent
             var boneIndex = bone.StudioBoneIndex;
             if ((uint)boneIndex >= (uint)pose.Length)
                 continue;
-            if (mask is not null && boneIndex < mask.Length && !mask[boneIndex])
-                continue;
 
             SetPhysicsBonePose(bone, pose[boneIndex].ToStrideMatrix());
         }
     }
 
-    public void SetPivotBonePoseByRootTransform(Stride.Core.Mathematics.Matrix rootTransformMatrix)
-    {
-        if (!IsEnabled || IsNullSkeleton || PivotPhysicsBone is null)
-            return;
+    //public void SetPivotBonePoseByRootTransform(Stride.Core.Mathematics.Matrix rootTransformMatrix)
+    //{
+    //    if (!IsEnabled || IsNullSkeleton || PivotPhysicsBone is null)
+    //        return;
 
-        // LoadSkeleton established:  modelRoot = modelRootOffset * pivotWorld
-        //                           modelRootOffset = Invert(pivotLocal)
-        // Given the model root, reconstruct the pivot bone's world transform and drive it:
-        //     pivotWorld = Invert(modelRootOffset) * modelRoot
-        // The inverse goes on the left, the same way round as the derivation above: Stride matrices
-        // are row-vector (World = Local * ParentWorld).
-        StrideMatrix.Invert(ref modelRootOffset, out var inverseOffset);
-        StrideMatrix.Multiply(ref inverseOffset, ref rootTransformMatrix, out var pivotWorld);
+    //    // LoadSkeleton established:  modelRoot = modelRootOffset * pivotWorld
+    //    //                           modelRootOffset = Invert(pivotLocal)
+    //    // Given the model root, reconstruct the pivot bone's world transform and drive it:
+    //    //     pivotWorld = Invert(modelRootOffset) * modelRoot
+    //    // The inverse goes on the left, the same way round as the derivation above: Stride matrices
+    //    // are row-vector (World = Local * ParentWorld).
+    //    StrideMatrix.Invert(ref modelRootOffset, out var inverseOffset);
+    //    StrideMatrix.Multiply(ref inverseOffset, ref rootTransformMatrix, out var pivotWorld);
 
-        SetPhysicsBonePose(PivotPhysicsBone, pivotWorld);
-    }
+    //    SetPhysicsBonePose(PivotPhysicsBone, pivotWorld);
+    //}
 
     /// <summary>
     /// Rebuilds the full studio skeleton pose: simulated bones are read from the physics simulation,
     /// non-simulated bones are reconstructed on top of their anchor.
     /// </summary>
     /// <param name="pose">
-    /// In/out array of studio bone world-space matrices indexed by studio bone index. The caller is
-    /// expected to fill it with the current base pose (for a kinematic entity, the current animation
-    /// pose). Simulated bones are overwritten with the physics pose; non-simulated bones are
-    /// overwritten only when a snapshot has been applied (see <see cref="ApplyPoseSnapshot"/>),
-    /// otherwise the caller's values are kept.
+    /// In/out array of studio bone world-space matrices indexed by studio bone index. Simulated bones
+    /// are written from the simulation; a bone without a rigid body is placed relative to its anchor
+    /// as <paramref name="basePose"/> has it, and is otherwise left as the caller filled it. The
+    /// caller therefore does not have to pre-fill it.
     /// </param>
-    /// <param name="settingMask">
-    /// Optional per-studio-bone mask; bones whose entry is false are skipped.
-    /// When null, the controller level <c>settingMasks</c> is used instead.
+    /// <param name="basePose">
+    /// The pose the caller considers current, indexed the same way - for a kinematic entity this
+    /// frame's animation pose, for a ragdoll the pose frozen at death. It is read to find where a bone
+    /// without a rigid body sits relative to its anchor, a question <paramref name="pose"/> itself can
+    /// no longer answer once the simulation has overwritten that anchor. Empty means "leave those
+    /// bones to the caller", which is what a reader with nothing of its own to say passes.
+    /// <para>
+    /// Two readers pass two different poses here, and the parameter is deliberately the pose rather
+    /// than its description. A ragdoll passes the pose frozen at death, so a fist stays clenched and
+    /// does not relax into the bind pose. A skeleton that keeps being animated passes the pose of the
+    /// current frame instead, so a bone hanging off a jiggle (addon) body follows the body the
+    /// simulation has moved rather than the animation it has left behind.
+    /// </para>
     /// </param>
     /// <remarks>
     /// Read-back counterpart of <see cref="SetPose"/>, mirroring gsphysics
     /// <c>SkeletalPhysicsComponent::SetupBones</c> and GoldSrc <c>SV_StudioSetupBones</c>.
     /// </remarks>
-    public void SetupBones(Span<Matrix3x4> pose, bool[]? settingMask = null)
+    public void SetupBones(Span<Matrix3x4> pose, ReadOnlySpan<Matrix3x4> basePose = default)
     {
         if (!IsEnabled || IsNullSkeleton || pose.Length == 0)
             return;
-
-        var mask = settingMask ?? settingMasks;
 
         // 1. Simulated bones are authoritative in the simulation.
         foreach (var bone in physicsBonesInternal)
@@ -315,175 +307,40 @@ public sealed class PhysicsController : EntityComponent
             var boneIndex = bone.StudioBoneIndex;
             if ((uint)boneIndex >= (uint)pose.Length)
                 continue;
-            if (mask is not null && boneIndex < mask.Length && !mask[boneIndex])
-                continue;
 
             // A body pose is centred on the collider's mass; report the bone's own origin instead.
             pose[boneIndex] = ComposeWorldMatrix(ToBoneOrigin(bone, body), body.Orientation).ToMatrix3x4();
         }
 
-        // 2. Non-simulated bones follow their anchor, which is always a simulated bone and has just been
-        //    refreshed above. Only possible when a pose snapshot was applied.
-        if (localPose is null)
+        // 2. Non-simulated bones follow their anchor, which is always a simulated bone and has just
+        //    been refreshed above.
+        if (basePose.IsEmpty)
             return;
 
         for (var boneIndex = 0; boneIndex < studioBoneCount && boneIndex < pose.Length; boneIndex++)
         {
+            if (boneIndex >= basePose.Length)
+                break;
+
             var anchorIndex = anchorBoneIndices[boneIndex];
             if (anchorIndex == boneIndex)
                 continue; // simulated, already written from physics
-            if ((uint)anchorIndex >= (uint)pose.Length)
-                continue;
-            if (mask is not null && boneIndex < mask.Length && !mask[boneIndex])
+            if ((uint)anchorIndex >= (uint)pose.Length || (uint)anchorIndex >= (uint)basePose.Length)
                 continue;
 
-            // The snapshot holds the bone's pose relative to its anchor, so replaying it is that local
-            // transform followed by the anchor's *new* world matrix. Stride matrices are row-vector
-            // (World = Local * ParentWorld), so the local transform goes on the left.
+            // Where the bone sits relative to its anchor - bone * inverse(anchor) - replayed against
+            // the anchor's *new* world matrix. Stride matrices are row-vector (World = Local *
+            // ParentWorld), so the relative transform goes on the left. Both steps are one expression
+            // on purpose: the relative transform is an intermediate nothing else reads, so
+            // materialising it would buy nothing but a buffer.
+            var anchorBase = basePose[anchorIndex].ToStrideMatrix();
+            StrideMatrix.Invert(ref anchorBase, out var inverseAnchorBase);
+            var boneBase = basePose[boneIndex].ToStrideMatrix();
+            StrideMatrix.Multiply(ref boneBase, ref inverseAnchorBase, out var relative);
             var anchorWorld = pose[anchorIndex].ToStrideMatrix();
-            var local = localPose[boneIndex];
-            StrideMatrix.Multiply(ref local, ref anchorWorld, out var world);
+            StrideMatrix.Multiply(ref relative, ref anchorWorld, out var world);
             pose[boneIndex] = world.ToMatrix3x4();
         }
-    }
-
-    /// <summary>
-    /// Rebuilds the full studio skeleton pose of a skeleton that is still animated: simulated bones are
-    /// read from the physics simulation, non-simulated bones keep the pose they have relative to their
-    /// anchor <b>in the animation</b>, which is where the anchor has since been moved from.
-    /// </summary>
-    /// <param name="pose">
-    /// In/out array of studio bone world-space matrices indexed by studio bone index, filled by the
-    /// caller with the current base pose. Simulated bones are overwritten with the physics pose,
-    /// non-simulated bones with the pose they hold relative to their anchor.
-    /// </param>
-    /// <param name="animationPose">
-    /// The animation pose of the same frame, indexed the same way - the pose the caller filled
-    /// <paramref name="pose"/> with. It is read to find where a bone without a rigid body sits
-    /// relative to its anchor, a question <paramref name="pose"/> itself can no longer answer once
-    /// the simulation has overwritten that anchor. Must not alias <paramref name="pose"/>.
-    /// </param>
-    /// <param name="settingMask">
-    /// Optional per-studio-bone mask; bones whose entry is false are skipped.
-    /// When null, the controller level <c>settingMasks</c> is used instead.
-    /// </param>
-    /// <remarks>
-    /// The read-back for an animated kinematic skeleton, and the counterpart of
-    /// <see cref="SetupBones(Span{Matrix3x4}, bool[]?)"/>. That one leaves a bone without a rigid body
-    /// at whatever the caller filled in unless a snapshot was applied - which is exactly what a
-    /// ragdoll wants, its pose being the one frozen at death, with no animation left to read. A
-    /// skeleton that keeps being animated wants the opposite: the anchor-relative pose of the current
-    /// frame, so a bone hanging off a jiggle (addon) body follows the body the simulation has moved
-    /// instead of the animation it has left behind.
-    /// </remarks>
-    public void SetupBones(Span<Matrix3x4> pose, ReadOnlySpan<Matrix3x4> animationPose, bool[]? settingMask = null)
-    {
-        if (!IsEnabled || IsNullSkeleton || pose.Length == 0 || animationPose.Length == 0)
-            return;
-
-        // Everything the two calls have in common: the simulated bones, and, when a snapshot was
-        // applied, the bones without a rigid body as that snapshot places them.
-        SetupBones(pose, settingMask);
-
-        // A snapshot wins: it is the pose those bones are meant to keep, and the call above has just
-        // replayed it.
-        if (localPose is not null)
-            return;
-
-        var mask = settingMask ?? settingMasks;
-
-        for (var boneIndex = 0; boneIndex < studioBoneCount && boneIndex < pose.Length; boneIndex++)
-        {
-            var anchorIndex = anchorBoneIndices[boneIndex];
-            if (anchorIndex == boneIndex)
-                continue; // simulated, already written from physics
-            if ((uint)anchorIndex >= (uint)pose.Length ||
-                (uint)anchorIndex >= (uint)animationPose.Length ||
-                (uint)boneIndex >= (uint)animationPose.Length)
-                continue;
-            if (mask is not null && boneIndex < mask.Length && !mask[boneIndex])
-                continue;
-
-            // The bone's pose relative to its anchor: the same offset CapturePoseSnapshot records,
-            // except read off the live animation rather than off a pose frozen earlier. Replaying it
-            // against the anchor's *new* world matrix is what puts the bone back onto the body.
-            var anchorAnimation = animationPose[anchorIndex].ToStrideMatrix();
-            var boneAnimation = animationPose[boneIndex].ToStrideMatrix();
-            StrideMatrix.Invert(ref anchorAnimation, out var inverseAnchorAnimation);
-            StrideMatrix.Multiply(ref boneAnimation, ref inverseAnchorAnimation, out var offset);
-
-            var anchorWorld = pose[anchorIndex].ToStrideMatrix();
-            StrideMatrix.Multiply(ref offset, ref anchorWorld, out var world);
-            pose[boneIndex] = world.ToMatrix3x4();
-        }
-    }
-
-    /// <summary>
-    /// Captures the pose described by <paramref name="pose"/> into an anchor-relative snapshot that can
-    /// be replayed on another skeleton instance.
-    /// </summary>
-    /// <param name="pose">Studio bone world-space matrices indexed by studio bone index.</param>
-    /// <remarks>
-    /// Typically called right before a character is turned into a ragdoll, so that the ragdoll keeps
-    /// the pose of bones that have no rigid body - a fist stays clenched instead of relaxing into the
-    /// bind pose. A ragdoll created on its own has no animated pose to hand over, so what it captures
-    /// is the model's bind pose: the pose its skeleton is already in. Capture is a deliberate, one-off
-    /// operation: it is the only way to produce a <see cref="PoseSnapshot"/>, and nothing caches poses
-    /// implicitly.
-    /// </remarks>
-    public PoseSnapshot CapturePoseSnapshot(ReadOnlySpan<Matrix3x4> pose)
-    {
-        if (IsNullSkeleton || studioBoneCount == 0)
-            return new PoseSnapshot([]);
-
-        var locals = new Matrix3x4[studioBoneCount];
-        Array.Fill(locals, Matrix3x4.Identity);
-
-        for (var boneIndex = 0; boneIndex < studioBoneCount; boneIndex++)
-        {
-            var anchorIndex = anchorBoneIndices[boneIndex];
-            if (anchorIndex == boneIndex)
-                continue; // simulated bones are never read back from a snapshot
-            if ((uint)anchorIndex >= (uint)pose.Length || (uint)boneIndex >= (uint)pose.Length)
-                continue;
-
-            var anchorWorld = pose[anchorIndex].ToStrideMatrix();
-            var boneWorld = pose[boneIndex].ToStrideMatrix();
-            StrideMatrix.Invert(ref anchorWorld, out var inverseAnchorWorld);
-            // Anchor-relative transform: boneWorld = local * anchorWorld (Stride is row-vector), so the
-            // local transform is the bone's world matrix with the anchor's inverse on the *right* -
-            // the mirror of the composition SetupBones replays it with.
-            StrideMatrix.Multiply(ref boneWorld, ref inverseAnchorWorld, out var local);
-            locals[boneIndex] = local.ToMatrix3x4();
-        }
-
-        return new PoseSnapshot(locals);
-    }
-
-    /// <summary>
-    /// Applies or clears a pose snapshot captured by <see cref="CapturePoseSnapshot"/>. While a
-    /// snapshot is applied, <see cref="SetupBones"/> reconstructs non-simulated bones from it.
-    /// </summary>
-    /// <param name="snapshot">The snapshot to apply, or null to clear the current one.</param>
-    /// <remarks>
-    /// A snapshot is only accepted when its studio bone count matches this skeleton's; otherwise it is
-    /// ignored and the current one is cleared.
-    /// </remarks>
-    public void ApplyPoseSnapshot(PoseSnapshot? snapshot)
-    {
-        if (snapshot is null || snapshot.BoneCount != studioBoneCount)
-        {
-            localPose = null;
-            return;
-        }
-
-        // Convert once here so SetupBones stays free of conversions on the render path.
-        var source = snapshot.LocalTransformsArray;
-        var converted = new StrideMatrix[source.Length];
-        for (var i = 0; i < source.Length; i++)
-            converted[i] = source[i].ToStrideMatrix();
-
-        localPose = converted;
     }
 
     /// <summary>
@@ -499,14 +356,13 @@ public sealed class PhysicsController : EntityComponent
     {
         if (IsNullSkeleton)
         {
-            throw new InvalidOperationException("No physics skeleton avalable on this controller.");
+            Entity.Transform.UpdateWorldMatrix();
+            return Entity.Transform.WorldMatrix;
         }
-        else
-        {
-            var pivotWorld = GetBoneWorldMatrix(PivotPhysicsBone);
-            StrideMatrix.Multiply(ref modelRootOffset, ref pivotWorld, out var rootWorld);
-            return rootWorld;
-        }
+
+        var pivotWorld = GetBoneWorldMatrix(PivotPhysicsBone);
+        StrideMatrix.Multiply(ref modelRootOffset, ref pivotWorld, out var rootWorld);
+        return rootWorld;
     }
 
     // ── Internals ─────────────────────────────────────────────────────────
