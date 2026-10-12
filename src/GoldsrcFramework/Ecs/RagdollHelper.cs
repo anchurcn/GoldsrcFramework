@@ -60,6 +60,18 @@ public static class RagdollHelper
     /// </summary>
     private const int kRenderFxRagdoll = 3601;
 
+    /// <summary>
+    /// The activities a Half-Life model dies on, as values of the HLSDK's <c>Activity</c> enum: the
+    /// plain death run ACT_DIESIMPLE..ACT_DIEVIOLENT and the wound run
+    /// ACT_DIE_HEADSHOT..ACT_DIE_BACKSHOT. Both are in <c>external/hlsdk/dlls/activity.h</c> (36-39
+    /// and 66-69), and both are what the reference implementation treats as dying - see
+    /// <see cref="IsPlayingDeathSequence"/>.
+    /// </summary>
+    private const int ActDieSimple = 36;
+    private const int ActDieViolent = 39;
+    private const int ActDieHeadshot = 66;
+    private const int ActDieBackshot = 69;
+
     /// <summary>Console variable holding how long a corpse stays, in seconds.</summary>
     private const string CorpseStayCvar = "phys_corpsestay";
 
@@ -284,6 +296,57 @@ public static class RagdollHelper
             new ClEntityTransformBinding(clEntity), TransformAuthority.Stride));
     }
     public unsafe static bool IsRagdoll(cl_entity_t* entity) => entity->curstate.renderfx == kRenderFxRagdoll;
+
+    /// <summary>
+    /// Whether <paramref name="entity"/> is playing a death sequence: the activity of the sequence the
+    /// engine has its model on is one the model dies on.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The client is never told that an entity died. What it can see is the sequence the server put it
+    /// on, and the model itself says what activity each of its sequences is - so that is the question
+    /// to ask before building a corpse for it, the same one the reference implementation asks
+    /// (<c>CorpseManager::IsPlayingDeathSequence</c>, <c>phy_corpse.cpp</c>). Asked of the live state
+    /// rather than remembered: a sequence that changes away from death is a respawn, and nothing of
+    /// ours has to be kept in step with it.
+    /// </para>
+    /// <para>
+    /// False for an entity that could not be rigged anyway - one that is not a studio model, or whose
+    /// sequence index is out of range, or whose model carries no activity on its sequences at all. Such
+    /// an entity is left to play its animation, which is what it would do without any physics.
+    /// </para>
+    /// </remarks>
+    internal static unsafe bool IsPlayingDeathSequence(cl_entity_t* entity)
+    {
+        if (entity == null)
+            return false;
+
+        var model = entity->model;
+        if (model == null || model->type != modtype_t.mod_studio)
+            return false;
+
+        var studio = EngineApi.PStudio;
+        if (studio == null || studio->Mod_Extradata == null)
+            return false;
+
+        var header = (studiohdr_t*)studio->Mod_Extradata(model);
+        if (header == null)
+            return false;
+
+        var sequence = entity->curstate.sequence;
+        if (sequence < 0 || sequence >= header->numseq)
+            return false;
+
+        return IsDeathActivity((header->GetSequences() + sequence)->activity);
+    }
+
+    /// <summary>
+    /// Whether a sequence activity is one of the ways a Half-Life model dies - see
+    /// <see cref="ActDieSimple"/>.
+    /// </summary>
+    private static bool IsDeathActivity(int activity)
+        => activity is >= ActDieSimple and <= ActDieViolent
+            or >= ActDieHeadshot and <= ActDieBackshot;
 
     /// <summary>
     /// The behavior that can produce a pose for <paramref name="entity"/>, if it is a ragdoll.

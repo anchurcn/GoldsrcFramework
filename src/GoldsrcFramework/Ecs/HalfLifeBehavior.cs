@@ -35,8 +35,17 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable, 
     /// </summary>
     public bool IsPlayer => clEntity.IsPlayer;
 
-    /// <summary>Whether the entity is currently playing a death sequence. Set externally.</summary>
-    public bool IsPlayingDeathSequence { get; set; }
+    /// <summary>
+    /// Whether the entity is playing a death sequence right now: the activity of the sequence the
+    /// engine has its model on is one the model dies on.
+    /// </summary>
+    /// <remarks>
+    /// Read live from the client entity, like every other question about this entity's state - the
+    /// client is never told that an entity died, and a sequence that changes away from death is a
+    /// respawn. <see cref="Update"/> ends the corpse and takes the skeleton back on exactly that
+    /// change, so the two cannot disagree.
+    /// </remarks>
+    public unsafe bool IsPlayingDeathSequence => RagdollHelper.IsPlayingDeathSequence(clEntity.NativeEntity);
 
     /// <summary>
     /// True while this entity's physics skeleton has been detached into a ragdoll temp entity.
