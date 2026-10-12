@@ -348,6 +348,77 @@ public sealed class PhysicsController : EntityComponent
     }
 
     /// <summary>
+    /// Rebuilds the full studio skeleton pose of a skeleton that is still animated: simulated bones are
+    /// read from the physics simulation, non-simulated bones keep the pose they have relative to their
+    /// anchor <b>in the animation</b>, which is where the anchor has since been moved from.
+    /// </summary>
+    /// <param name="pose">
+    /// In/out array of studio bone world-space matrices indexed by studio bone index, filled by the
+    /// caller with the current base pose. Simulated bones are overwritten with the physics pose,
+    /// non-simulated bones with the pose they hold relative to their anchor.
+    /// </param>
+    /// <param name="animationPose">
+    /// The animation pose of the same frame, indexed the same way - the pose the caller filled
+    /// <paramref name="pose"/> with. It is read to find where a bone without a rigid body sits
+    /// relative to its anchor, a question <paramref name="pose"/> itself can no longer answer once
+    /// the simulation has overwritten that anchor. Must not alias <paramref name="pose"/>.
+    /// </param>
+    /// <param name="settingMask">
+    /// Optional per-studio-bone mask; bones whose entry is false are skipped.
+    /// When null, the controller level <c>settingMasks</c> is used instead.
+    /// </param>
+    /// <remarks>
+    /// The read-back for an animated kinematic skeleton, and the counterpart of
+    /// <see cref="SetupBones(Span{Matrix3x4}, bool[]?)"/>. That one leaves a bone without a rigid body
+    /// at whatever the caller filled in unless a snapshot was applied - which is exactly what a
+    /// ragdoll wants, its pose being the one frozen at death, with no animation left to read. A
+    /// skeleton that keeps being animated wants the opposite: the anchor-relative pose of the current
+    /// frame, so a bone hanging off a jiggle (addon) body follows the body the simulation has moved
+    /// instead of the animation it has left behind.
+    /// </remarks>
+    public void SetupBones(Span<Matrix3x4> pose, ReadOnlySpan<Matrix3x4> animationPose, bool[]? settingMask = null)
+    {
+        if (!IsEnabled || IsNullSkeleton || pose.Length == 0 || animationPose.Length == 0)
+            return;
+
+        // Everything the two calls have in common: the simulated bones, and, when a snapshot was
+        // applied, the bones without a rigid body as that snapshot places them.
+        SetupBones(pose, settingMask);
+
+        // A snapshot wins: it is the pose those bones are meant to keep, and the call above has just
+        // replayed it.
+        if (localPose is not null)
+            return;
+
+        var mask = settingMask ?? settingMasks;
+
+        for (var boneIndex = 0; boneIndex < studioBoneCount && boneIndex < pose.Length; boneIndex++)
+        {
+            var anchorIndex = anchorBoneIndices[boneIndex];
+            if (anchorIndex == boneIndex)
+                continue; // simulated, already written from physics
+            if ((uint)anchorIndex >= (uint)pose.Length ||
+                (uint)anchorIndex >= (uint)animationPose.Length ||
+                (uint)boneIndex >= (uint)animationPose.Length)
+                continue;
+            if (mask is not null && boneIndex < mask.Length && !mask[boneIndex])
+                continue;
+
+            // The bone's pose relative to its anchor: the same offset CapturePoseSnapshot records,
+            // except read off the live animation rather than off a pose frozen earlier. Replaying it
+            // against the anchor's *new* world matrix is what puts the bone back onto the body.
+            var anchorAnimation = animationPose[anchorIndex].ToStrideMatrix();
+            var boneAnimation = animationPose[boneIndex].ToStrideMatrix();
+            StrideMatrix.Invert(ref anchorAnimation, out var inverseAnchorAnimation);
+            StrideMatrix.Multiply(ref boneAnimation, ref inverseAnchorAnimation, out var offset);
+
+            var anchorWorld = pose[anchorIndex].ToStrideMatrix();
+            StrideMatrix.Multiply(ref offset, ref anchorWorld, out var world);
+            pose[boneIndex] = world.ToMatrix3x4();
+        }
+    }
+
+    /// <summary>
     /// Captures the pose described by <paramref name="pose"/> into an anchor-relative snapshot that can
     /// be replayed on another skeleton instance.
     /// </summary>

@@ -44,6 +44,20 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
     /// <summary>The model key used for loading the physics prefab. Set externally each frame.</summary>
     public string? ModelKey { get; set; }
 
+    /// <summary>
+    /// The animation pose this frame's <see cref="PhysicsController.SetPose"/> was driven with - the
+    /// base a reader of the skeleton reconstructs the bones without a rigid body on top of - or an
+    /// empty span when the skeleton was not driven by animation this frame.
+    /// </summary>
+    /// <remarks>
+    /// The renderer needs it because the skeleton only rebuilds a bone without a rigid body from a
+    /// snapshot; without one it keeps whatever the caller put in the bone buffer, which is this pose.
+    /// Empty therefore means "nothing was written this frame", and a reader that finds it empty has
+    /// to leave the skeleton to be drawn from the animation instead.
+    /// </remarks>
+    public ReadOnlySpan<Matrix3x4> StudioPose
+        => posedBoneCount > 0 ? studioPose.Value.AsSpan(0, posedBoneCount) : default;
+
     private Components.ClEntityComponent clEntity;
 
     /// <summary>
@@ -75,6 +89,13 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
     /// buffer that carries no per-frame state of its own.
     /// </summary>
     private Lazy<Matrix3x4[]> studioPose = new Lazy<Matrix3x4[]>(new Matrix3x4[StudioConstants.MAXSTUDIOBONES]);
+
+    /// <summary>
+    /// How many matrices of <see cref="studioPose"/> the skeleton was driven with this frame, or 0
+    /// when it was not driven by the animation at all. Reset every frame, so it always describes the
+    /// pose the skeleton holds right now rather than an older one.
+    /// </summary>
+    private int posedBoneCount;
 
     public HalfLifeBehavior()
     {
@@ -147,22 +168,18 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
 
     public unsafe override void Update(GameTime gameTime)
     {
+        posedBoneCount = 0;
         EnsureSkeletonLoaded();
         var physics = PhysicsController;
-
-        // The skeleton is currently living in a ragdoll temp entity: only watch for respawn.
         if (RagdollRigged)
         {
             if (!IsPlayingDeathSequence)
             {
                 RagdollRigged = false;
                 physics.Enable();
-
-                // The corpse has served its purpose: the entity is alive again and draws itself.
                 RagdollHelper.Release(ragdollEntity);
                 ragdollEntity = null;
             }
-
             return;
         }
 
@@ -172,14 +189,11 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
             onEnter = false;
         }
 
-        // Only a kinematic, enabled skeleton is driven by the animation each frame.
         if (!physics.IsEnabled || physics.MotionType != PhysicsMotionType.Kinematic)
             return;
 
         if (IsPlayingDeathSequence && !physics.IsNullSkeleton)
         {
-            // Hand the current pose over to the ragdoll. The snapshot keeps the pose of bones that
-            // have no rigid body - a fist stays clenched instead of relaxing into the bind pose.
             var deathPose = Rendering.PreStudioModelRenderer.SetupBones(clEntity.NativeEntity, studioPose.Value) > 0
                 ? studioPose.Value
                 : null;
@@ -193,10 +207,8 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
                     ragdollEntity = ragdoll;
                 }
             }
-
             return;
         }
-
         UpdateSkeletonPose();
     }
 
@@ -306,11 +318,9 @@ public sealed class HalfLifeBehavior : ScriptComponentBase, IEnterExitCallable
         // keeps the skeleton in step with the model: a kinematic skeleton is driven from a pose, and
         // the render pass runs too late to hand one over for the step that follows.
 
-        var result = Rendering.PreStudioModelRenderer.SetupBones(clEntity.NativeEntity, studioPose.Value) > 0
-            ? studioPose.Value
-            : null;
+        posedBoneCount = Rendering.PreStudioModelRenderer.SetupBones(clEntity.NativeEntity, studioPose.Value);
 
-        PhysicsController.SetPose(result);
+        PhysicsController.SetPose(posedBoneCount > 0 ? studioPose.Value : null);
     }
 
 

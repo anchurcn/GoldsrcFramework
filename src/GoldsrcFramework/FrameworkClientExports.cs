@@ -263,7 +263,11 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
     public virtual int HUD_GetStudioModelInterface(int version, r_studio_interface_t** ppinterface, engine_studio_api_t* pstudio)
     {
         //return LegacyClientInterop.HUD_GetStudioModelInterface(version, ppinterface, pstudio);
-        return StudioModelRenderer.GetStudioModelInterface(version, ppinterface, pstudio);
+
+        // The renderer asks the runtime about the entities it draws, and the engine calls this before
+        // anything else exists to resolve the game from - so it is handed over. HUD_Init has already
+        // run by this point, which is what makes the game non-null here.
+        return StudioModelRenderer.GetStudioModelInterface(version, ppinterface, pstudio, clientGame!);
     }
 
     public virtual void HUD_ChatInputPosition(int* x, int* y)

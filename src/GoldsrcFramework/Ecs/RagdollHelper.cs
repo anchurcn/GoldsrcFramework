@@ -271,6 +271,7 @@ public static class RagdollHelper
         ragdoll.Components.Add(new GoldsrcTransformLinkComponent(
             new ClEntityTransformBinding(clEntity), TransformAuthority.Stride));
     }
+    public unsafe static bool IsRagdoll(cl_entity_t* entity) => entity->curstate.renderfx == kRenderFxRagdoll;
 
     /// <summary>
     /// The behavior that can produce a pose for <paramref name="entity"/>, if it is a ragdoll.

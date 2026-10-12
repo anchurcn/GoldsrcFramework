@@ -21,8 +21,9 @@ public unsafe class StudioModelRenderer
     // Move type and entity flag values now come from the generated enums (MoveType,
     // EntityFlags, EntityStateFlags) in GoldsrcFramework.Engine.Native.
 
-    private const int STUDIO_RENDER = 0x0001;
-    private const int STUDIO_EVENTS = 0x0002;
+    // Exposed to derived renderers: a replacement pose still has to honour the same two flags.
+    protected const int STUDIO_RENDER = 0x0001;
+    protected const int STUDIO_EVENTS = 0x0002;
 
     private const float ZISCALE = 0x8000;
 
@@ -43,10 +44,10 @@ public unsafe class StudioModelRenderer
     #region Member Variables - Current Entity and Model
 
     // The entity which we are currently rendering.
-    private cl_entity_t* m_pCurrentEntity;
+    protected cl_entity_t* m_pCurrentEntity;
 
     // The model for the entity being rendered
-    private model_t* m_pRenderModel;
+    protected model_t* m_pRenderModel;
 
     // Player info for current player, if drawing a player
     private player_info_t* m_pPlayerInfo;
@@ -58,7 +59,7 @@ public unsafe class StudioModelRenderer
     private float m_flGaitMovement;
 
     // Pointer to header block for studio model data
-    private studiohdr_t* m_pStudioHeader;
+    protected studiohdr_t* m_pStudioHeader;
 
     // Pointers to current body part and submodel
     private mstudiobodyparts_t* m_pBodyPart;
@@ -89,12 +90,12 @@ public unsafe class StudioModelRenderer
 
     // Matrices
     // Model to world transformation (pointer to Matrix3x4)
-    private Matrix3x4* m_protationmatrix;
+    protected Matrix3x4* m_protationmatrix;
     // Model to view transformation (pointer to Matrix3x4)
     private Matrix3x4* m_paliastransform;
 
     // Concatenated bone and light transforms (pointer to Matrix3x4[MAXSTUDIOBONES])
-    private Matrix3x4* m_pbonetransform;
+    protected Matrix3x4* m_pbonetransform;
     private Matrix3x4* m_plighttransform;
 
     #endregion
@@ -217,13 +218,17 @@ public unsafe class StudioModelRenderer
     /// Main entry point for drawing a studio model
     /// Original: bool CStudioModelRenderer::StudioDrawModel(int flags)
     /// </summary>
+    /// <remarks>
+    /// The entry resolves what is being drawn - the current entity, the client clock, and the model
+    /// behind it - and then hands the drawing to <see cref="StudioDrawModelEx"/>. Keeping the
+    /// per-frame state read here, once and before anything else, is what lets a derived renderer
+    /// replace the whole pose without repeating it: by the time an override runs, the current
+    /// entity, the render model and the studio header are all in place.
+    /// </remarks>
     /// <param name="flags">Rendering flags (STUDIO_RENDER, STUDIO_EVENTS)</param>
     /// <returns>True if model was drawn successfully</returns>
     public virtual bool StudioDrawModel(int flags)
     {
-        alight_t lighting;
-        Vector3 dir;
-
         m_pCurrentEntity = IEngineStudio->GetCurrentEntity();
         IEngineStudio->GetTimes(&_s->m_nFrameCount, &_s->m_clTime, &_s->m_clOldTime);
         IEngineStudio->GetViewInfo((float*)&_s->m_vRenderOrigin, (float*)&_s->m_vUp, (float*)&_s->m_vRight, (float*)&_s->m_vNormal);
@@ -267,25 +272,29 @@ public unsafe class StudioModelRenderer
         IEngineStudio->StudioSetHeader(m_pStudioHeader);
         IEngineStudio->SetRenderModel(m_pRenderModel);
 
-        // A ragdoll corpse carries its pose in the physics skeleton its client entity was linked to,
-        // so it is drawn from there instead of from its animation. Asked before the animation
-        // transform on purpose: that is exactly the work being skipped. An entity a corpse has
-        // replaced is not drawn at all - the engine would otherwise draw its death animation next to
-        // the body. Both questions go to RagdollHelper, the only thing here that knows what a ragdoll
-        // is.
-        if (m_pStudioHeader != null)
-        {
-            var boneCapacity = Math.Min(m_pStudioHeader->numbones, StudioConstants.MAXSTUDIOBONES);
+        return StudioDrawModelEx(flags);
+    }
 
-            if (RagdollHelper.TryFillPhysicsPose(m_pCurrentEntity, m_protationmatrix, m_pbonetransform, boneCapacity))
-            {
-                *m_protationmatrix = Matrix3x4.Identity;
-                m_protationmatrix->Origin = m_pCurrentEntity->curstate.origin;
-                return StudioDrawPhysicsModel(flags);
-            }
-            if (RagdollHelper.IsReplacedByCorpse(m_pCurrentEntity))
-                return false;
-        }
+    /// <summary>
+    /// Draws the model behind <c>m_pCurrentEntity</c> from its animation.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is the animation pipeline itself, split out of <see cref="StudioDrawModel"/> so that a
+    /// derived renderer can put a pose of its own in its place. It runs with the current entity, the
+    /// render model and the studio header already resolved, and it means "draw the animated model":
+    /// an override that wants it after replacing this has to ask for the base implementation
+    /// explicitly.
+    /// </para>
+    /// <para>
+    /// In the original C++ all of this lived inside <c>StudioDrawModel</c>; the split changes nothing
+    /// about what it draws.
+    /// </para>
+    /// </remarks>
+    protected virtual bool StudioDrawModelEx(int flags)
+    {
+        alight_t lighting;
+        Vector3 dir;
 
         StudioSetUpTransform(false);
 
@@ -519,7 +528,28 @@ public unsafe class StudioModelRenderer
     }
 
     #endregion
-    internal bool StudioDrawPhysicsModel(int flags)
+
+    #region Physics Pose Drawing
+
+    /// <summary>
+    /// Draws the model from a pose that is already in place: <c>m_protationmatrix</c> and
+    /// <c>m_pbonetransform</c> are expected to hold it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is the drawing half of the animated pipeline with the pose production taken out - no
+    /// <c>StudioSetUpTransform</c> and no <c>StudioSetupBones</c> - because the caller supplies bones
+    /// that came from somewhere else. It mirrors the same stage in gsphysics'
+    /// <c>PhyStudioModelRenderer</c>, down to the name.
+    /// </para>
+    /// <para>
+    /// The light transform is a copy of the bone transform rather than a second composition: the pose
+    /// has already left model space, so there is no separate light-space version of it to build.
+    /// </para>
+    /// </remarks>
+    /// <param name="flags">Rendering flags (STUDIO_RENDER, STUDIO_EVENTS)</param>
+    /// <returns>True unless the bounding box rejected the model or there is nothing to draw.</returns>
+    protected virtual bool StudioDrawPhysModel(int flags)
     {
         alight_t lighting;
         Vector3 dir;
@@ -577,6 +607,8 @@ public unsafe class StudioModelRenderer
 
         return true;
     }
+
+    #endregion
 
     #region Bone Calculation Methods
 
@@ -1911,7 +1943,16 @@ public unsafe class StudioModelRenderer
     /// Get studio model interface - called by engine
     /// Original: int HUD_GetStudioModelInterface(int version, r_studio_interface_t** ppinterface, engine_studio_api_t* pstudio)
     /// </summary>
-    public static int GetStudioModelInterface(int version, r_studio_interface_t** ppinterface, engine_studio_api_t* pstudio)
+    /// <param name="version">The interface version the engine is asking for.</param>
+    /// <param name="ppinterface">Receives the rendering interface the engine will call back into.</param>
+    /// <param name="pstudio">The engine's studio API table.</param>
+    /// <param name="game">
+    /// The client game the renderer asks about the runtime - which entity provides the pose it draws,
+    /// and whether an entity is one a corpse has replaced. The engine calls this straight out of its
+    /// own initialisation, where there is no registry to resolve the game from, so it is handed over
+    /// instead. <c>HUD_Init</c> always runs first, so this is never null in practice.
+    /// </param>
+    public static int GetStudioModelInterface(int version, r_studio_interface_t** ppinterface, engine_studio_api_t* pstudio, GoldsrcClientGame game)
     {
         fixed(r_studio_interface_t** p =  &nativeRenderer)
         {
@@ -1974,7 +2015,7 @@ public unsafe class StudioModelRenderer
         *ppinterface = studioInterface;
 
         // Create and initialize renderer instance
-        _instance = new StudioModelRenderer();
+        _instance = new PhyStudioModelRenderer(game);
         _instance.Init();
 
         return 1;
