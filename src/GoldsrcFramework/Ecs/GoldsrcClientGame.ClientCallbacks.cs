@@ -83,6 +83,25 @@ public sealed partial class GoldsrcClientGame
     }
 
     /// <summary>
+    /// The Stride side of <c>CL_CreateMove</c>: latches the buttons the client library has just put
+    /// into the command. The engine sends the command either way and nothing here decides anything -
+    /// but the command is the only readable statement of what the player is holding, so it is kept for
+    /// the scripts that ask (see <see cref="ClientInput"/>).
+    /// </summary>
+    /// <param name="cmd">The command the library has filled in.</param>
+    /// <param name="active">
+    /// Zero while a menu is up, while a demo plays and before sign-on. The library leaves the command
+    /// untouched then, so it says nothing about the buttons and the previous reading stands.
+    /// </param>
+    public unsafe void CL_CreateMove(usercmd_t* cmd, int active)
+    {
+        if (active == 0)
+            return;
+
+        Input.Observe(cmd->buttons);
+    }
+
+    /// <summary>
     /// The Stride side of <c>HUD_NewMap</c>: drops everything scoped to the map that just ended - its
     /// content resources, the scene bookkeeping and every entity - then warms the new map's brush
     /// prefabs so the first visible brush entity does not pay for triangulation.

@@ -121,6 +121,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
     public virtual void CL_CreateMove(float frametime, usercmd_t* cmd, int active)
     {
         LegacyClientInterop.CL_CreateMove(frametime, cmd, active);
+        clientGame?.CL_CreateMove(cmd, active);
     }
 
     public virtual int CL_IsThirdPerson()

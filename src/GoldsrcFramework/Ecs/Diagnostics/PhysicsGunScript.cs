@@ -64,9 +64,6 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
     private const float DefaultForce = 100_000f;
     private const float DefaultEyeHeight = 28f;
 
-    private const string AttackButton = "+attack";
-    private const string Attack2Button = "+attack2";
-
     /// <summary>Closest a held body is ever kept to the eye, in units.</summary>
     private const float MinHoldDistance = 16f;
 
@@ -103,11 +100,10 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
     /// <summary>There is no simulation to cast into yet.</summary>
     private static readonly Color4 NoPhysicsRayColor = new(1f, 0.2f, 0.2f, 1f);
 
-    /// <summary>Buttons already reported as unbound, so the warning is printed once each.</summary>
-    private static readonly HashSet<string> reportedButtons = [];
-
-    /// <summary>Set once the legacy client library has proven unable to answer key lookups.</summary>
-    private static bool buttonsUnavailable;
+    /// <summary>
+    /// The player's buttons, as the engine's command builder reports them; see <see cref="ClientInput"/>.
+    /// </summary>
+    private static ClientInput? clientInput;
 
     /// <summary>The instance the overlay currently belongs to; the draw hook has no registry to ask.</summary>
     private static PhysicsGunScript? overlayOwner;
@@ -158,6 +154,10 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
         ArgumentNullException.ThrowIfNull(game);
 
         RegisterConsole();
+
+        // The gun reads the player's buttons from the command the client library builds each frame;
+        // nothing else can see them (see ClientInput).
+        clientInput = game.Input;
 
         if (ReferenceEquals(attachedScene, game.SceneInstance))
             return;
@@ -359,8 +359,8 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
         }
 
         var armed = IsCrowbarOut(engine);
-        var left = IsButtonHeld(AttackButton);
-        var right = IsButtonHeld(Attack2Button);
+        var left = clientInput?.AttackHeld ?? false;
+        var right = clientInput?.Attack2Held ?? false;
         var leftPressed = left && !leftDown;
         var rightPressed = right && !rightDown;
         leftDown = left;
@@ -792,50 +792,13 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
     private static byte ToLower(byte value)
         => value is >= (byte)'A' and <= (byte)'Z' ? (byte)(value + 32) : value;
 
-    /// <summary>
-    /// Whether a <c>+command</c> key button is currently down.
-    /// </summary>
-    /// <remarks>
-    /// Read from the key buttons the engine itself drives: the legacy client library owns them and
-    /// the engine resolves them through our <c>KB_Find</c> export, so this is the same object the
-    /// engine writes when the binding goes down. The alternative, <c>usercmd_t.buttons</c> inside
-    /// <c>CL_CreateMove</c>, runs several times per frame as prediction re-runs commands, and a
-    /// side-effecting action must not fire more than once.
-    /// </remarks>
-    private static unsafe bool IsButtonHeld(string button)
+    /// <summary>The buttons the engine's last command carried, for the console.</summary>
+    private static string DescribeButtons()
     {
-        if (buttonsUnavailable)
-            return false;
+        if (clientInput is not { } input)
+            return "no command yet - the engine has not built one";
 
-        Span<byte> name = stackalloc byte[32];
-        if (!TryWriteAscii(button, name))
-            return false;
-
-        fixed (byte* pointer = name)
-        {
-            try
-            {
-                var key = LegacyClientInterop.KB_Find((NChar*)pointer);
-
-                if (key == null)
-                {
-                    if (reportedButtons.Add(button))
-                        Print($"gsf_physgun: '{button}' is not bound, so the gun cannot see its buttons\n");
-
-                    return false;
-                }
-
-                // Low bit is the down state; the second bit is a one-shot pulse the legacy client
-                // consumes for its own weapon code and is deliberately not used here.
-                return (key->state & 1) != 0;
-            }
-            catch (Exception exception) when (exception is DllNotFoundException or EntryPointNotFoundException)
-            {
-                buttonsUnavailable = true;
-                Print($"gsf_physgun: key buttons are unreadable ({exception.GetType().Name})\n");
-                return false;
-            }
-        }
+        return $"+attack {(input.AttackHeld ? "down" : "up")}, +attack2 {(input.Attack2Held ? "down" : "up")}";
     }
 
     // ── Console ───────────────────────────────────────────────────────────
@@ -916,8 +879,7 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
         Print($"gsf_physgun: physics configuration {(instance.physics is null ? "not resolved yet" : "ready")}\n");
         Print($"gsf_physgun: view model            {ViewModelName(engine)}"
             + $"{(IsCrowbarOut(engine) ? " - gate open" : " - gate closed, the gun is not armed")}\n");
-        Print($"gsf_physgun: '{AttackButton}' bound        {(ButtonIsBound(AttackButton) ? "yes" : "no")}\n");
-        Print($"gsf_physgun: '{Attack2Button}' bound       {(ButtonIsBound(Attack2Button) ? "yes" : "no")}\n");
+        Print($"gsf_physgun: attack buttons        {DescribeButtons()}\n");
         Print($"gsf_physgun: what the crosshair sees {CrosshairSummary(instance)}\n");
         Print($"gsf_physgun: hold                  {(instance.heldBody is null ? "nothing" : Describe(instance.target))}\n");
         Print($"gsf_physgun: pinned bodies         {instance.pinned.Count}\n");
@@ -952,29 +914,6 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
         return pick.CanHold
             ? $"{Describe(pick)} - holdable"
             : $"{Describe(pick)} - {Refusal(pick.Verdict)}";
-    }
-
-    /// <summary>Whether a key button exists, without printing the warning <see cref="IsButtonHeld"/> would.</summary>
-    private static unsafe bool ButtonIsBound(string button)
-    {
-        if (buttonsUnavailable)
-            return false;
-
-        Span<byte> name = stackalloc byte[32];
-        if (!TryWriteAscii(button, name))
-            return false;
-
-        fixed (byte* pointer = name)
-        {
-            try
-            {
-                return LegacyClientInterop.KB_Find((NChar*)pointer) != null;
-            }
-            catch (Exception exception) when (exception is DllNotFoundException or EntryPointNotFoundException)
-            {
-                return false;
-            }
-        }
     }
 
     private static unsafe string ViewModelName(ClientEngineFuncs* engine)

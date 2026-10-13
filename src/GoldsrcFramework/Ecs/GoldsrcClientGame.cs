@@ -80,6 +80,11 @@ public sealed partial class GoldsrcClientGame : IDisposable
 
     public GameTime Time { get; }
 
+    /// <summary>
+    /// The player's buttons, as the engine's command builder reported them for the current command.
+    /// </summary>
+    public ClientInput Input { get; } = new();
+
     public Scene RootScene => SceneSystem.RootScene;
 
     public SceneInstance SceneInstance => SceneSystem.SceneInstance;
