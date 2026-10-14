@@ -65,7 +65,6 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
 
     public virtual int HUD_Redraw(float flTime, int intermission)
     {
-        EngineApi.DrawStringCenter("GoldsrcFrameworkDemo");
         return LegacyClientInterop.HUD_Redraw(flTime, intermission);
     }
 
