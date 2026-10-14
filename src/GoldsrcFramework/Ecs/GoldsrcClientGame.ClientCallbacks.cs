@@ -29,6 +29,13 @@ namespace GoldsrcFramework.Ecs;
 /// place; naming them after the systems would only move the coupling into the name.
 /// </para>
 /// <para>
+/// One callback is composed the other way round. The library runs first everywhere else, but a call
+/// that has to be bracketed - <c>CL_CreateMove</c>, because the mouse only becomes a turn of the view
+/// inside it - can only be bracketed by its caller: there the runtime makes the library call itself,
+/// and the export is left with nothing but the handoff. What comes with it is still the same seam -
+/// an intent and the engine state the runtime looks up on its own.
+/// </para>
+/// <para>
 /// This is the client half of the host. The server will grow its own set of equivalently named methods
 /// over the same runtime; the systems themselves stay shared.
 /// </para>
@@ -83,23 +90,139 @@ public sealed partial class GoldsrcClientGame
     }
 
     /// <summary>
-    /// The Stride side of <c>CL_CreateMove</c>: latches the buttons the client library has just put
-    /// into the command. The engine sends the command either way and nothing here decides anything -
-    /// but the command is the only readable statement of what the player is holding, so it is kept for
-    /// the scripts that ask (see <see cref="ClientInput"/>).
+    /// The Stride side of <c>CL_CreateMove</c>: builds the command with the client library, then keeps
+    /// what the library read out of the player's input - the buttons, and the movement the mouse asked
+    /// for.
     /// </summary>
-    /// <param name="cmd">The command the library has filled in.</param>
+    /// <param name="frametime">Frame time in seconds, as the engine reports it.</param>
+    /// <param name="cmd">The command the library fills in.</param>
     /// <param name="active">
     /// Zero while a menu is up, while a demo plays and before sign-on. The library leaves the command
     /// untouched then, so it says nothing about the buttons and the previous reading stands.
     /// </param>
-    public unsafe void CL_CreateMove(usercmd_t* cmd, int active)
+    /// <remarks>
+    /// <para>
+    /// This is the one export the runtime does not simply follow. The library's own <c>CreateMove</c> is
+    /// where the mouse becomes a turn of the view and nowhere else, so the call is bracketed - the view
+    /// angles are read on each side of it - and the difference is what the look was about to spend.
+    /// Nothing else can measure it: it is not state that can be looked up, and the library recentres the
+    /// pointer as it goes. What comes back has already been through the player's sensitivity, mouse
+    /// filtering and pitch clamp, which is what lets a control spend the same movement the crosshair
+    /// would have taken.
+    /// </para>
+    /// <para>
+    /// While the runtime has claimed the mouse (<see cref="ClientInput.MouseCaptured"/>) the turn is
+    /// given back: the angles the frame is drawn with, and the ones the server is told about, return to
+    /// where they were, and the movement is left for the runtime. The claim is read before the library
+    /// runs - it is the previous tick's word, because a command is built ahead of the frame it belongs to
+    /// - and the pitch clamp is widened for that same call (<see cref="PitchClamp"/>), which is the one
+    /// thing the library would otherwise take away from a turn.
+    /// </para>
+    /// </remarks>
+    public unsafe void CL_CreateMove(float frametime, usercmd_t* cmd, int active)
     {
+        var engine = EngineApi.PClient;
+        var measurable = active != 0
+            && engine != null
+            && engine->GetViewAngles != null
+            && engine->SetViewAngles != null;
+
+        var captured = measurable && Input.MouseCaptured;
+
+        var before = default(GoldsrcVector3);
+        if (measurable)
+            engine->GetViewAngles((float*)&before);
+
+        var clamp = captured ? PitchClamp.Widen(engine) : default;
+
+        LegacyClientInterop.CL_CreateMove(frametime, cmd, active);
+
+        clamp.Restore();
+
         if (active == 0)
             return;
 
         Input.Observe(cmd->buttons);
+
+        if (measurable)
+        {
+            var after = default(GoldsrcVector3);
+            engine->GetViewAngles((float*)&after);
+
+            Input.ObserveMouseMove(after.X - before.X, after.Y - before.Y);
+        }
+
+        if (!captured)
+            return;
+
+        // The runtime asked for the mouse, so the turn the library just made is given back: the view
+        // the frame is drawn with and the angles the server is told about both return to where they
+        // were, and the movement stays with the runtime.
+        engine->SetViewAngles((float*)&before);
+        cmd->viewangles = before;
     }
+
+    /// <summary>
+    /// The view's pitch clamp, widened for the length of one call and put back afterwards.
+    /// </summary>
+    /// <remarks>
+    /// The library clamps the view's pitch to <c>cl_pitchup</c>/<c>cl_pitchdown</c> (89 degrees either
+    /// way) as it applies the mouse, to keep a player's aim sane. While the mouse is captured the aim
+    /// does not move - the angles are given back where they started - so the clamp has nothing to
+    /// protect and one thing to take away: it would swallow the vertical half of a turn made while
+    /// looking down at the floor, and the body would stop answering in that direction. Both variables
+    /// are restored the moment the call returns, so nothing outside can observe the widening.
+    /// </remarks>
+    private readonly unsafe struct PitchClamp
+    {
+        /// <summary>Pitch, in degrees, the view may reach while the runtime has the mouse.</summary>
+        private const float Wide = 3600f;
+
+        private readonly cvar_t* down;
+        private readonly cvar_t* up;
+        private readonly float savedDown;
+        private readonly float savedUp;
+
+        private PitchClamp(cvar_t* down, cvar_t* up, float savedDown, float savedUp)
+        {
+            this.down = down;
+            this.up = up;
+            this.savedDown = savedDown;
+            this.savedUp = savedUp;
+        }
+
+        /// <summary>Widens the view's pitch clamp, remembering the values it had.</summary>
+        public static PitchClamp Widen(ClientEngineFuncs* engine)
+        {
+            var down = LookupCvar(engine, "cl_pitchdown"u8);
+            var up = LookupCvar(engine, "cl_pitchup"u8);
+
+            var savedDown = down == null ? 0f : down->value;
+            var savedUp = up == null ? 0f : up->value;
+
+            if (down != null)
+                down->value = Wide;
+
+            if (up != null)
+                up->value = Wide;
+
+            return new PitchClamp(down, up, savedDown, savedUp);
+        }
+
+        /// <summary>Puts back the values the clamp had.</summary>
+        public void Restore()
+        {
+            if (down != null)
+                down->value = savedDown;
+
+            if (up != null)
+                up->value = savedUp;
+        }
+    }
+
+    /// <summary>Looks a console variable up by name, or answers null when there is no such variable.</summary>
+    private static unsafe cvar_t* LookupCvar(ClientEngineFuncs* engine, ReadOnlySpan<byte> name)
+        => engine->GetCvarPointer == null ? null : engine->GetCvarPointer(name.GetNCharPtr());
 
     /// <summary>
     /// The Stride side of <c>HUD_Key_Event</c>: latches the keys a command cannot carry, which today

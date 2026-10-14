@@ -25,6 +25,18 @@ namespace GoldsrcFramework.Ecs.Diagnostics;
 /// </summary>
 /// <remarks>
 /// <para>
+/// Turning is the one control that takes something away from the player: for as long as the use key is
+/// down the mouse is the turn's, and the view is left where it was (<see cref="ClientInput.MouseCaptured"/>).
+/// Without that the crosshair would swing across the world with every sweep of the mouse and the body
+/// would be turning with it - a rotation nobody can see, because the camera is going round too.
+/// </para>
+/// <para>
+/// The script lives on the local player's entity, so the claim goes with it: leaving the scene gives
+/// the mouse back (<see cref="OnExit"/>), and so does every frame that is not turning.
+/// </para>
+/// </remarks>
+/// <remarks>
+/// <para>
 /// The script lives on the local player's entity. That gives the gun the lifetime it wants - the
 /// held body and the pinned bodies are per-player state - and it ticks in
 /// <see cref="GoldsrcScriptSystem"/> (-90), after the scene has handed out collidables and before
@@ -149,16 +161,10 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
     /// <remarks>
     /// A quaternion rather than an angle: the turn has two axes - the world's up for a sideways sweep
     /// and the view's right for an up-and-down one - so no single number describes it. Composing the
-    /// per-frame differences is also what keeps the body from jumping when the view crosses 180
-    /// degrees, because it is the difference that is wrapped, not the heading it is applied to.
+    /// per-frame movements is also what keeps the body from jumping when the crosshair's numbers wrap
+    /// from 180 to -180, because it is the movement that is wrapped, not the heading it is applied to.
     /// </remarks>
     private Quaternion rotationDelta = Quaternion.Identity;
-
-    /// <summary>The view's yaw on the previous frame, so a turn can be measured as a difference.</summary>
-    private float rotationYaw;
-
-    /// <summary>The view's pitch on the previous frame, for the same reason.</summary>
-    private float rotationPitch;
 
     private float holdDistance = 80f;
     private bool holdDown;
@@ -309,6 +315,10 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
         failed = false;
         announced = false;
         reportedNoPhysics = false;
+
+        // The claim belongs to the runtime, not to this instance, so a restart must not inherit one:
+        // a body that was being turned when the entity was rebuilt is not held any more.
+        ClaimMouse(false);
     }
 
     public void OnEnter()
@@ -328,6 +338,10 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
     {
         ReleaseHold("the local player left the scene");
 
+        // The tick stops with the entity, so this is the last chance to give the mouse back: a claim
+        // left standing here would follow the player into the next map, with no gun left to release it.
+        ClaimMouse(false);
+
         target = PhysicsGunTarget.None;
 
         if (ReferenceEquals(active, this))
@@ -346,6 +360,12 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
         Overlay.Clear();
         RayOverlay.Clear();
 
+        // The mouse is given back here and claimed again only where the turn is applied. It has to be
+        // stated in the negative rather than simply claimed once: the claim outlives the tick - the
+        // next command is built after it - so one left standing would leave the player unable to look
+        // around, with nothing left running that could release it.
+        ClaimMouse(false);
+
         if (failed)
             return;
 
@@ -362,10 +382,33 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
         }
     }
 
+    /// <summary>
+    /// States whether the mouse belongs to the turn rather than to the view.
+    /// </summary>
+    /// <remarks>
+    /// A level, not a request: the use key that asks for the mouse is held rather than tapped, so the
+    /// answer stands until a frame that does not want it says so. The gun is the only claimant, and it
+    /// drops the claim on every path out - the frame that is not turning, the entity leaving the scene -
+    /// because the claim is not scoped to the gun's lifetime but to the runtime's.
+    /// </remarks>
+    private static void ClaimMouse(bool claimed)
+    {
+        if (clientInput is { } input)
+            input.MouseCaptured = claimed;
+    }
+
     // ── Frame ─────────────────────────────────────────────────────────────
 
     private unsafe void UpdateGun()
     {
+        // Both are drained whether or not anything is held, so a scroll or a sweep made between two
+        // grips is forgotten rather than banked up and spent on the next one.
+        var wheel = clientInput?.ConsumeWheel() ?? 0;
+
+        var mousePitch = 0f;
+        var mouseYaw = 0f;
+        clientInput?.ConsumeMouseMove(out mousePitch, out mouseYaw);
+
         var engine = EngineApi.PClient;
         if (engine is null)
             return;
@@ -382,7 +425,8 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
         if (!announced)
         {
             announced = true;
-            Print("gsf_physgun: on; take the crowbar out - right button holds, left freezes, wheel pushes and pulls, E and the mouse turn\n");
+            Print("gsf_physgun: on; take the crowbar out - right button holds, left freezes, "
+                + "wheel pushes and pulls, E takes the mouse to turn the body\n");
         }
 
         // Resolved late: the physics configuration only exists once something collidable has been
@@ -422,12 +466,8 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
 
         var use = clientInput?.UseHeld ?? false;
 
-        // Drained whether or not anything is held, so a turn made between two holds is forgotten
-        // rather than banked up and spent on the next grab.
-        var wheel = clientInput?.ConsumeWheel() ?? 0;
-
         if (heldBody is not null)
-            UpdateHold(eye, aim, angles, armed, hold, pinPressed, use, wheel);
+            UpdateHold(eye, aim, angles, armed, hold, pinPressed, use, wheel, mousePitch, mouseYaw);
         else if (armed)
             UpdateIdle(eye, aim, holdPressed, pinPressed);
 
@@ -435,7 +475,7 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
         BuildOverlay(eye, aim, maxRange, true);
     }
 
-    private void UpdateHold(StrideVector3 eye, StrideVector3 aim, in GoldsrcVector3 angles, bool armed, bool hold, bool pinPressed, bool use, int wheel)
+    private void UpdateHold(StrideVector3 eye, StrideVector3 aim, in GoldsrcVector3 angles, bool armed, bool hold, bool pinPressed, bool use, int wheel, float mousePitch, float mouseYaw)
     {
         // The body can vanish under us: a corpse is released when its owner respawns, and a map
         // change takes every entity with it.
@@ -471,7 +511,7 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
         if (heldConstraint is not null)
             heldConstraint.Target = eye + aim * holdDistance;
 
-        UpdateRotation(angles, use);
+        UpdateRotation(angles, use, mousePitch, mouseYaw);
     }
 
     private void UpdateIdle(StrideVector3 eye, StrideVector3 aim, bool holdPressed, bool pinPressed)
@@ -509,20 +549,25 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
 
     /// <summary>
     /// Turns the held body while the use key is down, following the mouse: a sideways sweep spins it
-    /// about the world's up axis, an up-and-down one tumbles it about the view's right axis.
+    /// about the world's up axis, an up-and-down one tumbles it about the view's right axis. While the
+    /// key is down the mouse belongs to the turn rather than to the view, so the crosshair stays where
+    /// it was and the movement shows on the body alone.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// What is applied is the change of the view since the key went down, not the view itself: the
-    /// body would otherwise snap to a fixed heading the instant the key was pressed. The change is
-    /// measured frame by frame - the yaw wrapped, the pitch taken whole - and composed into
-    /// <see cref="rotationDelta"/>, so the two axes can be used together and in either order.
+    /// What is applied is what the mouse asked for in this frame - the movement the view would have
+    /// taken - never the view itself: applying the yaw would snap the body to a fixed heading the
+    /// instant the key was pressed. Each frame's movement is composed into
+    /// <see cref="rotationDelta"/>, so the two axes can be used together and in either order, and so
+    /// the body does not jump when the view's own numbers wrap from 180 to -180: it is the movement
+    /// that is wrapped, not the heading it is applied to.
     /// </para>
     /// <para>
-    /// Those two axes are enough to reach any orientation, which is what makes this a turn rather
-    /// than a spin: the right axis is horizontal and points wherever the view points, so turning the
-    /// view also turns the axis a tumble uses. Rolling the body about the line of sight needs no axis
-    /// of its own - that is a sideways sweep, seen while looking along the axis it turns about.
+    /// Those two axes are enough to reach any orientation, which is what makes this a turn rather than
+    /// a spin: the right axis is horizontal and its direction is the view's, which the turn holds still
+    /// - so it is the heading the turn began at, and the same frame a hand would have grabbed the body
+    /// in. Rolling the body about the line of sight needs no axis of its own: that is a sideways sweep,
+    /// seen while looking along the axis it turns about.
     /// </para>
     /// <para>
     /// The servo is removed - rather than merely left at its last target - when the key comes up, so
@@ -530,7 +575,7 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
     /// the target orientation, which is what makes the turn take hold instead of unwinding.
     /// </para>
     /// </remarks>
-    private void UpdateRotation(in GoldsrcVector3 angles, bool use)
+    private void UpdateRotation(in GoldsrcVector3 angles, bool use, float mousePitch, float mouseYaw)
     {
         if (!use)
         {
@@ -545,35 +590,32 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
         {
             rotationBase = body.Orientation;
             rotationDelta = Quaternion.Identity;
-            rotationYaw = angles.Y;
-            rotationPitch = angles.X;
             CreateRotationConstraint(body);
         }
 
-        var deltaYaw = WrapDegrees(angles.Y - rotationYaw);
-        var deltaPitch = angles.X - rotationPitch;
-        rotationYaw = angles.Y;
-        rotationPitch = angles.X;
+        // The mouse is the turn's for as long as the key is down: the claim is what keeps the view from
+        // turning with it, and it is restated every frame the turn is up (Update drops it first).
+        ClaimMouse(true);
 
-        if (heldRotation is not { } rotation)
+        if (heldRotation is not { } rotation || (mousePitch == 0f && mouseYaw == 0f))
             return;
 
-        if (deltaYaw != 0f || deltaPitch != 0f)
-            rotationDelta = ComposeTurn(rotationDelta, angles.Y, deltaYaw, deltaPitch);
-
+        rotationDelta = ComposeTurn(rotationDelta, angles.Y, WrapDegrees(mouseYaw), mousePitch);
         rotation.TargetOrientation = Quaternion.Normalize(rotationDelta * rotationBase);
     }
 
     /// <summary>
-    /// Folds one frame's change of the view into the turn, in the world the body sits in.
+    /// Folds one frame's mouse movement into the turn, in the world the body sits in.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// A sideways sweep is a rotation about the world's up axis, in the direction the view turned:
-    /// the body keeps the heading the player is aiming at instead of fighting it.
+    /// A sideways movement is a rotation about the world's up axis, in the direction the movement
+    /// pushes the face of the body the player is looking at: the body turns the way the crosshair
+    /// would have turned, so a hand resting on it would slide the way the mouse is going rather than
+    /// against it.
     /// </para>
     /// <para>
-    /// A vertical sweep is a rotation about the view's right axis, which stays horizontal whatever
+    /// A vertical movement is a rotation about the view's right axis, which stays horizontal whatever
     /// the pitch is: it turns with the yaw alone. Taking it from the yaw rather than from a cross
     /// product with the up axis is what keeps it defined when the view looks straight up or straight
     /// down, where that cross product collapses.
@@ -584,13 +626,20 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
     /// the top. That is the whole difference between this and a spin.
     /// </para>
     /// </remarks>
-    private static Quaternion ComposeTurn(Quaternion turn, float viewYaw, float deltaYaw, float deltaPitch)
+    /// <param name="turn">The turn accumulated so far, which this movement is folded into.</param>
+    /// <param name="viewYaw">
+    /// The view's yaw, which is the heading the right axis points from. It is held still for the
+    /// whole turn, so it is the heading the turn began at rather than a value that drifts with it.
+    /// </param>
+    /// <param name="mouseYaw">The sideways movement of this frame, in view degrees.</param>
+    /// <param name="mousePitch">The vertical movement of this frame, in view degrees.</param>
+    private static Quaternion ComposeTurn(Quaternion turn, float viewYaw, float mouseYaw, float mousePitch)
     {
-        var spin = Quaternion.RotationAxis(StrideVector3.UnitZ, MathUtil.DegreesToRadians(deltaYaw));
+        var spin = Quaternion.RotationAxis(StrideVector3.UnitZ, MathUtil.DegreesToRadians(mouseYaw));
 
         var yaw = MathUtil.DegreesToRadians(viewYaw);
         var right = new StrideVector3(MathF.Sin(yaw), -MathF.Cos(yaw), 0f);
-        var tumble = Quaternion.RotationAxis(right, MathUtil.DegreesToRadians(-deltaPitch));
+        var tumble = Quaternion.RotationAxis(right, MathUtil.DegreesToRadians(-mousePitch));
 
         return Quaternion.Normalize(tumble * spin * turn);
     }
@@ -1024,6 +1073,25 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
             + $"+use (turn) {(input.UseHeld ? "down" : "up")}";
     }
 
+    /// <summary>
+    /// Who the mouse belongs to, for the console.
+    /// </summary>
+    /// <remarks>
+    /// The one thing worth reporting about the turn that the hold line cannot: whether the view is
+    /// being held still. A turn whose mouse is still with the view does not turn the body at all - it
+    /// turns the crosshair, and the body spins with it, which is indistinguishable from nothing
+    /// happening.
+    /// </remarks>
+    private static string DescribeMouse()
+    {
+        if (clientInput is not { } input)
+            return "no command yet - the engine has not built one";
+
+        return input.MouseCaptured
+            ? "claimed by the turn - the view is held still"
+            : "with the view - the mouse looks around";
+    }
+
     // ── Console ───────────────────────────────────────────────────────────
 
     private static unsafe void RegisterConsole()
@@ -1106,6 +1174,7 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
         Print($"gsf_physgun: view model            {ViewModelName(engine)}"
             + $"{(IsCrowbarOut(engine) ? " - gate open" : " - gate closed, the gun is not armed")}\n");
         Print($"gsf_physgun: hold / freeze buttons {DescribeButtons()}\n");
+        Print($"gsf_physgun: mouse                 {DescribeMouse()}\n");
         Print($"gsf_physgun: what the crosshair sees {CrosshairSummary(instance)}\n");
         Print($"gsf_physgun: hold                  {HoldSummary(instance)}\n");
         Print($"gsf_physgun: pinned bodies         {instance.pinned.Count}\n");

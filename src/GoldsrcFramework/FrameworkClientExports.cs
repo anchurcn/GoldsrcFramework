@@ -14,6 +14,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
 {
     private const int MaxLevelNameLength = 260;
 
+    private GoldsrcClientGame ClientGame => clientGame ?? throw new NullReferenceException();
     private GoldsrcClientGame? clientGame;
 
     /// <summary>
@@ -118,10 +119,9 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         LegacyClientInterop.IN_Accumulate();
     }
 
-    public virtual void CL_CreateMove(float frametime, usercmd_t* cmd, int active)
+    public virtual unsafe void CL_CreateMove(float frametime, usercmd_t* cmd, int active)
     {
-        LegacyClientInterop.CL_CreateMove(frametime, cmd, active);
-        clientGame?.CL_CreateMove(cmd, active);
+        ClientGame.CL_CreateMove(frametime, cmd, active);
     }
 
     public virtual int CL_IsThirdPerson()
@@ -155,7 +155,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
 
         // The engine calls this for brush model entities too, so doors, platforms and func_wall come
         // through here as well; the game decides which of them it tracks.
-        clientGame?.HUD_AddEntity(type, ent);
+        ClientGame?.HUD_AddEntity(type, ent);
 
         return result;
     }
@@ -174,7 +174,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
     {
         LegacyClientInterop.HUD_DrawTransparentTriangles();
 
-        clientGame?.HUD_DrawTransparentTriangles();
+        ClientGame?.HUD_DrawTransparentTriangles();
     }
 
     public virtual void HUD_StudioEvent(mstudioevent_t* @event, cl_entity_t* entity)
@@ -191,7 +191,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
     {
         isNewMapPending = false;
         CurrentLevelName = null;
-        clientGame?.HUD_Shutdown();
+        ClientGame?.HUD_Shutdown();
         LegacyClientInterop.HUD_Shutdown();
     }
 
@@ -242,7 +242,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         // while the physics gun is holding a body, where the invnext/invprev the wheel is bound to
         // would take the crowbar away and end the hold. Answering zero is the client library's own way
         // of saying "handled": the engine skips the binding and the gun keeps its distance control.
-        if (clientGame?.HUD_Key_Event(eventcode, keynum) == true)
+        if (ClientGame?.HUD_Key_Event(eventcode, keynum) == true)
             return 0;
 
         return result;
@@ -252,7 +252,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
     {
         LegacyClientInterop.HUD_TempEntUpdate(frametime, client_time, cl_gravity, ppTempEntFree, ppTempEntActive, Callback_AddVisibleEntity, Callback_TempEntPlaySound);
 
-        if (clientGame is not { } game)
+        if (ClientGame is not { } game)
             return;
 
         game.HUD_TempEntUpdate(frametime, client_time, cl_gravity);
@@ -280,7 +280,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         // The renderer asks the runtime about the entities it draws, and the engine calls this before
         // anything else exists to resolve the game from - so it is handed over. HUD_Init has already
         // run by this point, which is what makes the game non-null here.
-        return StudioModelRenderer.GetStudioModelInterface(version, ppinterface, pstudio, clientGame!);
+        return StudioModelRenderer.GetStudioModelInterface(version, ppinterface, pstudio, ClientGame!);
     }
 
     public virtual void HUD_ChatInputPosition(int* x, int* y)
@@ -323,7 +323,7 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
         
         // Drop the previous map's physics resources and entities, then warm the new map's brush
         // prefabs so the first visible brush entity does not pay for triangulation.
-        clientGame?.HUD_NewMap();
+        ClientGame?.HUD_NewMap();
 
         if (NewMapLoaded is null)
             return;

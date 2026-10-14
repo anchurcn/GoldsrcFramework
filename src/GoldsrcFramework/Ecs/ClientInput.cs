@@ -23,6 +23,13 @@ namespace GoldsrcFramework.Ecs;
 /// One frame produces several commands and the library consumes its own edge bits on each of them, so
 /// what is kept here is a level. Hold it against the previous frame to get a press or a release.
 /// </para>
+/// <para>
+/// The mouse is kept here too, in the two forms the buttons cannot express: the movement it asked for
+/// (<see cref="ConsumeMouseMove"/>), which the library has already turned into a view change, and the
+/// claim that the movement belongs to the runtime rather than to the view
+/// (<see cref="MouseCaptured"/>) - which is what lets a control aim something other than the
+/// crosshair.
+/// </para>
 /// </remarks>
 public sealed class ClientInput
 {
@@ -34,6 +41,8 @@ public sealed class ClientInput
 
     private ushort buttons;
     private int wheelSteps;
+    private float mousePitch;
+    private float mouseYaw;
 
     /// <summary>
     /// The buttons of the most recent command, as <see cref="InputButtons"/> flags. Zero until the
@@ -53,6 +62,74 @@ public sealed class ClientInput
 
     /// <summary>The use button, <c>+use</c> - the E key on a stock config.</summary>
     public bool UseHeld => IsHeld(InputButtons.USE);
+
+    /// <summary>
+    /// Whether the mouse belongs to the runtime rather than to the view.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// While this is set, the turn the client library makes to the view inside <c>CL_CreateMove</c> is
+    /// undone before the frame is drawn: the view - and the angles the server is told about - stay
+    /// where they were, and the movement is left for the runtime to spend
+    /// (<see cref="ConsumeMouseMove"/>). Nothing is switched off at the source, so the mouse never
+    /// stops being read, and no sensitivity, filtering or pitch clamp has to be reproduced to get the
+    /// movement back.
+    /// </para>
+    /// <para>
+    /// It describes a hold rather than a tap, so it stays set for as long as the hold lasts: the owner
+    /// states it every frame it wants it and drops it in the frame it does not, rather than setting it
+    /// once. Nothing else may leave it set - a claim left standing is a player who cannot look around.
+    /// </para>
+    /// <para>
+    /// What is read when the next command is built is the previous tick's word, because the command is
+    /// built ahead of the frame it belongs to: the mouse is taken one frame after the hold starts, and
+    /// given back one frame after it ends.
+    /// </para>
+    /// </remarks>
+    public bool MouseCaptured { get; set; }
+
+    /// <summary>
+    /// Records what the client library did to the view from the mouse when it built a command.
+    /// </summary>
+    /// <remarks>
+    /// See <see cref="ConsumeMouseMove"/> for what the numbers are. Summed rather than replaced: a
+    /// frame builds several commands and the movement is shared across them.
+    /// </remarks>
+    internal void ObserveMouseMove(float pitch, float yaw)
+    {
+        mousePitch += pitch;
+        mouseYaw += yaw;
+    }
+
+    /// <summary>
+    /// Reads the mouse movement seen since the last call, in view degrees, and clears it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is the movement the engine's own look was about to apply, measured where it happens: the
+    /// runtime reads the view angles on both sides of the library's <c>CL_CreateMove</c> and hands the
+    /// difference here. Sensitivity, mouse filtering and the pitch clamp have already been applied,
+    /// so a control that spends it on something else turns at the speed the player's own settings say.
+    /// </para>
+    /// <para>
+    /// In the engine's own axes: an increase in pitch means the view went down, one in yaw means it
+    /// turned anticlockwise seen from above.
+    /// </para>
+    /// <para>
+    /// A frame builds several commands, and only the first of them finds a mouse displacement - the
+    /// library recentres the pointer - so what is summed over a frame is that frame's movement rather
+    /// than a multiple of it. Callers drain it every frame whether or not they have a use for it, so
+    /// that a sweep made between two uses is forgotten instead of banked up.
+    /// </para>
+    /// </remarks>
+    internal void ConsumeMouseMove(out float pitch, out float yaw)
+    {
+        pitch = mousePitch;
+        yaw = mouseYaw;
+
+        mousePitch = 0f;
+        mouseYaw = 0f;
+    }
 
     /// <summary>Records the buttons of a command the library has just built.</summary>
     internal void Observe(ushort commandButtons) => buttons = commandButtons;
