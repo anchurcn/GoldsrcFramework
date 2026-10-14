@@ -109,13 +109,12 @@ internal static class StudioPhysicsPrefabFactory
                 // Kinematic while the entity is alive; PhysicsController switches the addon bodies and
                 // the whole skeleton for a ragdoll.
                 Kinematic = true,
-                // Every bone of a skeleton shares one collision group, which makes Bepu skip contact
-                // generation between bones of the same skeleton. The capsule of one limb overlaps the
-                // capsule of the next by several units at each joint (the limb capsules model the same
-                // continuous flesh the joints sit inside), so without this the solver would read those
-                // overlaps as deep penetrations and blast the ragdoll apart. Bones still collide with
-                // the world: brush geometry keeps the default id of zero, a different group.
-                CollisionGroup = new CollisionGroup { Id = 1 },
+                // Only a placeholder, so that a bare prefab - one put into a simulation without a
+                // PhysicsController - still does not let a skeleton collide with itself. Which bones
+                // of a skeleton may touch which, and which skeletons may touch each other, is worked
+                // out and written when a skeleton is loaded, from the joint graph of the skeleton as
+                // it stands then - see SkeletonCollisionGroups and PhysicsController.LoadSkeleton.
+                CollisionGroup = new CollisionGroup { Id = SkeletonCollisionGroups.PrefabGroupId },
             };
 
             var entity = new Entity($"PhysicsBone_{rigidBody.BoneIndex}");

@@ -161,6 +161,7 @@ public sealed class PhysicsController : EntityComponent
             return; // NullPhysicsSkeleton
 
         CollectConstraints();
+        ApplyCollisionGroups();
 
         // Pivot: the simulated bone with the smallest studio bone index (index 0 preferred).
         // Studio bone 0 is not necessarily simulated and is not the model origin either, so the pivot
@@ -457,6 +458,68 @@ public sealed class PhysicsController : EntityComponent
                     regularConstraints.Add(constraint);
             }
         }
+    }
+
+    /// <summary>
+    /// Writes the collision group of every collidable of this skeleton: the subgroup indices that
+    /// stop only the pairs a joint links, and an id of its own.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Stride's narrow phase drops a contact between two collidables that share a non-zero
+    /// <c>CollisionGroup.Id</c> and sit within one subgroup index of each other on every axis, which
+    /// makes the three indices a cell of a grid and that test a Chebyshev distance - see
+    /// <see cref="SkeletonCollisionGroups"/> for what a skeleton needs and why the id is per
+    /// instance. Both halves are worked out here, from the joints the skeleton actually carries,
+    /// because that graph is what the filter has to reproduce: a ragdoll's clones have their joints
+    /// re-pointed at the clones, so the joints a prefab was built with are only the same list by
+    /// construction.
+    /// </para>
+    /// <para>
+    /// A skeleton of a single collidable keeps the id that filters nothing: it holds no pair to stop,
+    /// and two of them - two doors, two props - have to go on colliding with each other.
+    /// </para>
+    /// </remarks>
+    private void ApplyCollisionGroups()
+    {
+        var slots = new Dictionary<BodyComponent, int>();
+        for (var bone = 0; bone < physicsBonesInternal.Count; bone++)
+        {
+            if (physicsBonesInternal[bone].Body is { } body)
+                slots[body] = bone;
+        }
+
+        var joints = new (int BodyA, int BodyB)[regularConstraints.Count + addonConstraints.Count];
+        var jointCount = 0;
+
+        foreach (var constraint in AllConstraints())
+        {
+            if (constraint is ITwoBody { A: { } bodyA, B: { } bodyB }
+                && slots.TryGetValue(bodyA, out var slotA)
+                && slots.TryGetValue(bodyB, out var slotB))
+            {
+                joints[jointCount++] = (slotA, slotB);
+            }
+        }
+
+        var groups = SkeletonCollisionGroups.Layout(physicsBonesInternal.Count, joints.AsSpan(0, jointCount));
+        var id = physicsBonesInternal.Count > 1 ? SkeletonCollisionGroups.NextId() : (ushort)0;
+
+        for (var bone = 0; bone < physicsBonesInternal.Count; bone++)
+        {
+            groups[bone].Id = id;
+            physicsBonesInternal[bone].Collidable.CollisionGroup = groups[bone];
+        }
+    }
+
+    /// <summary>Every joint of the skeleton, whether or not it touches an addon (jiggle) bone.</summary>
+    private IEnumerable<ConstraintComponentBase> AllConstraints()
+    {
+        foreach (var constraint in regularConstraints)
+            yield return constraint;
+
+        foreach (var constraint in addonConstraints)
+            yield return constraint;
     }
 
     /// <summary>
