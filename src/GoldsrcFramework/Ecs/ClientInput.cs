@@ -26,7 +26,14 @@ namespace GoldsrcFramework.Ecs;
 /// </remarks>
 public sealed class ClientInput
 {
+    /// <summary>The engine's key number for the wheel scrolled up, from <c>keydefs.h</c> (<c>K_MWHEELUP</c>).</summary>
+    private const int WheelUp = 240;
+
+    /// <summary>The engine's key number for the wheel scrolled down, from <c>keydefs.h</c> (<c>K_MWHEELDOWN</c>).</summary>
+    private const int WheelDown = 239;
+
     private ushort buttons;
+    private int wheelSteps;
 
     /// <summary>
     /// The buttons of the most recent command, as <see cref="InputButtons"/> flags. Zero until the
@@ -44,6 +51,62 @@ public sealed class ClientInput
     /// <summary>The secondary attack button, <c>+attack2</c>.</summary>
     public bool Attack2Held => IsHeld(InputButtons.ATTACK2);
 
+    /// <summary>The use button, <c>+use</c> - the E key on a stock config.</summary>
+    public bool UseHeld => IsHeld(InputButtons.USE);
+
     /// <summary>Records the buttons of a command the library has just built.</summary>
     internal void Observe(ushort commandButtons) => buttons = commandButtons;
+
+    /// <summary>
+    /// Records a key the engine reported to <c>HUD_Key_Event</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The wheel is the one control no command can carry: <c>usercmd_t</c> has no field for it, and
+    /// the library turns it into the <c>invnext</c>/<c>invprev</c> commands before any command
+    /// exists. <c>HUD_Key_Event</c> is the only place the engine names it, and it names it by key
+    /// number.
+    /// </para>
+    /// <para>
+    /// A notch is counted rather than held, because a wheel is an edge by nature: what the caller
+    /// wants to know is how far it was turned, not whether it is still down. Read the count with
+    /// <see cref="ConsumeWheel"/>, which clears it.
+    /// </para>
+    /// <para>
+    /// The answer says whether the key was a wheel notch, which is the caller's cue to keep it away
+    /// from the engine: <c>HUD_Key_Event</c> answering "handled" is what stops the engine from running
+    /// the binding the notch would otherwise fire. Nothing here decides that - the caller does, since
+    /// only the caller knows whether it has a use for the wheel at that moment.
+    /// </para>
+    /// </remarks>
+    /// <param name="down">Non-zero for a press, zero for a release.</param>
+    /// <param name="keynum">The engine's key number.</param>
+    /// <returns>True when the key was a wheel notch, so the caller may want to keep it.</returns>
+    internal bool ObserveKeyEvent(int down, int keynum)
+    {
+        if (down == 0)
+            return false;
+
+        switch (keynum)
+        {
+            case WheelUp:
+                wheelSteps++;
+                return true;
+
+            case WheelDown:
+                wheelSteps--;
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>Reads the wheel notches seen since the last call and clears the count.</summary>
+    internal int ConsumeWheel()
+    {
+        var steps = wheelSteps;
+        wheelSteps = 0;
+        return steps;
+    }
 }

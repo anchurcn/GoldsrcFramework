@@ -19,8 +19,9 @@ namespace GoldsrcFramework.Ecs.Diagnostics;
 
 /// <summary>
 /// A client-side-only physics gun for poking at the framework's physics: aim at a dynamic body,
-/// hold it with the left mouse button, freeze it with the right one. It is active only while the
-/// crowbar is out and only when <c>gsf_physgun</c> is non-zero.
+/// hold it with the right mouse button, freeze it with the left one, scroll the wheel to push it
+/// away or pull it back in, and hold the use key (E) to turn it with the mouse. It is active only
+/// while the crowbar is out and only when <c>gsf_physgun</c> is non-zero.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -51,18 +52,27 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
     private const string CvarSpeed = "gsf_physgun_speed";
     private const string CvarForce = "gsf_physgun_force";
     private const string CvarEyeHeight = "gsf_physgun_eye";
+    private const string CvarWheelSpeed = "gsf_physgun_wheelspeed";
+    private const string CvarRotateStiffness = "gsf_physgun_rotstiffness";
+    private const string CvarRotateDamping = "gsf_physgun_rotdamping";
 
     /// <summary>Command that prints what the gun can see and why it is not working.</summary>
     private const string StatusCommand = "gsf_physgun_status";
 
     private const float DefaultEnabled = 1f;
 
-    private const float DefaultMaxRange = 128f;
+    private const float DefaultMaxRange = 512f;
     private const float DefaultStiffness = 30f;
     private const float DefaultDamping = 5f;
     private const float DefaultSpeed = 1000f;
     private const float DefaultForce = 100_000f;
     private const float DefaultEyeHeight = 28f;
+
+    /// <summary>How much one wheel notch moves the held body, in units.</summary>
+    private const float DefaultWheelSpeed = 16f;
+
+    private const float DefaultRotateStiffness = 30f;
+    private const float DefaultRotateDamping = 5f;
 
     /// <summary>Closest a held body is ever kept to the eye, in units.</summary>
     private const float MinHoldDistance = 16f;
@@ -123,9 +133,36 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
     private BodyComponent? heldBody;
     private Entity? heldBone;
     private OneBodyLinearServoConstraintComponent? heldConstraint;
+
+    /// <summary>
+    /// The rotation servo, present only while the use key is down. Null is what "not rotating"
+    /// means - there is no second flag to keep in step with it.
+    /// </summary>
+    private OneBodyAngularServoConstraintComponent? heldRotation;
+
+    /// <summary>The held body's orientation when the turn started, before any of it was applied.</summary>
+    private Quaternion rotationBase = Quaternion.Identity;
+
+    /// <summary>
+    /// The turn taken since the key went down, accumulated in the world.
+    /// </summary>
+    /// <remarks>
+    /// A quaternion rather than an angle: the turn has two axes - the world's up for a sideways sweep
+    /// and the view's right for an up-and-down one - so no single number describes it. Composing the
+    /// per-frame differences is also what keeps the body from jumping when the view crosses 180
+    /// degrees, because it is the difference that is wrapped, not the heading it is applied to.
+    /// </remarks>
+    private Quaternion rotationDelta = Quaternion.Identity;
+
+    /// <summary>The view's yaw on the previous frame, so a turn can be measured as a difference.</summary>
+    private float rotationYaw;
+
+    /// <summary>The view's pitch on the previous frame, for the same reason.</summary>
+    private float rotationPitch;
+
     private float holdDistance = 80f;
-    private bool leftDown;
-    private bool rightDown;
+    private bool holdDown;
+    private bool pinDown;
     private bool failed;
     private bool announced;
     private bool reportedNoPhysics;
@@ -237,6 +274,21 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
         entity.Components.Add(new PhysicsGunScript());
     }
 
+    /// <summary>True while a body is in the gun's grip.</summary>
+    /// <remarks>
+    /// <para>
+    /// Asked from the key callback rather than from inside the gun, because what it answers is not a
+    /// question about the gun: it is "does the runtime have a use for the wheel right now". While a
+    /// body is held, the notch belongs to the gun - holding the grip with a push or a pull - and the
+    /// engine's own binding for the wheel would take the crowbar away and end the grip with it.
+    /// </para>
+    /// <para>
+    /// The answer is the grip of the last frame, since the key callback runs in the engine's input
+    /// pump, ahead of the tick that would update it.
+    /// </para>
+    /// </remarks>
+    public static bool IsHolding => active?.heldBody is not null;
+
     // ── Script lifecycle ──────────────────────────────────────────────────
 
     /// <summary>
@@ -252,8 +304,8 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
     {
         active = this;
         physics = null;
-        leftDown = false;
-        rightDown = false;
+        holdDown = false;
+        pinDown = false;
         failed = false;
         announced = false;
         reportedNoPhysics = false;
@@ -330,7 +382,7 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
         if (!announced)
         {
             announced = true;
-            Print("gsf_physgun: on; hold the crowbar and aim at a dynamic body, or run gsf_physgun_status\n");
+            Print("gsf_physgun: on; take the crowbar out - right button holds, left freezes, wheel pushes and pulls, E and the mouse turn\n");
         }
 
         // Resolved late: the physics configuration only exists once something collidable has been
@@ -345,7 +397,7 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
             Print("gsf_physgun: no physics configuration yet, so there is nothing to cast into\n");
         }
 
-        if (!TryGetAim(engine, out var eye, out var aim, out _))
+        if (!TryGetAim(engine, out var eye, out var aim, out var angles))
             return;
 
         var maxRange = ReadCvar(CvarMaxRange, DefaultMaxRange);
@@ -359,23 +411,31 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
         }
 
         var armed = IsCrowbarOut(engine);
-        var left = clientInput?.AttackHeld ?? false;
-        var right = clientInput?.Attack2Held ?? false;
-        var leftPressed = left && !leftDown;
-        var rightPressed = right && !rightDown;
-        leftDown = left;
-        rightDown = right;
+
+        // The buttons are crossed over on purpose: the right one holds and the left one freezes.
+        var hold = clientInput?.Attack2Held ?? false;
+        var pin = clientInput?.AttackHeld ?? false;
+        var holdPressed = hold && !holdDown;
+        var pinPressed = pin && !pinDown;
+        holdDown = hold;
+        pinDown = pin;
+
+        var use = clientInput?.UseHeld ?? false;
+
+        // Drained whether or not anything is held, so a turn made between two holds is forgotten
+        // rather than banked up and spent on the next grab.
+        var wheel = clientInput?.ConsumeWheel() ?? 0;
 
         if (heldBody is not null)
-            UpdateHold(eye, aim, armed, left, rightPressed);
+            UpdateHold(eye, aim, angles, armed, hold, pinPressed, use, wheel);
         else if (armed)
-            UpdateIdle(eye, aim, leftPressed, rightPressed);
+            UpdateIdle(eye, aim, holdPressed, pinPressed);
 
         overlayOwner = this;
         BuildOverlay(eye, aim, maxRange, true);
     }
 
-    private void UpdateHold(StrideVector3 eye, StrideVector3 aim, bool armed, bool left, bool rightPressed)
+    private void UpdateHold(StrideVector3 eye, StrideVector3 aim, in GoldsrcVector3 angles, bool armed, bool hold, bool pinPressed, bool use, int wheel)
     {
         // The body can vanish under us: a corpse is released when its owner respawns, and a map
         // change takes every entity with it.
@@ -391,25 +451,32 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
             return;
         }
 
-        if (!left)
+        if (!hold)
         {
-            ReleaseHold("left button released", notify: true);
+            ReleaseHold("right button released", notify: true);
             return;
         }
 
-        if (rightPressed)
+        if (pinPressed)
         {
             PinHeld();
             return;
         }
 
+        // The wheel moves the hold point before it is written, so a turn of the wheel and the
+        // follow-up of the body land in the same physics step rather than a frame apart.
+        if (wheel != 0)
+            AdjustHoldDistance(wheel);
+
         if (heldConstraint is not null)
             heldConstraint.Target = eye + aim * holdDistance;
+
+        UpdateRotation(angles, use);
     }
 
-    private void UpdateIdle(StrideVector3 eye, StrideVector3 aim, bool leftPressed, bool rightPressed)
+    private void UpdateIdle(StrideVector3 eye, StrideVector3 aim, bool holdPressed, bool pinPressed)
     {
-        if (leftPressed)
+        if (holdPressed)
         {
             if (target.CanHold)
                 Grab(eye, aim);
@@ -419,8 +486,153 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
             return;
         }
 
-        if (rightPressed && target.Verdict == PhysicsGunVerdict.Pinned && target.Body is { } body)
+        if (pinPressed && target.Verdict == PhysicsGunVerdict.Pinned && target.Body is { } body)
             Unpin(body);
+    }
+
+    /// <summary>
+    /// Pushes the held body out or pulls it back in, one wheel notch at a time.
+    /// </summary>
+    /// <remarks>
+    /// Only the hold point moves; the servo carries the body after it. The point is kept inside
+    /// [<see cref="MinHoldDistance"/>, <c>gsf_physgun_maxrange</c>] so that the wheel cannot put the
+    /// body where the pick ray could no longer have reached it - which would leave the gun holding
+    /// something the crosshair says is out of range.
+    /// </remarks>
+    private void AdjustHoldDistance(int steps)
+    {
+        var step = ReadCvar(CvarWheelSpeed, DefaultWheelSpeed);
+        var maxRange = ReadCvar(CvarMaxRange, DefaultMaxRange);
+
+        holdDistance = Math.Clamp(holdDistance + steps * step, MinHoldDistance, maxRange);
+    }
+
+    /// <summary>
+    /// Turns the held body while the use key is down, following the mouse: a sideways sweep spins it
+    /// about the world's up axis, an up-and-down one tumbles it about the view's right axis.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// What is applied is the change of the view since the key went down, not the view itself: the
+    /// body would otherwise snap to a fixed heading the instant the key was pressed. The change is
+    /// measured frame by frame - the yaw wrapped, the pitch taken whole - and composed into
+    /// <see cref="rotationDelta"/>, so the two axes can be used together and in either order.
+    /// </para>
+    /// <para>
+    /// Those two axes are enough to reach any orientation, which is what makes this a turn rather
+    /// than a spin: the right axis is horizontal and points wherever the view points, so turning the
+    /// view also turns the axis a tumble uses. Rolling the body about the line of sight needs no axis
+    /// of its own - that is a sideways sweep, seen while looking along the axis it turns about.
+    /// </para>
+    /// <para>
+    /// The servo is removed - rather than merely left at its last target - when the key comes up, so
+    /// the body is once again free to settle under gravity and its joints. Until then it is held at
+    /// the target orientation, which is what makes the turn take hold instead of unwinding.
+    /// </para>
+    /// </remarks>
+    private void UpdateRotation(in GoldsrcVector3 angles, bool use)
+    {
+        if (!use)
+        {
+            RemoveRotationConstraint();
+            return;
+        }
+
+        if (heldBody is not { } body)
+            return;
+
+        if (heldRotation is null)
+        {
+            rotationBase = body.Orientation;
+            rotationDelta = Quaternion.Identity;
+            rotationYaw = angles.Y;
+            rotationPitch = angles.X;
+            CreateRotationConstraint(body);
+        }
+
+        var deltaYaw = WrapDegrees(angles.Y - rotationYaw);
+        var deltaPitch = angles.X - rotationPitch;
+        rotationYaw = angles.Y;
+        rotationPitch = angles.X;
+
+        if (heldRotation is not { } rotation)
+            return;
+
+        if (deltaYaw != 0f || deltaPitch != 0f)
+            rotationDelta = ComposeTurn(rotationDelta, angles.Y, deltaYaw, deltaPitch);
+
+        rotation.TargetOrientation = Quaternion.Normalize(rotationDelta * rotationBase);
+    }
+
+    /// <summary>
+    /// Folds one frame's change of the view into the turn, in the world the body sits in.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A sideways sweep is a rotation about the world's up axis, in the direction the view turned:
+    /// the body keeps the heading the player is aiming at instead of fighting it.
+    /// </para>
+    /// <para>
+    /// A vertical sweep is a rotation about the view's right axis, which stays horizontal whatever
+    /// the pitch is: it turns with the yaw alone. Taking it from the yaw rather than from a cross
+    /// product with the up axis is what keeps it defined when the view looks straight up or straight
+    /// down, where that cross product collapses.
+    /// </para>
+    /// <para>
+    /// The sign is negative because a view pitch counts downwards: pushing the mouse down drags the
+    /// near face of the body down with it, the way a hand on it would, and the far face comes over
+    /// the top. That is the whole difference between this and a spin.
+    /// </para>
+    /// </remarks>
+    private static Quaternion ComposeTurn(Quaternion turn, float viewYaw, float deltaYaw, float deltaPitch)
+    {
+        var spin = Quaternion.RotationAxis(StrideVector3.UnitZ, MathUtil.DegreesToRadians(deltaYaw));
+
+        var yaw = MathUtil.DegreesToRadians(viewYaw);
+        var right = new StrideVector3(MathF.Sin(yaw), -MathF.Cos(yaw), 0f);
+        var tumble = Quaternion.RotationAxis(right, MathUtil.DegreesToRadians(-deltaPitch));
+
+        return Quaternion.Normalize(tumble * spin * turn);
+    }
+
+    /// <summary>Adds the rotation servo, starting from the orientation the turn began at.</summary>
+    private void CreateRotationConstraint(BodyComponent body)
+    {
+        if (heldBone is not { } bone)
+            return;
+
+        var rotation = new OneBodyAngularServoConstraintComponent
+        {
+            A = body,
+            TargetOrientation = rotationBase,
+            SpringFrequency = ReadCvar(CvarRotateStiffness, DefaultRotateStiffness),
+            SpringDampingRatio = ReadCvar(CvarRotateDamping, DefaultRotateDamping),
+            ServoMaximumSpeed = ReadCvar(CvarSpeed, DefaultSpeed),
+            ServoMaximumForce = ReadCvar(CvarForce, DefaultForce),
+        };
+
+        bone.Components.Add(rotation);
+        heldRotation = rotation;
+    }
+
+    /// <summary>Drops the rotation servo, if one is up.</summary>
+    private void RemoveRotationConstraint()
+    {
+        if (heldRotation is { } rotation && heldBone is { } bone && bone.Components.Contains(rotation))
+            bone.Components.Remove(rotation);
+
+        heldRotation = null;
+    }
+
+    /// <summary>Brings an angle into (-180, 180], so a turn can be measured as a difference.</summary>
+    private static float WrapDegrees(float value)
+    {
+        value = (value + 180f) % 360f;
+
+        if (value < 0f)
+            value += 360f;
+
+        return value - 180f;
     }
 
     // ── Picking ───────────────────────────────────────────────────────────
@@ -564,6 +776,7 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
     private void ForgetHold()
     {
         heldConstraint = null;
+        heldRotation = null;
         heldBone = null;
         heldBody = null;
 
@@ -571,19 +784,27 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
     }
 
     /// <summary>
-    /// Detaches the servo from the bone entity.
+    /// Detaches both servos from the bone entity.
     /// </summary>
     /// <remarks>
     /// Removal goes through the entity's component collection, which is what the
     /// <c>ConstraintProcessor</c> watches: it drops the constraint from the solver on its next pass
-    /// (-900). Until then the body is still being pulled, so a release lags one frame.
+    /// (-900). Until then the body is still being pulled, so a release lags one frame. The rotation
+    /// servo goes with the hold it belongs to; a turn never outlives the grip that started it.
     /// </remarks>
     private void RemoveConstraint()
     {
-        if (heldConstraint is { } constraint && heldBone is { } bone && bone.Components.Contains(constraint))
-            bone.Components.Remove(constraint);
+        if (heldBone is { } bone)
+        {
+            if (heldConstraint is { } constraint && bone.Components.Contains(constraint))
+                bone.Components.Remove(constraint);
+
+            if (heldRotation is { } rotation && bone.Components.Contains(rotation))
+                bone.Components.Remove(rotation);
+        }
 
         heldConstraint = null;
+        heldRotation = null;
         heldBone = null;
     }
 
@@ -798,7 +1019,9 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
         if (clientInput is not { } input)
             return "no command yet - the engine has not built one";
 
-        return $"+attack {(input.AttackHeld ? "down" : "up")}, +attack2 {(input.Attack2Held ? "down" : "up")}";
+        return $"+attack2 (hold) {(input.Attack2Held ? "down" : "up")}, "
+            + $"+attack (freeze) {(input.AttackHeld ? "down" : "up")}, "
+            + $"+use (turn) {(input.UseHeld ? "down" : "up")}";
     }
 
     // ── Console ───────────────────────────────────────────────────────────
@@ -817,6 +1040,9 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
         RegisterCvar(engine, CvarSpeed, DefaultSpeed.ToString("0"));
         RegisterCvar(engine, CvarForce, DefaultForce.ToString("0"));
         RegisterCvar(engine, CvarEyeHeight, DefaultEyeHeight.ToString("0"));
+        RegisterCvar(engine, CvarWheelSpeed, DefaultWheelSpeed.ToString("0"));
+        RegisterCvar(engine, CvarRotateStiffness, DefaultRotateStiffness.ToString("0"));
+        RegisterCvar(engine, CvarRotateDamping, DefaultRotateDamping.ToString("0"));
 
         RegisterCommand(engine, StatusCommand, &PrintStatusCommand);
 
@@ -879,9 +1105,9 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
         Print($"gsf_physgun: physics configuration {(instance.physics is null ? "not resolved yet" : "ready")}\n");
         Print($"gsf_physgun: view model            {ViewModelName(engine)}"
             + $"{(IsCrowbarOut(engine) ? " - gate open" : " - gate closed, the gun is not armed")}\n");
-        Print($"gsf_physgun: attack buttons        {DescribeButtons()}\n");
+        Print($"gsf_physgun: hold / freeze buttons {DescribeButtons()}\n");
         Print($"gsf_physgun: what the crosshair sees {CrosshairSummary(instance)}\n");
-        Print($"gsf_physgun: hold                  {(instance.heldBody is null ? "nothing" : Describe(instance.target))}\n");
+        Print($"gsf_physgun: hold                  {HoldSummary(instance)}\n");
         Print($"gsf_physgun: pinned bodies         {instance.pinned.Count}\n");
 
         // The numbers behind the ray, for when the picture and the expectation disagree.
@@ -914,6 +1140,16 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
         return pick.CanHold
             ? $"{Describe(pick)} - holdable"
             : $"{Describe(pick)} - {Refusal(pick.Verdict)}";
+    }
+
+    /// <summary>What is held, how far out it sits and whether the turn is up, for the console.</summary>
+    private static string HoldSummary(PhysicsGunScript instance)
+    {
+        if (instance.heldBody is null)
+            return "nothing";
+
+        var turning = instance.heldRotation is null ? "" : ", turning";
+        return $"{Describe(instance.target)}, {instance.holdDistance:0} units out{turning}";
     }
 
     private static unsafe string ViewModelName(ClientEngineFuncs* engine)

@@ -233,7 +233,19 @@ public unsafe class FrameworkClientExports : IClientExportFuncs
 
     public virtual int HUD_Key_Event(int eventcode, int keynum, NCharPtr pszCurrentBinding)
     {
-        return LegacyClientInterop.HUD_Key_Event(eventcode, keynum, pszCurrentBinding);
+        // The library answers first, and its answer is normally what goes back: it is the library that
+        // decides whether the engine goes on to run the key's binding.
+        var result = LegacyClientInterop.HUD_Key_Event(eventcode, keynum, pszCurrentBinding);
+
+        // The runtime may then take a key back, which is the one thing it is allowed to change here.
+        // It asks only for keys it has a use for beyond the binding - today that is the mouse wheel
+        // while the physics gun is holding a body, where the invnext/invprev the wheel is bound to
+        // would take the crowbar away and end the hold. Answering zero is the client library's own way
+        // of saying "handled": the engine skips the binding and the gun keeps its distance control.
+        if (clientGame?.HUD_Key_Event(eventcode, keynum) == true)
+            return 0;
+
+        return result;
     }
 
     public virtual void HUD_TempEntUpdate(double frametime, double client_time, double cl_gravity, TEMPENTITY** ppTempEntFree, TEMPENTITY** ppTempEntActive, delegate* unmanaged[Cdecl]<cl_entity_t*, int> Callback_AddVisibleEntity, delegate* unmanaged[Cdecl]<TEMPENTITY*, float, void> Callback_TempEntPlaySound)

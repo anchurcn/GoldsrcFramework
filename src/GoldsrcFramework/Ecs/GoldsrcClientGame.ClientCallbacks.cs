@@ -102,6 +102,36 @@ public sealed partial class GoldsrcClientGame
     }
 
     /// <summary>
+    /// The Stride side of <c>HUD_Key_Event</c>: latches the keys a command cannot carry, which today
+    /// is only the mouse wheel (see <see cref="ClientInput"/>), and answers whether the runtime wants
+    /// the key for itself.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The wheel is latched either way - the answer is about the engine's binding, not about the
+    /// reading. Answering true is what keeps <c>invnext</c>/<c>invprev</c> from being run, and the one
+    /// thing the runtime asks for is a wheel that the physics gun has a use for: while it holds a body
+    /// the notch is its distance control, and the weapon switch would take the crowbar away and end
+    /// the hold with it. Everything else, and the wheel at every other moment, goes back untouched.
+    /// </para>
+    /// <para>
+    /// The answer is based on the last frame's grip, which is what the engine's input pump can see -
+    /// there is no reading of the buttons that is more recent. A notch scrolled in the same frame the
+    /// grip starts is the one case where the two disagree, and it is not worth a second source of
+    /// truth to close.
+    /// </para>
+    /// </remarks>
+    /// <param name="eventcode">Non-zero for a press, zero for a release.</param>
+    /// <param name="keynum">The engine's key number.</param>
+    /// <returns>True when the engine must not run the key's binding.</returns>
+    public bool HUD_Key_Event(int eventcode, int keynum)
+    {
+        var wheel = Input.ObserveKeyEvent(eventcode, keynum);
+
+        return wheel && PhysicsGunScript.IsHolding;
+    }
+
+    /// <summary>
     /// The Stride side of <c>HUD_NewMap</c>: drops everything scoped to the map that just ended - its
     /// content resources, the scene bookkeeping and every entity - then warms the new map's brush
     /// prefabs so the first visible brush entity does not pay for triangulation.

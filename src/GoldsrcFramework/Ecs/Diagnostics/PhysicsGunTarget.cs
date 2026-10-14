@@ -15,7 +15,7 @@ public enum PhysicsGunVerdict
     /// <summary>A dynamic body, which the gun may hold and freeze.</summary>
     Grabbable = 1,
 
-    /// <summary>A body this gun froze earlier. The right button releases it again.</summary>
+    /// <summary>A body this gun froze earlier. The left button releases it again.</summary>
     Pinned = 2,
 
     /// <summary>World geometry - worldspawn's brush mesh. There is no body to drive.</summary>
