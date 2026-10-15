@@ -370,6 +370,21 @@ public sealed class PhysicsController : EntityComponent
 
     private void DetachBones()
     {
+        // Constraints first, and while the bones are still in the scene. Leaving the scene takes the
+        // bodies with it, and a body that leaves the simulation takes the solver's copy of every
+        // constraint that touches it - silently, because the solver has no way to tell a component
+        // that its handle is now a name for nothing. The components would keep those handles and hand
+        // them back when they are torn down, which is a read through a freed handle. Disabling detaches
+        // now, while the handle is still the solver's to remove.
+        foreach (var bone in boneEntities)
+        {
+            foreach (var component in bone.Components)
+            {
+                if (component is ConstraintComponentBase constraint)
+                    constraint.Enabled = false;
+            }
+        }
+
         foreach (var bone in boneEntities)
             bone.Transform.Parent = null;
     }
@@ -537,14 +552,29 @@ public sealed class PhysicsController : EntityComponent
 
         var kinematic = motionType == PhysicsMotionType.Kinematic;
 
+        // Detached before the bodies change and re-attached after, in that order and not the other way
+        // round. The solver removes any constraint whose bodies all stop being dynamic, and it does
+        // that as the body turns kinematic - silently, leaving the component that owns the constraint
+        // naming a handle that is no longer there. Disabling first detaches while the handle is still
+        // the solver's; re-enabling has to wait for the bodies to be dynamic again, because a
+        // constraint cannot be added to kinematic bodies at all.
+        if (kinematic)
+        {
+            foreach (var constraint in regularConstraints)
+                constraint.Enabled = false;
+        }
+
         foreach (var bone in physicsBonesInternal)
         {
             if (bone.Body is { } body)
                 body.Kinematic = !bone.IsAddon && kinematic;
         }
 
-        foreach (var constraint in regularConstraints)
-            constraint.Enabled = !kinematic;
+        if (!kinematic)
+        {
+            foreach (var constraint in regularConstraints)
+                constraint.Enabled = true;
+        }
     }
 
     /// <summary>

@@ -485,6 +485,18 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
             return;
         }
 
+        // The entity can still be here while the constraint is already gone. A body that stops being
+        // simulated takes the solver's copy of every constraint on it away with it, and a body that
+        // stops being dynamic has its one-body constraint dropped as a singularity; the solver does
+        // both without telling the component, which goes on naming a handle that is no longer there.
+        // Nothing can be done with a constraint in that state - reading it or handing it back are both
+        // reads through a freed handle - so the hold is dropped without touching it.
+        if (heldBody is { } alive && (alive.Simulation is null || alive.Kinematic))
+        {
+            ForgetHold("the body stopped being simulated");
+            return;
+        }
+
         if (!armed)
         {
             ReleaseHold("the crowbar is no longer out");
@@ -770,8 +782,30 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
         if (heldBody is not { } body)
             return;
 
-        var force = heldConstraint is null ? 0f : heldConstraint.GetAccumulatedForceMagnitude();
         var name = body.Entity?.Name ?? "body";
+
+        // A joint between two frozen bones has nothing left to solve, and the solver drops it the
+        // moment the second one is frozen - silently, leaving the component that owns it naming a
+        // handle that is no longer there. That is also one way: a joint dropped like that does not come
+        // back when one of the two is released, so the rig would come apart at that bone for good.
+        // Letting the rest of the rig hang off the one frozen bone is the whole point of a pin, so a
+        // second bone that is jointed to it is refused rather than made to work.
+        if (FrozenNeighbour(body) is { } neighbour)
+        {
+            var other = neighbour.Entity?.Name ?? "another bone";
+            Notify($"gsf_physgun: not freezing {name}: it is jointed to {other}, which is frozen already");
+            return;
+        }
+
+        var force = heldConstraint is null ? 0f : heldConstraint.GetAccumulatedForceMagnitude();
+
+        // Detached before the freeze, not after. Freezing is expressed as a change of inertia, and the
+        // solver answers it by removing every constraint whose bodies all stop being dynamic - this
+        // servo is one of them, since the body being frozen is its only body. Taking the servo off the
+        // entity's components only asks the constraint processor to drop it, a pass later, which is too
+        // late for it to survive; disabling detaches right away, while the handle is still the
+        // solver's to remove.
+        DetachServos();
 
         RemoveConstraint();
         heldBody = null;
@@ -783,6 +817,71 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
         pinned.Add(body);
 
         Notify($"gsf_physgun: pinned {name} (the servo was applying {force:0} units of force)");
+    }
+
+    /// <summary>
+    /// The bone this gun already froze that <paramref name="body"/> is jointed to, or null when there
+    /// is none.
+    /// </summary>
+    /// <remarks>
+    /// Read from the bodies' own entities rather than from a skeleton's joint list: the question is
+    /// about this one body, and whatever the joints turn out to be - a prefab's, an addon bone's, a
+    /// framework-built skeleton's - the solver treats a joint between two frozen bodies the same way.
+    /// A joint lives on body A's entity only, so it is looked for from both ends: this bone's own
+    /// components hold the joints it is the A end of, and the frozen bones' components hold the ones
+    /// it is the B end of.
+    /// </remarks>
+    private BodyComponent? FrozenNeighbour(BodyComponent body)
+    {
+        if (body.Entity is not { } bone || pinned.Count == 0)
+            return null;
+
+        foreach (var component in bone.Components)
+        {
+            if (component is not ConstraintComponentBase constraint)
+                continue;
+
+            foreach (var other in constraint.Bodies)
+            {
+                if (other is not null && !ReferenceEquals(other, body) && pinned.Contains(other))
+                    return other;
+            }
+        }
+
+        foreach (var frozen in pinned)
+        {
+            if (frozen.Entity is not { } frozenBone)
+                continue;
+
+            foreach (var component in frozenBone.Components)
+            {
+                if (component is not ConstraintComponentBase constraint)
+                    continue;
+
+                foreach (var other in constraint.Bodies)
+                {
+                    if (ReferenceEquals(other, body))
+                        return frozen;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Detaches both servos from the solver, without waiting for the constraint processor.</summary>
+    /// <remarks>
+    /// Disabling a constraint takes it out of the solver immediately; dropping it from the entity's
+    /// components only asks the constraint processor to do that on its next pass. A caller that is about
+    /// to change what the bodies are needs the first - see <see cref="PinHeld"/>.
+    /// </remarks>
+    private void DetachServos()
+    {
+        if (heldConstraint is { } constraint)
+            constraint.Enabled = false;
+
+        if (heldRotation is { } rotation)
+            rotation.Enabled = false;
     }
 
     private void Unpin(BodyComponent body)
@@ -822,14 +921,15 @@ public sealed class PhysicsGunScript : ScriptComponentBase, IEnterExitCallable
     }
 
     /// <summary>Drops the hold without touching the body, for a body that is already gone.</summary>
-    private void ForgetHold()
+    /// <param name="reason">Why the hold ended, for the console line.</param>
+    private void ForgetHold(string reason = "the body left the scene")
     {
         heldConstraint = null;
         heldRotation = null;
         heldBone = null;
         heldBody = null;
 
-        Print("gsf_physgun: let go (the body left the scene)\n");
+        Print($"gsf_physgun: let go ({reason})\n");
     }
 
     /// <summary>
