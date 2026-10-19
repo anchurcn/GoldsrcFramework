@@ -483,7 +483,7 @@ public static class RagdollHelper
             ? controller.GetModelRootTransform().TranslationVector
             : default(StrideVector3);
 
-        var links = game?.SceneInstance.GetProcessor<GoldsrcTransformSyncProcessor>()?.Links.Count;
+        var links = game?.TransformSync.Links.Count;
 
         Log("[gsf] release origin=" + Point(origin.X, origin.Y, origin.Z)
             + " curstate=" + Point(state->origin.X, state->origin.Y, state->origin.Z)

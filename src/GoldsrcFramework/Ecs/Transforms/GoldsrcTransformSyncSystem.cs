@@ -7,27 +7,37 @@ namespace GoldsrcFramework.Ecs;
 
 internal sealed class GoldsrcTransformSyncSystem : GameSystemBase
 {
-    private readonly GoldsrcSceneSystem sceneSystem;
-
     public GoldsrcTransformSyncSystem(IServiceRegistry services)
         : base(services)
     {
-        sceneSystem = services.GetService<GoldsrcSceneSystem>()
-            ?? throw new InvalidOperationException("GoldsrcSceneSystem is not registered.");
         Enabled = true;
+        Visible = true;
         UpdateOrder = -500;
         DrawOrder = 1_000;
     }
 
+    /// <summary>
+    /// The links to sync, as the processor that holds them sees them.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A view, not a copy: the processor hands its own component table over in <c>OnSystemAdd</c>, so
+    /// what is read here is exactly the set the entity manager keeps in step as links enter and leave,
+    /// and there is no second list to keep in step of its own.
+    /// </para>
+    /// <para>
+    /// The processor attaches it rather than this looking the processor up on every pass, because a
+    /// lookup that finds nothing cannot be told apart from a scene that holds no links - and those are
+    /// different problems: one is wiring, the other an empty scene. Empty until the first link has been
+    /// in the scene, which is also the first moment there is anything to sync.
+    /// </para>
+    /// </remarks>
+    public IReadOnlyCollection<GoldsrcTransformLinkComponent> Links { get; internal set; }
+        = Array.Empty<GoldsrcTransformLinkComponent>();
+
     public override void Update(GameTime gameTime)
     {
-        // The set of links belongs to the scene: the processor owns it and the entity manager keeps it in
-        // step as links are attached and detached. Until a link has been in the scene there is no
-        // processor at all - and nothing to read either.
-        if (sceneSystem.SceneInstance.GetProcessor<GoldsrcTransformSyncProcessor>() is not { } processor)
-            return;
-
-        foreach (var link in processor.Links)
+        foreach (var link in Links)
         {
             if (link.Authority != TransformAuthority.Goldsrc || !link.Binding.TryRead(out var origin, out var angles))
                 continue;
@@ -42,10 +52,7 @@ internal sealed class GoldsrcTransformSyncSystem : GameSystemBase
 
     public override void Draw(GameTime gameTime)
     {
-        if (sceneSystem.SceneInstance.GetProcessor<GoldsrcTransformSyncProcessor>() is not { } processor)
-            return;
-
-        foreach (var link in processor.Links)
+        foreach (var link in Links)
         {
             if (link.Authority != TransformAuthority.Stride)
                 continue;

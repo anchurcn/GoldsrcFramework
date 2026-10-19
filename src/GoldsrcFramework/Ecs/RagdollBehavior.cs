@@ -1,4 +1,3 @@
-using GoldsrcFramework.Engine.Native;
 using GoldsrcFramework.LinearMath;
 using Stride.Engine;
 using Stride.Games;
@@ -128,26 +127,6 @@ public sealed class RagdollBehavior : ScriptComponentBase, ILateUpdate, IPhysics
     /// Idempotent, since an entity that has already left has no scene to leave.
     /// </remarks>
     internal void CompleteRelease() => Entity.Scene?.Entities.Remove(Entity);
-
-    /// <summary>
-    /// Keeps the client entity the engine draws this corpse through where the simulation put it.
-    /// </summary>
-    /// <remarks>
-    /// <see cref="LateUpdate"/> writes the Stride transform, and that reaches the client entity
-    /// through the transform sync pass at the end of the frame - after the engine has already culled
-    /// the temp entity against the position it held then, which is a frame old. Writing the origin
-    /// here instead puts the position in place before that cull, so a corpse that is moving fast is
-    /// culled where it is rather than where it was. Angles are left alone: the corpse is drawn from
-    /// the pose the skeleton carries, not from the orientation of its client entity.
-    /// </remarks>
-    internal unsafe void DriveClientEntity(cl_entity_t* entity)
-    {
-        if (entity == null || physics is null || !physics.IsEnabled || physics.IsNullSkeleton)
-            return;
-
-        var position = physics.GetModelRootTransform().TranslationVector;
-        entity->origin = new Vector3(position.X, position.Y, position.Z);
-    }
 
     /// <summary>
     /// Whether this is a physics pose source at all: for a corpse that is the same question as whether

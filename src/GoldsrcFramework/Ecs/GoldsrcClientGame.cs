@@ -46,6 +46,7 @@ public sealed partial class GoldsrcClientGame : IDisposable
         Services.AddService(SceneManagement);
 
         transformSync = new GoldsrcTransformSyncSystem(Services);
+        Services.AddService(transformSync);
 
         Time = new GameTime();
 
@@ -77,6 +78,15 @@ public sealed partial class GoldsrcClientGame : IDisposable
     public PhysicsDebugDrawProcessor PhysicsDebug => SceneSystem.PhysicsDebug;
 
     private readonly GoldsrcTransformSyncSystem transformSync;
+
+    /// <summary>
+    /// The transform sync system - the links it works on, and the pass that writes them back.
+    /// </summary>
+    /// <remarks>
+    /// Reached through here rather than looked up as a processor: the system holds the set the processor
+    /// handed it, so it answers the same question without depending on a processor existing yet.
+    /// </remarks>
+    internal GoldsrcTransformSyncSystem TransformSync => transformSync;
 
     public GameTime Time { get; }
 
